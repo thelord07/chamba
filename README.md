@@ -82,6 +82,8 @@ To wire up an Obsidian vault, add `"env": { "CHAMBA_OBSIDIAN_VAULT_PATH": "/path
 | `chamba_remember` | `{ key, content, tags? }` | Persists a markdown memory |
 | `chamba_recall` | `{ query }` | Searches saved memories |
 | `chamba_get_agent_config` | `{ role }` | `{ model, effort, reasoning_priority, provider, hint }` for a role — no LLM |
+| `chamba_create_worktrees` | `{ ticket, repos? }` | Multi-repo worktrees for a ticket (config-driven); keeps branches |
+| `chamba_cleanup_worktrees` | `{ ticket, repos? }` | Removes a ticket's worktrees, **keeps every branch** |
 
 ## How it works
 

@@ -80,6 +80,8 @@ Para conectar un vault de Obsidian, agregá `"env": { "CHAMBA_OBSIDIAN_VAULT_PAT
 | `chamba_remember` | `{ key, content, tags? }` | Persiste una memoria en markdown |
 | `chamba_recall` | `{ query }` | Busca en las memorias guardadas |
 | `chamba_get_agent_config` | `{ role }` | `{ model, effort, reasoning_priority, provider, hint }` por rol — sin LLM |
+| `chamba_create_worktrees` | `{ ticket, repos? }` | Worktrees multi-repo para un ticket (por config); conserva ramas |
+| `chamba_cleanup_worktrees` | `{ ticket, repos? }` | Borra los worktrees del ticket, **conserva todas las ramas** |
 
 ## Cómo funciona
 

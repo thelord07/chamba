@@ -3,6 +3,11 @@ import { DEFAULT_CONFIG } from './defaults.js';
 import { AGENT_ROLES } from './roles.js';
 import { type ConfigFile, parseChambaConfig } from './schema.js';
 import type { AgentConfig, ResolvedConfig } from './types.js';
+import {
+  type PartialWorktreeConfig,
+  resolveWorktreeConfig,
+  type WorktreeConfig,
+} from './worktrees.js';
 
 /** Raised when a config is invalid and the caller asked to fail hard. */
 export class ConfigError extends Error {
@@ -24,6 +29,8 @@ export interface ConfigSource {
 
 export interface LoadConfigResult {
   config: ResolvedConfig;
+  /** Resolved multi-repo worktree policy (defaults ← global ← project). */
+  worktrees: WorktreeConfig;
   sources: ConfigSource[];
 }
 
@@ -46,6 +53,7 @@ export async function loadConfig(
 ): Promise<LoadConfigResult> {
   const sources: ConfigSource[] = [{ kind: 'default', status: 'applied' }];
   const config = cloneDefaults();
+  let worktreesPartial: PartialWorktreeConfig = {};
 
   const layers: Array<{ kind: ConfigSourceKind; path?: string }> = [
     { kind: 'global', path: opts.globalPath },
@@ -64,10 +72,13 @@ export async function loadConfig(
       continue;
     }
     applyLayer(config, loaded.file);
+    if (loaded.file.worktrees) {
+      worktreesPartial = { ...worktreesPartial, ...loaded.file.worktrees };
+    }
     sources.push({ kind: layer.kind, path: layer.path, status: 'applied' });
   }
 
-  return { config, sources };
+  return { config, worktrees: resolveWorktreeConfig(worktreesPartial), sources };
 }
 
 function cloneDefaults(): ResolvedConfig {

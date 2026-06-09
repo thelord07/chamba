@@ -2,7 +2,9 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { Logger } from 'pino';
 import { createNodeServices, type Services } from './services.js';
 import { registerCleanupWorktree } from './tools/cleanup-worktree.js';
+import { registerCleanupWorktrees } from './tools/cleanup-worktrees.js';
 import { registerCreateWorktree } from './tools/create-worktree.js';
+import { registerCreateWorktrees } from './tools/create-worktrees.js';
 import { registerGeneratePlan } from './tools/generate-plan.js';
 import { registerGetAgentConfig } from './tools/get-agent-config.js';
 import { registerListWorktrees } from './tools/list-worktrees.js';
@@ -38,6 +40,8 @@ export function createServer(logger: Logger, services: Services = createNodeServ
   registerCreateWorktree(server, logger, services);
   registerListWorktrees(server, logger, services);
   registerCleanupWorktree(server, logger, services);
+  registerCreateWorktrees(server, logger, services);
+  registerCleanupWorktrees(server, logger, services);
   registerRemember(server, logger, services);
   registerRecall(server, logger, services);
   registerGetAgentConfig(server, logger, services);

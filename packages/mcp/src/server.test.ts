@@ -39,7 +39,9 @@ describe('chamba MCP server', () => {
 
     expect(tools.map((t) => t.name).sort()).toEqual([
       'chamba_cleanup_worktree',
+      'chamba_cleanup_worktrees',
       'chamba_create_worktree',
+      'chamba_create_worktrees',
       'chamba_generate_plan',
       'chamba_get_agent_config',
       'chamba_list_worktrees',
