@@ -29,7 +29,7 @@
 | 8 | Documentación multi-editor + ejemplos | ✅ Completada | 2026-06-09 | 324eb08 |
 | 9 | Release 1.0.0 + push de tracción | ✅ Completada | 2026-06-09 | bb6db0a |
 | 10 | Configuración por-agente (modelo + esfuerzo) | ✅ Completada | 2026-06-09 | 313229c |
-| 11 | Worktrees multi-repo genéricos (workspace-aware) | ✅ Completada | 2026-06-09 | _pending_ |
+| 11 | Worktrees multi-repo genéricos (workspace-aware) | ✅ Completada | 2026-06-09 | 7e3098e |
 
 **Símbolos:** ⏳ Pendiente — 🚧 En progreso — ✅ Completada — ❌ Bloqueada
 
@@ -754,7 +754,7 @@ la tool; config corrupto degrada a defaults+warning; changeset registrado.
 
 ### Fase 11 — Worktrees multi-repo genéricos (workspace-aware)
 
-**Estado:** ✅ Completada — 2026-06-09 — _pending_ — 5 sub-fases (11.1 b123476, 11.2 51584e6, 11.3 dd713bf, 11.4 1eb8c20, 11.5 _pending_). Tools #14-15 `chamba_create_worktrees`/`chamba_cleanup_worktrees`; `/ticket` orchestrator-worker + subagent `planner`; config `worktrees` por workspace con escape hatch `command`; copia `.env` y `.code-workspace` opt-in. Changeset `multi-repo-worktrees` (minor → 0.3.0). Tests verdes, biome limpio (124 archivos).
+**Estado:** ✅ Completada — 2026-06-09 — 7e3098e — 5 sub-fases (11.1 b123476, 11.2 51584e6, 11.3 dd713bf, 11.4 1eb8c20, 11.5 7e3098e). Tools #14-15 `chamba_create_worktrees`/`chamba_cleanup_worktrees`; `/ticket` orchestrator-worker + subagent `planner`; config `worktrees` por workspace con escape hatch `command`; copia `.env` y `.code-workspace` opt-in. Changeset `multi-repo-worktrees` (minor → 0.3.0). Tests verdes, biome limpio (124 archivos).
 
 **Goal:** convertir la creación de worktrees multi-repo (hoy resuelta con scripts bespoke por
 equipo) en una capacidad genérica de chamba, manejada por el `.chamba/config.json` del
