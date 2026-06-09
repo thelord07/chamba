@@ -1,6 +1,6 @@
 {
   "name": "@chamba/claude-extras",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Optional Claude Code extras for chamba: slash commands, subagents and hooks installer",
   "license": "MIT",
   "type": "module",
@@ -11,6 +11,23 @@
     "dist",
     "bin",
     "assets"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/thelord07/chamba.git",
+    "directory": "packages/claude-extras"
+  },
+  "homepage": "https://github.com/thelord07/chamba#readme",
+  "bugs": {
+    "url": "https://github.com/thelord07/chamba/issues"
+  },
+  "keywords": [
+    "chamba",
+    "claude-code",
+    "mcp",
+    "slash-commands",
+    "subagents",
+    "hooks"
   ],
   "scripts": {
     "build": "tsup src/cli.ts --format esm --clean",

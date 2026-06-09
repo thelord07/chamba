@@ -1,7 +1,7 @@
 {
   "name": "@chamba/core",
-  "version": "0.0.0",
-  "description": "Núcleo del harness chamba: API types, providers, agent loop, tools, compaction",
+  "version": "0.1.0",
+  "description": "Core logic for chamba: workspace scanner, plan + heuristic reviewer, git worktrees, Obsidian, memory — no Node APIs, no LLM",
   "license": "MIT",
   "type": "module",
   "main": "./dist/index.js",
@@ -16,14 +16,28 @@
   "files": [
     "dist"
   ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/thelord07/chamba.git",
+    "directory": "packages/core"
+  },
+  "homepage": "https://github.com/thelord07/chamba#readme",
+  "bugs": {
+    "url": "https://github.com/thelord07/chamba/issues"
+  },
+  "keywords": [
+    "chamba",
+    "mcp",
+    "ai",
+    "agent",
+    "workspace",
+    "obsidian",
+    "git-worktree"
+  ],
   "scripts": {
     "build": "tsup src/index.ts --format esm --dts --clean",
     "test": "vitest run --passWithNoTests",
     "typecheck": "tsc --noEmit"
-  },
-  "dependencies": {
-    "neverthrow": "^8.0.0",
-    "zod": "^3.23.0"
   },
   "devDependencies": {
     "typescript": "^5.6.0",

@@ -27,7 +27,7 @@
 | 6 | Memory store + cross-session context | ✅ Completada | 2026-06-09 | d8c1cbc |
 | 7 | Claude Code extras (slash commands, subagents, hooks) | ✅ Completada | 2026-06-09 | 7ead405 |
 | 8 | Documentación multi-editor + ejemplos | ✅ Completada | 2026-06-09 | 324eb08 |
-| 9 | Release 1.0.0 + push de tracción | ⏳ Pendiente | — | — |
+| 9 | Release 1.0.0 + push de tracción | 🚧 En progreso | — | — |
 
 **Símbolos:** ⏳ Pendiente — 🚧 En progreso — ✅ Completada — ❌ Bloqueada
 
@@ -682,7 +682,7 @@ cat ~/.claude.json | grep chamba  # debe estar el server registrado
 
 ### Fase 9 — Release 1.0.0 + push de tracción 📢📢📢
 
-**Estado:** ⏳ Pendiente
+**Estado:** 🚧 En progreso — release preparado (changesets, CI, v0.1.0, metadata); falta publish a npm (requiere login + org @chamba)
 
 **Goal:** publicar en npm, lanzar campaña de visibilidad.
 

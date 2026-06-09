@@ -1,6 +1,6 @@
 {
   "name": "@chamba/mcp",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "chamba MCP server — orchestration, workspace, worktree and Obsidian tools for any MCP-capable editor",
   "license": "MIT",
   "type": "module",
@@ -11,6 +11,26 @@
   "files": [
     "dist",
     "bin"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/thelord07/chamba.git",
+    "directory": "packages/mcp"
+  },
+  "homepage": "https://github.com/thelord07/chamba#readme",
+  "bugs": {
+    "url": "https://github.com/thelord07/chamba/issues"
+  },
+  "keywords": [
+    "chamba",
+    "mcp",
+    "model-context-protocol",
+    "ai",
+    "cursor",
+    "claude-code",
+    "obsidian",
+    "git-worktree",
+    "orchestrator"
   ],
   "scripts": {
     "build": "tsup src/main.ts --format esm --clean",

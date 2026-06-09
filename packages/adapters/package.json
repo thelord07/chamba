@@ -1,6 +1,6 @@
 {
   "name": "@chamba/adapters",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Node implementations of @chamba/core ports (filesystem, process, clock)",
   "license": "MIT",
   "type": "module",
@@ -15,6 +15,21 @@
   },
   "files": [
     "dist"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/thelord07/chamba.git",
+    "directory": "packages/adapters"
+  },
+  "homepage": "https://github.com/thelord07/chamba#readme",
+  "bugs": {
+    "url": "https://github.com/thelord07/chamba/issues"
+  },
+  "keywords": [
+    "chamba",
+    "mcp",
+    "adapters",
+    "node"
   ],
   "scripts": {
     "build": "tsup src/index.ts --format esm --dts --clean",

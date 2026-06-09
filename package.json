@@ -2,10 +2,18 @@
   "name": "chamba",
   "version": "0.0.0",
   "private": true,
-  "description": "AI agent harness en TypeScript, provider-agnóstico, con MCP de primera clase y orchestrator-worker",
+  "description": "MCP server that adds orchestration, workspace context, git worktrees and Obsidian memory to any AI editor",
   "license": "MIT",
   "type": "module",
   "packageManager": "pnpm@10.33.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/thelord07/chamba.git"
+  },
+  "homepage": "https://github.com/thelord07/chamba#readme",
+  "bugs": {
+    "url": "https://github.com/thelord07/chamba/issues"
+  },
   "engines": {
     "node": ">=22"
   },
@@ -14,10 +22,14 @@
     "test": "pnpm -r test",
     "check": "biome check .",
     "check:write": "biome check --write .",
-    "typecheck": "pnpm -r exec tsc --noEmit"
+    "typecheck": "pnpm -r exec tsc --noEmit",
+    "changeset": "changeset",
+    "version": "changeset version",
+    "release": "pnpm -r build && changeset publish"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.0.0",
+    "@changesets/cli": "^2.27.0",
     "tsup": "^8.0.0",
     "tsx": "^4.19.0",
     "typescript": "^5.6.0",
