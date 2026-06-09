@@ -69,8 +69,19 @@ hand edits.
 | `chamba_summarize_to_vault` | `{ title, content, projectSlug? }` | Writes a structured note to the vault under `proyectos/<date>-<slug>.md` |
 | `chamba_generate_plan` | `{ task, context? }` | A structured plan template (goal, acceptance criteria, subtasks, risks) for the model to fill |
 | `chamba_review_plan` | `{ plan, task, context? }` | Heuristic review: `{ approved, issues, suggestions, riskFlags }` — no LLM |
+| `chamba_create_worktree` | `{ taskSlug, workerId, baseBranch? }` | Creates an isolated git worktree on `chamba/<date>-<task>/<worker>` (or a clear error if not a git repo) |
+| `chamba_list_worktrees` | `{}` | Lists the repo's worktrees (path, HEAD, branch) |
+| `chamba_cleanup_worktree` | `{ branch }` | Removes the worktree dir but **keeps the branch** (no `--force`, no merge) |
 
-The full V1 tool set (worktrees, memory) is detailed in [`PLAN.md`](./PLAN.md).
+The full V1 tool set (memory) is detailed in [`PLAN.md`](./PLAN.md).
+
+### Git worktrees for safe parallelism
+
+`chamba_create_worktree` gives each task/worker its own git worktree so parallel
+work never steps on the same files. Cleanup is deliberately conservative: it runs
+`git worktree remove` **without `--force`** (a dirty worktree fails loudly) and
+**never deletes the branch or merges** — the branch stays open for you to review and
+`git merge --no-ff` by hand. Isolation by chamba, control by you.
 
 ### Heuristic plan review (no LLM)
 
