@@ -126,6 +126,12 @@ export class WorkspaceScanner {
       return;
     }
 
+    // A linked git worktree has a `.git` *file* (a gitdir pointer), not a `.git`
+    // directory. Skip nested worktrees so their checked-out copies don't show up
+    // as separate projects. If chamba was pointed straight at a worktree
+    // (depth 0), respect that and scan it anyway.
+    if (depth > 0 && entries.some((e) => e.name === '.git' && e.isFile)) return;
+
     for (const entry of entries) {
       const childRel = rel.length > 0 ? `${rel}/${entry.name}` : entry.name;
       if (isIgnored(rules, childRel, entry.isDirectory)) continue;

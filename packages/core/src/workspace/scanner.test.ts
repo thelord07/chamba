@@ -62,6 +62,39 @@ describe('WorkspaceScanner', () => {
     expect(ws.languages).toEqual(expect.arrayContaining(['TypeScript', 'Python']));
   });
 
+  it('skips nested linked worktrees but keeps real repos', async () => {
+    const ws = await scan(
+      {
+        // real repo: `.git` is a directory (has files under it)
+        '/ws/app/package.json': JSON.stringify({ name: 'app' }),
+        '/ws/app/.git/HEAD': 'ref: refs/heads/main\n',
+        '/ws/app/src/index.ts': 'export {};\n',
+        // linked worktree: `.git` is a FILE (a gitdir pointer)
+        '/ws/WORKTREES/app-feature/.git': 'gitdir: /ws/app/.git/worktrees/app-feature\n',
+        '/ws/WORKTREES/app-feature/package.json': JSON.stringify({ name: 'app' }),
+        '/ws/WORKTREES/app-feature/src/index.ts': 'export {};\n',
+      },
+      '/ws',
+    );
+
+    const paths = ws.projects.map((p) => p.path);
+    expect(paths).toContain('app');
+    expect(paths.some((p) => p.startsWith('WORKTREES'))).toBe(false);
+  });
+
+  it('still scans a worktree when pointed straight at it (depth 0)', async () => {
+    const ws = await scan(
+      {
+        '/wt/.git': 'gitdir: /main/.git/worktrees/wt\n',
+        '/wt/package.json': JSON.stringify({ name: 'wt-app' }),
+        '/wt/src/index.ts': 'export {};\n',
+      },
+      '/wt',
+    );
+
+    expect(ws.projects.map((p) => p.name)).toContain('wt-app');
+  });
+
   it('respects .gitignore and never includes node_modules', async () => {
     const ws = await scan(
       {
