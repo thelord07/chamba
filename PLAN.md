@@ -59,6 +59,7 @@
 - **chamba entiende el contexto de un workspace** (estructura del proyecto + vault de Obsidian si existe) y lo usa para informar planes y ejecuciones.
 - **Existe un comando `/orchestrator <tarea>`** que dispara el flujo completo: cargar contexto → generar plan → auto-evaluar plan → ejecutar en paralelo → testear → resumir y documentar en el vault.
 - **chamba se puede invocar desde el chat de cualquier editor con MCP client** (Cursor, VS Code con Copilot, Windsurf, Cline, JetBrains, Trae) corriendo `chamba mcp` como server. Los comandos clave (orchestrate, workspace init, summarize) quedan disponibles como tools directamente en el chat del editor.
+- **El orchestrator aísla cada worker en su propio git worktree** cuando el proyecto es un repo git. Workers en paralelo no se pisan archivos, cada uno trabaja en su propia rama. Al terminar, las ramas quedan abiertas para que el humano las revise y mergee manualmente. Si el proyecto no es un repo git, esta capacidad se desactiva automáticamente y el orchestrator delega secuencialmente.
 - README listo para Hacker News / Reddit / LinkedIn.
 
 ---
@@ -164,6 +165,10 @@ chamba/
 │   │   │   │   ├── orchestrator.ts
 │   │   │   │   ├── reviewer.ts               # NUEVO (Fase 6)
 │   │   │   │   └── delegate-tool.ts
+│   │   │   ├── worktree/                     # NUEVO (Fase 6) — aislamiento por worker
+│   │   │   │   ├── manager.ts                # WorktreeManager: crea, limpia, lista
+│   │   │   │   ├── git-detector.ts           # Detecta si root es repo git
+│   │   │   │   └── branch-naming.ts          # Política de nombres de rama
 │   │   │   ├── mcp/
 │   │   │   │   ├── client.ts
 │   │   │   │   └── server-config.ts
@@ -205,7 +210,8 @@ chamba/
 │   │   │   │   ├── tools.ts
 │   │   │   │   ├── subagents.ts
 │   │   │   │   ├── workspace.ts              # NUEVO — /workspace init|show|reload
-│   │   │   │   └── orchestrator.ts           # NUEVO — /orq <tarea>
+│   │   │   │   ├── orchestrator.ts           # NUEVO — /orq <tarea>
+│   │   │   │   └── worktrees.ts              # NUEVO — /worktrees (lista activos)
 │   │   │   └── config.ts
 │   │   ├── bin/
 │   │   │   └── chamba
@@ -264,6 +270,10 @@ mi-proyecto/                        # Carpeta del usuario (cualquier proyecto)
     │   └── tester.md
     ├── plans/                      # Planes generados por el orchestrator
     │   └── 2026-06-09-auth-magic-links.md
+    ├── worktrees/                  # NUEVO (Fase 6) — worktrees activos del orchestrator
+    │   └── 2026-06-09-auth-magic-links/
+    │       ├── backend-worker/     # git worktree con rama chamba/2026-06-09-auth-magic-links/backend-worker
+    │       └── frontend-worker/    # git worktree con rama chamba/2026-06-09-auth-magic-links/frontend-worker
     └── memory/                     # Memoria persistente entre sesiones
         └── {sessionId}/
             └── *.md
@@ -382,6 +392,33 @@ export interface Reviewer {
   review(plan: string, context: string, task: string): Promise<PlanReview>;
 }
 
+// @chamba/core/worktree/manager.ts  (NUEVO Fase 6)
+export interface WorktreeHandle {
+  branch: string;             // e.g. "chamba/2026-06-09-add-health-check/backend-worker"
+  path: string;               // path absoluto al worktree creado
+  baseBranch: string;         // rama desde la que se ramificó
+  workerId: string;
+  taskSlug: string;
+  createdAt: string;          // ISO timestamp
+}
+
+export interface WorktreeManager {
+  isGitRepo(root: string): Promise<boolean>;
+  create(opts: {
+    root: string;
+    workerId: string;
+    taskSlug: string;
+    baseBranch?: string;      // por defecto la rama actual
+  }): Promise<WorktreeHandle>;
+  list(root: string): Promise<WorktreeHandle[]>;
+  /**
+   * Cleanup NO borra branches ni hace merge.
+   * Solo remueve el directorio de worktree, dejando la rama intacta para review humano.
+   * El humano hace merge a mano cuando esté listo.
+   */
+  cleanup(handle: WorktreeHandle): Promise<void>;
+}
+
 // @chamba/core/harness.ts
 export class Harness {
   constructor(opts: {
@@ -409,6 +446,7 @@ export interface OrchestratorResult {
   testResults: TestResult[];
   summary: string;
   vaultNotePath?: string;          // Si se escribió resumen a Obsidian
+  pendingBranches?: string[];      // Ramas creadas en worktrees que quedan abiertas para review humano
 }
 ```
 
@@ -721,52 +759,64 @@ OBSIDIAN_VAULT_PATH=~/Obsidian/MiVault npx tsx scripts/smoke-workspace-obsidian.
 
 **Entregables:**
 
-- `packages/core/src/subagent/subagent.ts` — clase `Subagent` = Harness restringido con parent reference. Hereda workspace del parent si no se especifica uno propio.
+- `packages/core/src/subagent/subagent.ts` — clase `Subagent` = Harness restringido con parent reference. Hereda workspace del parent si no se especifica uno propio. **Recibe un `cwd` específico al instanciarse — si el orchestrator le pasa un worktree, todas las tools del subagent operan ahí.**
 
 - `packages/core/src/subagent/delegate-tool.ts` — tool `delegate_to_subagent` que recibe `{ agent, task, context }`, instancia el subagent, ejecuta, devuelve resumen.
 
-- `packages/core/src/subagent/reviewer.ts` — `Reviewer` class:
-  - `review(plan, context, task) → PlanReview`.
-  - Usa un sub-agente con system prompt específico de revisión crítica.
-  - Devuelve estructurado: `{ approved, gaps[], suggestions[], riskFlags[] }`.
-  - El orchestrator usa el resultado para decidir si re-planea o avanza.
+- `packages/core/src/worktree/manager.ts` — `WorktreeManager` que gestiona git worktrees:
+  - `isGitRepo(root)` — `git rev-parse --is-inside-work-tree`.
+  - `create({ root, workerId, taskSlug, baseBranch })` — crea worktree en `.chamba/worktrees/{taskSlug}/{workerId}/` con rama nueva `chamba/{taskSlug}/{workerId}`. Usa el `ProcessPort` para invocar `git worktree add`.
+  - `list(root)` — parsea `git worktree list --porcelain`.
+  - `cleanup(handle)` — **solo** ejecuta `git worktree remove` (sin `--force` por defecto). **NUNCA borra la rama ni hace merge.** La rama queda viva para que el humano la revise.
+
+- `packages/core/src/worktree/git-detector.ts` — detecta si el `cwd` es un repo git. Resultado se cachea por sesión.
+
+- `packages/core/src/worktree/branch-naming.ts` — convención de nombres: `chamba/{YYYY-MM-DD}-{task-slug}/{worker-id}`. Sanitiza para que git no se queje (lowercase, sin espacios, sin caracteres reservados).
+
+- `packages/core/src/subagent/reviewer.ts` — `Reviewer` class (sin cambios respecto al plan anterior).
 
 - `packages/core/src/subagent/orchestrator.ts` — `createOrchestrator(opts)` que configura un Harness con:
   - System prompt que prohíbe Edit/Write/Bash directos.
   - Tools restringidas: `read_file`, `grep`, `search_notes` (si hay Obsidian), `delegate_to_subagent`, `summarize_to_vault`.
   - Workspace context inyectado automáticamente.
   - Reviewer integrado en el flow.
+  - **WorktreeManager integrado.** Antes de delegar a cada subagent, si el repo es git, el orchestrator crea un worktree y se lo pasa al subagent como su `cwd`. Si no es git, los workers comparten el `cwd` original y el orchestrator los serializa (no corre dos workers en paralelo en el mismo directorio).
   - Subagentes registrados disponibles para delegación.
 
-- **Flujo completo del orchestrator:**
+- **Flujo completo del orchestrator (versión actualizada con worktrees):**
   ```
   1. Recibir task
   2. Cargar contexto (workspace.md + búsqueda en vault si aplica)
   3. Generar plan inicial → .chamba/plans/{fecha}-{slug}.md
-  4. Llamar reviewer.review(plan) 
+  4. Llamar reviewer.review(plan)
   5. Si approved=false: re-planear con feedback, volver a paso 4 (max 3 iteraciones)
   6. Mostrar plan al humano para aprobación final (vía evento; en CLI esto pausa, en server espera POST)
-  7. Si aprobado: delegar tareas a workers en paralelo (con worktrees si aplica)
-  8. Cada worker termina → tester valida → si falla, replantea esa tarea
-  9. Al terminar todo: llamar summarize_to_vault con resumen completo
-  10. Devolver OrchestratorResult al caller
+  7. Para cada tarea del plan que va a un worker:
+     7a. Si el repo es git: WorktreeManager.create() → worktree dedicado en .chamba/worktrees/
+     7b. Si no es git: usar cwd original; encolar serialmente
+     7c. Delegar al subagent con su cwd correspondiente
+  8. Cada worker termina → tester valida → si falla, replantea esa tarea en el MISMO worktree
+  9. Al terminar TODOS los workers:
+     - WorktreeManager.cleanup() para cada handle (borra el dir, NO la rama)
+     - El orchestrator lista las ramas creadas en el summary para que el humano sepa qué mergear
+  10. Llamar summarize_to_vault con resumen completo incluyendo la lista de ramas pendientes de review
+  11. Devolver OrchestratorResult al caller
   ```
 
-- `examples/orchestrator-team/main.ts` — demo concreto: orchestrator + reviewer + implementer + tester construyendo un mini módulo en un repo de demo.
+- `examples/orchestrator-team/main.ts` — demo concreto: orchestrator + reviewer + implementer + tester construyendo un mini módulo en un repo git de demo. **Debe mostrar la creación de los worktrees, ejecución paralela, y al final el listado de ramas pendientes de merge.**
 
-- `examples/obsidian-orchestrator/` — demo end-to-end con vault Obsidian:
-  - Crea un vault de ejemplo con notas pre-existentes sobre un "proyecto" ficticio.
-  - Corre `chamba` apuntando a ese vault.
-  - Lanza una tarea que requiere consultar las notas para responder bien.
-  - Demuestra que el plan generado **cita** información del vault.
-  - Al final, el resumen aparece como nueva nota en el vault.
+- `examples/obsidian-orchestrator/` — demo end-to-end con vault Obsidian (sin cambios respecto al plan anterior).
 
 - Tests verifican:
   - Un subagent puede ejecutar tools que el orchestrator no puede.
   - El orchestrator recibe el resumen del subagent como `tool_result`.
-  - Subagents corren en paralelo cuando el orchestrator delega múltiples tareas.
+  - Subagents corren en paralelo cuando el orchestrator delega múltiples tareas **y el repo es git**.
+  - Subagents corren serialmente cuando el repo **no es git**.
+  - WorktreeManager.create crea el worktree correctamente y devuelve un handle válido.
+  - WorktreeManager.cleanup remueve el directorio pero la rama sigue existiendo (`git branch --list chamba/*` la muestra).
   - El reviewer puede rechazar un plan y forzar re-planeo.
   - El orchestrator escala correctamente cuando hay loop infinito de rechazos (corta después de 3 iteraciones).
+  - Si `git worktree add` falla (rama ya existe, conflicto, etc.), el orchestrator reporta error claro y no continúa con esa tarea.
 
 **Acceptance criteria:**
 ```bash
@@ -787,7 +837,9 @@ pnpm --filter @chamba/examples-obsidian-orchestrator start
 - Subagents corren con su propio context window (no comparten messages con parent).
 - Reviewer rechaza al menos un escenario en los tests (caso de plan obviamente incompleto).
 - El demo `obsidian-orchestrator` muestra al menos una cita a una nota del vault en el plan generado.
-- Commit: `feat(core): subagents + orchestrator-worker pattern + reviewer + obsidian flow`.
+- **WorktreeManager funcional**: si corres el demo orchestrator-team en un repo git, después de terminar debes poder hacer `git branch --list 'chamba/*'` y ver las ramas creadas por los workers, sin merged y sin borradas.
+- **Detección git robusta**: si corres el demo en un directorio que NO es git, el orchestrator delega serialmente sin intentar crear worktrees, y lo anuncia en su output ("non-git workspace, workers run sequentially").
+- Commit: `feat(core): subagents + orchestrator-worker pattern + reviewer + worktrees + obsidian flow`.
 
 **📢 Post de LinkedIn:** *"Mi agente ahora delega como un tech lead. Genera plan, lo audita, lo ejecuta en paralelo, lo prueba, y deja todo documentado en mi vault de Obsidian. ¿Por qué este patrón cambia todo?"* Tema: orchestrator-worker explicado para developers, con énfasis en el reviewer como gate crítico y en la conexión con el sistema de notas personal. Va en #MenteDeDesarrollador porque conecta directamente con la práctica de tech leadership humano.
 
@@ -815,7 +867,8 @@ pnpm --filter @chamba/examples-obsidian-orchestrator start
   - **`/workspace init`** — escanea dir actual, genera `.chamba/workspace.md`, lo abre en `$EDITOR` para aprobación.
   - **`/workspace show`** — muestra el workspace.md actual.
   - **`/workspace reload`** — re-escanea y mergea con el workspace.md existente (no sobrescribe, propone diff).
-  - **`/orq <tarea>`** o **`/orchestrator <tarea>`** — dispara el flujo completo de orchestrator. Muestra plan-review UI cuando el plan está listo, después muestra progreso en vivo de los workers en paralelo.
+  - **`/orq <tarea>`** o **`/orchestrator <tarea>`** — dispara el flujo completo de orchestrator. Muestra plan-review UI cuando el plan está listo, después muestra progreso en vivo de los workers en paralelo. **Al final, muestra una sección de "branches pendientes" listando los worktrees creados y los comandos `git merge` sugeridos** para que el humano pueda revisar y mergear con un copy-paste.
+  - **`/worktrees`** — nuevo comando que lista los worktrees activos de chamba en el repo actual (parsea `git worktree list`). Útil para limpiar manualmente si quedaron worktrees zombi por crash o Ctrl+C abrupto.
 
 - `packages/cli/src/config.ts` — carga `.chamba/config.json` del CWD + `~/.chamba/config.json` global (CWD overrides global).
 - `packages/cli/bin/chamba` — shebang script para `npx chamba` o install global.
@@ -1169,7 +1222,7 @@ El README crece fase por fase, no se escribe entero en Fase 9. Cada fase que añ
 
 ## 8. Checklist de validación final (post-V1)
 
-Los 5 ejercicios de bettatech traducidos a chamba + 2 ejercicios específicos del workspace/orchestrator. Si los 7 pasan, el harness está realmente vivo, extensible y consciente del contexto.
+Los 5 ejercicios de bettatech traducidos a chamba + 3 ejercicios específicos del workspace/orchestrator/worktrees. Si los 8 pasan, el harness está realmente vivo, extensible y consciente del contexto.
 
 - [ ] **E1.** Añadir un tool `git_diff` siguiendo el patrón de `read-file.ts`. Verificar que aparece en `/tools` y el modelo lo invoca.
 - [ ] **E2.** Añadir una `CompactionStrategy` llamada `TokenBudget` que descarta mensajes antiguos hasta estar bajo un umbral configurable.
@@ -1178,8 +1231,9 @@ Los 5 ejercicios de bettatech traducidos a chamba + 2 ejercicios específicos de
 - [ ] **E5.** Test e2e simulando conversación de 5 turnos con tool calls, con `MockProvider`, sin tocar APIs reales.
 - [ ] **E6.** Configurar un vault Obsidian de pruebas, correr `/workspace init`, después `/orq "documenta el patrón observer"`. Verificar que el plan cita notas del vault y que el resumen final aparece como nota nueva.
 - [ ] **E7.** Customizar el reviewer con un system prompt específico (ej: "eres muy estricto con seguridad") y verificar que rechaza planes que serían aprobados por el reviewer default.
+- [ ] **E8.** En un repo git limpio, correr `/orq "crea endpoints health, metrics y version en paralelo"`. Verificar: (a) se crean 3 worktrees en `.chamba/worktrees/`, (b) cada worker trabaja en su propio worktree sin pisar a los otros, (c) al terminar las 3 ramas quedan abiertas (no merged, no borradas), (d) el summary lista las ramas con los comandos `git merge` sugeridos. Después correr el mismo `/orq` en un directorio NO git y verificar que el orchestrator detecta y delega serialmente.
 
-Si los 7 pasan: hay harness real, agnóstico, extensible, testeable, workspace-aware, con orchestrator-worker funcional. Y construiste material para 7 posts adicionales en LinkedIn ("cómo añadir un X a chamba").
+Si los 8 pasan: hay harness real, agnóstico, extensible, testeable, workspace-aware, con orchestrator-worker funcional y aislamiento real por worker. Y construiste material para 8 posts adicionales en LinkedIn ("cómo añadir un X a chamba").
 
 ---
 
