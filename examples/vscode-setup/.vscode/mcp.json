@@ -1,0 +1,9 @@
+{
+  "servers": {
+    "chamba": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@chamba/mcp"]
+    }
+  }
+}
