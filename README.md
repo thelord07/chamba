@@ -35,34 +35,39 @@ chamba's tools. That means:
 
 Most of these arrive in later phases. See [`PLAN.md`](./PLAN.md) for the roadmap.
 
-## Try it (Phase 1)
+## Try it
 
 ```bash
 git clone https://github.com/<your-org>/chamba.git
 cd chamba
 pnpm install
-pnpm --filter @chamba/mcp build
+pnpm -r build
 ```
 
-Inspect the running server with the MCP Inspector — you should see one tool,
-`chamba_workspace_show`:
+Inspect the running server with the MCP Inspector — you should see the workspace
+tools:
 
 ```bash
 npx @modelcontextprotocol/inspector node packages/mcp/dist/main.js
 ```
 
-The tool reads `.chamba/workspace.md` from the directory where the editor launched
-chamba and returns its contents (or tells you none exists yet). Creating that file
-lands as a tool in Phase 2.
+Then, from any directory, `chamba_workspace_init` scans the project and writes a
+human-editable `.chamba/workspace.md` (languages, framework, conventions, active
+projects, folder map). It respects `.gitignore`/`.dockerignore` and never reads
+`node_modules` or binaries. `chamba_workspace_show` returns it, and
+`chamba_workspace_reload` re-scans and returns a **diff** — it never overwrites your
+hand edits.
 
 ## Tools (so far)
 
 | Tool | Input | Output |
 |---|---|---|
+| `chamba_workspace_init` | `{ root?: string }` | Scans and writes `.chamba/workspace.md`; if it exists, returns current contents without overwriting |
 | `chamba_workspace_show` | `{}` | Contents of `.chamba/workspace.md`, or a "not found" note |
+| `chamba_workspace_reload` | `{}` | A diff between the current `.chamba/workspace.md` and a fresh re-scan (no writes) |
 
-The full V1 tool set (workspace init/reload, load context, plan + review, worktrees,
-Obsidian summaries, memory) is detailed in [`PLAN.md`](./PLAN.md).
+The full V1 tool set (load context, plan + review, worktrees, Obsidian summaries,
+memory) is detailed in [`PLAN.md`](./PLAN.md).
 
 ## Requirements
 

@@ -20,7 +20,7 @@
 | # | Fase | Estado | Fecha | Commit |
 |---|---|---|---|---|
 | 1 | Bootstrap del monorepo + MCP server mínimo | ✅ Completada | 2026-06-09 | 40b029c |
-| 2 | Workspace context + scanner | ⏳ Pendiente | — | — |
+| 2 | Workspace context + scanner | ✅ Completada | 2026-06-09 | _pending_ |
 | 3 | Obsidian integration | ⏳ Pendiente | — | — |
 | 4 | Plan generation + reviewer (heurístico) | ⏳ Pendiente | — | — |
 | 5 | Worktree manager | ⏳ Pendiente | — | — |
@@ -353,7 +353,7 @@ node /path/to/chamba/packages/mcp/dist/main.js < /dev/null
 
 ### Fase 2 — Workspace context + scanner
 
-**Estado:** ⏳ Pendiente
+**Estado:** ✅ Completada — 2026-06-09 — _pending_
 
 **Goal:** las 3 tools de workspace funcionales: init (escanea el dir y genera `workspace.md`), show (ya existe), reload (re-escanea y devuelve diff sin sobrescribir).
 

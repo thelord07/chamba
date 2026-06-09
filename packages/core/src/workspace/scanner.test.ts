@@ -1,0 +1,82 @@
+import { describe, expect, it } from 'vitest';
+import { MemoryFilesystem } from '../testing/memory-filesystem.js';
+import { WorkspaceScanner } from './scanner.js';
+
+const scan = (files: Record<string, string>, root: string) =>
+  new WorkspaceScanner(new MemoryFilesystem(files)).scan(root);
+
+describe('WorkspaceScanner', () => {
+  it('detects a Node project: language, framework, project name, README description', async () => {
+    const ws = await scan(
+      {
+        '/proj/package.json': JSON.stringify({ name: 'myapp', dependencies: { express: '^4' } }),
+        '/proj/src/index.ts': 'export const x = 1;\n',
+        '/proj/README.md': '# myapp\n\nA tiny HTTP API.\n',
+      },
+      '/proj',
+    );
+
+    expect(ws.languages).toContain('TypeScript');
+    expect(ws.framework).toBe('Express');
+    expect(ws.projects.map((p) => p.name)).toContain('myapp');
+    expect(ws.folderMap).toContain('src');
+    expect(ws.description).toBe('A tiny HTTP API.');
+  });
+
+  it('detects a Python project from pyproject.toml', async () => {
+    const ws = await scan(
+      {
+        '/py/pyproject.toml': '[project]\nname = "pyapp"\ndependencies = ["flask>=3"]\n',
+        '/py/app/main.py': 'print(1)\n',
+      },
+      '/py',
+    );
+
+    expect(ws.languages).toContain('Python');
+    expect(ws.framework).toBe('Flask');
+    expect(ws.projects.map((p) => p.name)).toContain('pyapp');
+  });
+
+  it('detects a mixed monorepo with multiple projects', async () => {
+    const ws = await scan(
+      {
+        '/m/package.json': JSON.stringify({ name: 'root', private: true }),
+        '/m/packages/api/package.json': JSON.stringify({
+          name: 'api',
+          dependencies: { fastify: '^4' },
+        }),
+        '/m/packages/api/src/server.ts': 'export {};\n',
+        '/m/packages/web/package.json': JSON.stringify({
+          name: 'web',
+          dependencies: { react: '^18' },
+        }),
+        '/m/packages/web/src/app.tsx': 'export {};\n',
+        '/m/svc/pyproject.toml': '[project]\nname = "svc"\ndependencies = ["fastapi"]\n',
+        '/m/svc/main.py': 'print(1)\n',
+      },
+      '/m',
+    );
+
+    const names = ws.projects.map((p) => p.name);
+    expect(names).toEqual(expect.arrayContaining(['api', 'web', 'svc']));
+    expect(ws.languages).toEqual(expect.arrayContaining(['TypeScript', 'Python']));
+  });
+
+  it('respects .gitignore and never includes node_modules', async () => {
+    const ws = await scan(
+      {
+        '/r/package.json': JSON.stringify({ name: 'r' }),
+        '/r/.gitignore': 'secret.txt\nignored-dir/\n',
+        '/r/secret.txt': 'nope',
+        '/r/ignored-dir/a.ts': 'x',
+        '/r/keep/b.ts': 'y',
+        '/r/node_modules/lib/index.js': 'z',
+      },
+      '/r',
+    );
+
+    expect(ws.folderMap).toContain('keep');
+    expect(ws.folderMap).not.toContain('ignored-dir');
+    expect(ws.folderMap).not.toContain('node_modules');
+  });
+});

@@ -1,5 +1,8 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { Logger } from 'pino';
+import { createNodeServices, type Services } from './services.js';
+import { registerWorkspaceInit } from './tools/workspace-init.js';
+import { registerWorkspaceReload } from './tools/workspace-reload.js';
 import { registerWorkspaceShow } from './tools/workspace-show.js';
 
 export const SERVER_NAME = 'chamba';
@@ -8,13 +11,16 @@ export const SERVER_VERSION = '0.0.0';
 /**
  * Build the chamba MCP server with every tool registered.
  *
- * Kept transport-agnostic on purpose: `main.ts` wires it to stdio, and tests
- * wire it to an in-memory transport. The server itself never touches stdio.
+ * Transport-agnostic: `main.ts` wires it to stdio, tests wire it to an
+ * in-memory transport. `services` is injectable so tests can pass a
+ * `MemoryFilesystem` and a fixed cwd.
  */
-export function createServer(logger: Logger): McpServer {
+export function createServer(logger: Logger, services: Services = createNodeServices()): McpServer {
   const server = new McpServer({ name: SERVER_NAME, version: SERVER_VERSION });
 
-  registerWorkspaceShow(server, logger);
+  registerWorkspaceShow(server, logger, services);
+  registerWorkspaceInit(server, logger, services);
+  registerWorkspaceReload(server, logger, services);
 
   return server;
 }
