@@ -4,6 +4,7 @@ import { createNodeServices, type Services } from './services.js';
 import { registerCleanupWorktree } from './tools/cleanup-worktree.js';
 import { registerCreateWorktree } from './tools/create-worktree.js';
 import { registerGeneratePlan } from './tools/generate-plan.js';
+import { registerGetAgentConfig } from './tools/get-agent-config.js';
 import { registerListWorktrees } from './tools/list-worktrees.js';
 import { registerLoadContext } from './tools/load-context.js';
 import { registerRecall } from './tools/recall.js';
@@ -39,6 +40,7 @@ export function createServer(logger: Logger, services: Services = createNodeServ
   registerCleanupWorktree(server, logger, services);
   registerRemember(server, logger, services);
   registerRecall(server, logger, services);
+  registerGetAgentConfig(server, logger, services);
 
   return server;
 }

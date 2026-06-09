@@ -41,6 +41,7 @@ describe('chamba MCP server', () => {
       'chamba_cleanup_worktree',
       'chamba_create_worktree',
       'chamba_generate_plan',
+      'chamba_get_agent_config',
       'chamba_list_worktrees',
       'chamba_load_context',
       'chamba_recall',
