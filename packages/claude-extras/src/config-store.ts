@@ -1,4 +1,10 @@
-import type { AgentConfig, AgentRole, ConfigFile, FilesystemPort } from '@chamba/core';
+import type {
+  AgentConfig,
+  AgentRole,
+  ConfigFile,
+  FilesystemPort,
+  PartialWorktreeConfig,
+} from '@chamba/core';
 import { ConfigError, DEFAULT_CONFIG, dirname, parseChambaConfig } from '@chamba/core';
 
 /**
@@ -37,6 +43,20 @@ export class ConfigStore {
     overrides[role] = { ...(overrides[role] ?? {}), ...patch };
     const next: ConfigFile = { ...current, version: 1, overrides };
 
+    const parsed = parseChambaConfig(next);
+    if (!parsed.ok) throw new ConfigError(parsed.error);
+    await this.write(parsed.value);
+    return parsed.value;
+  }
+
+  /** Merge a patch into the `worktrees` block and persist (validated). */
+  async setWorktrees(patch: PartialWorktreeConfig): Promise<ConfigFile> {
+    const current = await this.read();
+    const next: ConfigFile = {
+      ...current,
+      version: 1,
+      worktrees: { ...(current.worktrees ?? {}), ...patch },
+    };
     const parsed = parseChambaConfig(next);
     if (!parsed.ok) throw new ConfigError(parsed.error);
     await this.write(parsed.value);

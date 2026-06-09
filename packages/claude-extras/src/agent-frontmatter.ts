@@ -1,12 +1,13 @@
 import { type AgentConfig, type AgentRole, type Effort, getModel } from '@chamba/core';
 
 /**
- * Which shipped subagent asset file maps to which config role. Only these three
- * subagents exist as files today; the other roles (orchestrator, planner,
- * summarizer, researcher) are reachable via `chamba_get_agent_config` and the
- * `chamba-config` CLI, not as `~/.claude/agents/*.md`.
+ * Which shipped subagent asset file maps to which config role. These four
+ * subagents exist as files; the remaining roles (orchestrator, summarizer,
+ * researcher) are reachable via `chamba_get_agent_config` and the `chamba-config`
+ * CLI, not as `~/.claude/agents/*.md`. The orchestrator is the main session.
  */
 export const AGENT_ROLE_BY_FILE: Record<string, AgentRole> = {
+  'planner.md': 'planner',
   'implementer.md': 'implementer',
   'reviewer.md': 'reviewer',
   'tester.md': 'tester',

@@ -1,6 +1,6 @@
-import { ConfigError, MemoryFilesystem } from '@chamba/core';
+import { ConfigError, MemoryFilesystem, resolveWorktreeConfig } from '@chamba/core';
 import { describe, expect, it } from 'vitest';
-import { cmdSet, formatModels, formatShow } from './config-cli.js';
+import { cmdSet, formatModels, formatShow, formatWorktrees } from './config-cli.js';
 import { ConfigStore } from './config-store.js';
 
 const GLOBAL = '/home/.chamba/config.json';
@@ -63,5 +63,22 @@ describe('formatShow', () => {
     const fs = new MemoryFilesystem({ [GLOBAL]: 'NOT JSON' });
     const out = await formatShow(fs, { globalPath: GLOBAL, projectPath: PROJECT });
     expect(out).toContain('IGNORED');
+  });
+});
+
+describe('formatWorktrees', () => {
+  it('renders the resolved worktree policy with defaults', () => {
+    const out = formatWorktrees(resolveWorktreeConfig());
+    expect(out).toContain('layout');
+    expect(out).toContain('WORKTREES');
+    expect(out).toContain('(autodetect)');
+  });
+
+  it('shows overridden fields', () => {
+    const out = formatWorktrees(
+      resolveWorktreeConfig({ branchPrefix: 'ticket/', copyEnvFiles: true }),
+    );
+    expect(out).toContain('ticket/');
+    expect(out).toContain('copyEnvFiles     true');
   });
 });

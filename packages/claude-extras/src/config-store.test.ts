@@ -41,4 +41,26 @@ describe('ConfigStore', () => {
     const store = new ConfigStore(new MemoryFilesystem({ [PATH]: 'NOT JSON' }), PATH);
     await expect(store.read()).rejects.toBeInstanceOf(ConfigError);
   });
+
+  it('setWorktrees merges into the worktrees block, preserving other config', async () => {
+    const fs = new MemoryFilesystem({});
+    const store = new ConfigStore(fs, PATH);
+    await store.setRole('implementer', { model: 'claude-haiku-4-5' });
+    await store.setWorktrees({ layout: 'sibling', root: 'WORKTREES' });
+    await store.setWorktrees({ copyEnvFiles: true });
+
+    const file = JSON.parse(await fs.readFile(PATH));
+    expect(file.worktrees).toMatchObject({
+      layout: 'sibling',
+      root: 'WORKTREES',
+      copyEnvFiles: true,
+    });
+    expect(file.overrides.implementer.model).toBe('claude-haiku-4-5');
+  });
+
+  it('setWorktrees rejects an invalid layout', async () => {
+    const store = new ConfigStore(new MemoryFilesystem({}), PATH);
+    // @ts-expect-error invalid layout on purpose
+    await expect(store.setWorktrees({ layout: 'flat' })).rejects.toBeInstanceOf(ConfigError);
+  });
 });

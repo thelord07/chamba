@@ -4,12 +4,14 @@ import {
   type AgentRole,
   type ConfigFile,
   DEFAULT_CONFIG,
+  DEFAULT_WORKTREE_CONFIG,
   EFFORT_LEVELS,
   type Effort,
   MODEL_CATALOG,
+  type PartialWorktreeConfig,
   ROLE_DESCRIPTIONS,
 } from '@chamba/core';
-import { confirm, select } from '@inquirer/prompts';
+import { confirm, input, select } from '@inquirer/prompts';
 
 export interface RoleAnswer {
   role: AgentRole;
@@ -53,6 +55,47 @@ function effortChoices() {
 /** Thrown by inquirer on Ctrl+C / ESC. */
 function isCancellation(e: unknown): boolean {
   return e instanceof Error && e.name === 'ExitPromptError';
+}
+
+/**
+ * Interactive prompts for the `worktrees` block. Returns a partial config to
+ * merge into `~/.chamba/config.json`. (Interactive, so not unit-tested.)
+ */
+export async function runWorktreesWizard(): Promise<PartialWorktreeConfig> {
+  const d = DEFAULT_WORKTREE_CONFIG;
+  const layout = await select({
+    message: 'Worktree layout',
+    choices: [
+      {
+        name: 'sibling — one folder per ticket (<root>/<ticket>/<repo>)',
+        value: 'sibling' as const,
+      },
+      { name: 'nested — a worktree under each repo', value: 'nested' as const },
+    ],
+    default: d.layout,
+  });
+  const root = await input({
+    message: 'Worktree root directory',
+    default: layout === 'sibling' ? 'WORKTREES' : '.chamba/worktrees',
+  });
+  const branchPrefix = await input({ message: 'Branch prefix', default: 'ticket/' });
+  const baseBranch = await input({ message: 'Base branch to fork from', default: d.baseBranch });
+  const copyEnvFiles = await confirm({
+    message: 'Copy git-ignored .env* files into worktrees?',
+    default: false,
+  });
+  const editor = await confirm({
+    message: 'Generate a .code-workspace per ticket?',
+    default: true,
+  });
+  return {
+    layout,
+    root,
+    branchPrefix,
+    baseBranch,
+    copyEnvFiles,
+    editorWorkspace: editor ? 'code-workspace' : null,
+  };
 }
 
 /**

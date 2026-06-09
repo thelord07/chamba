@@ -4,9 +4,11 @@ import { Installer } from './installer.js';
 
 const ASSETS = {
   '/assets/commands/orq.md': '# orq',
+  '/assets/commands/ticket.md': '# ticket',
   '/assets/commands/workspace.md': '# workspace',
   '/assets/commands/worktrees.md': '# worktrees',
   '/assets/commands/recall.md': '# recall',
+  '/assets/agents/planner.md': '# planner',
   '/assets/agents/implementer.md': '# implementer',
   '/assets/agents/reviewer.md': '# reviewer',
   '/assets/agents/tester.md': '# tester',
@@ -31,7 +33,7 @@ describe('Installer.install', () => {
     const { fs, installer } = build({ '/home/.claude.json': '{}' });
     const result = await installer.install();
 
-    expect(result.counts).toEqual({ commands: 4, agents: 3, hooks: 2 });
+    expect(result.counts).toEqual({ commands: 5, agents: 4, hooks: 2 });
     expect(result.mcpAdded).toBe(true);
     expect(await fs.exists('/home/.claude/commands/orq.md')).toBe(true);
     expect(await fs.exists('/home/.claude/agents/implementer.md')).toBe(true);
@@ -47,7 +49,7 @@ describe('Installer.install', () => {
     const second = await installer.install();
 
     expect(second.installed).toEqual([]);
-    expect(second.skipped).toHaveLength(9);
+    expect(second.skipped).toHaveLength(11);
     expect(second.mcpAlreadyPresent).toBe(true);
   });
 
@@ -79,6 +81,7 @@ describe('Installer.applyConfig', () => {
     const first = await installer.applyConfig();
     expect(first.regenerated.sort()).toEqual([
       'agents/implementer.md',
+      'agents/planner.md',
       'agents/reviewer.md',
       'agents/tester.md',
     ]);
@@ -87,9 +90,13 @@ describe('Installer.applyConfig', () => {
     expect(impl).toContain('model: claude-sonnet-4-6');
     expect(impl).toContain('effort: medium');
 
+    const planner = await fs.readFile('/home/.claude/agents/planner.md');
+    expect(planner).toContain('model: claude-opus-4-8');
+    expect(planner).toContain('effort: max');
+
     const second = await installer.applyConfig();
     expect(second.regenerated).toEqual([]);
-    expect(second.unchanged).toHaveLength(3);
+    expect(second.unchanged).toHaveLength(4);
   });
 
   it('reflects a config override when regenerating', async () => {
@@ -127,7 +134,7 @@ describe('Installer.uninstall', () => {
     await installer.install();
 
     const result = await installer.uninstall();
-    expect(result.removed).toHaveLength(9);
+    expect(result.removed).toHaveLength(11);
     expect(result.mcpRemoved).toBe(true);
     expect(await fs.exists('/home/.claude/commands/orq.md')).toBe(false);
 

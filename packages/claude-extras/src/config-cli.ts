@@ -11,11 +11,12 @@ import {
   joinPath,
   loadConfig,
   MODEL_CATALOG,
+  type WorktreeConfig,
 } from '@chamba/core';
 import { confirm } from '@inquirer/prompts';
 import { ConfigStore } from './config-store.js';
 import { Installer } from './installer.js';
-import { runWizard } from './wizard.js';
+import { runWizard, runWorktreesWizard } from './wizard.js';
 
 const CONFIG_RELATIVE = '.chamba/config.json';
 
@@ -73,6 +74,20 @@ export async function cmdSet(
   return `Set ${args.role} → ${args.model}${effortNote}. Run 'config apply' to regenerate subagents.`;
 }
 
+export function formatWorktrees(w: WorktreeConfig): string {
+  return [
+    'worktrees config:',
+    `  layout           ${w.layout}`,
+    `  root             ${w.root}`,
+    `  branchPrefix     ${w.branchPrefix}`,
+    `  baseBranch       ${w.baseBranch}`,
+    `  copyEnvFiles     ${w.copyEnvFiles}`,
+    `  editorWorkspace  ${w.editorWorkspace ?? '(none)'}`,
+    `  repos            ${w.repos ? w.repos.join(', ') : '(autodetect)'}`,
+    `  command          ${w.command ?? '(none)'}`,
+  ].join('\n');
+}
+
 // --- command router ----------------------------------------------------------
 
 function buildInstaller(fs: FilesystemPort): Installer {
@@ -99,6 +114,7 @@ const USAGE =
   '  set <role> <model> [--effort <level>]  change one role\n' +
   '  reset [--yes]                          restore defaults\n' +
   '  wizard [--defaults]                    (re)run the interactive wizard\n' +
+  '  worktrees <show|init>                  show or configure the multi-repo worktree policy\n' +
   '  apply                                  regenerate ~/.claude/agents from the config\n' +
   '  edit                                   open the config in $EDITOR\n';
 
@@ -154,6 +170,28 @@ export async function runConfigCommand(args: string[]): Promise<void> {
         await store.write(config);
         await buildInstaller(fs).applyConfig();
         process.stdout.write(`Wrote ${store.filePath} and regenerated subagents.\n`);
+        return;
+      }
+      case 'worktrees': {
+        const sub = rest[0];
+        if (sub === 'show') {
+          const { worktrees } = await loadConfig(fs, {
+            globalPath: globalConfigPath(),
+            projectPath: projectConfigPath(),
+          });
+          process.stdout.write(`${formatWorktrees(worktrees)}\n`);
+          return;
+        }
+        if (sub === 'init') {
+          const patch = await runWorktreesWizard();
+          await store.setWorktrees(patch);
+          process.stdout.write(
+            `Wrote worktrees config to ${store.filePath}.${patch.copyEnvFiles ? ` Tip: add '${patch.root}/' to your .gitignore.` : ''}\n`,
+          );
+          return;
+        }
+        process.stderr.write('Usage: config worktrees <show|init>\n');
+        process.exitCode = sub ? 1 : 0;
         return;
       }
       case 'apply': {
