@@ -137,6 +137,7 @@ delegar. Otros editores leen la misma config vía `chamba_get_agent_config`. Ver
 - ✅ Docs multi-editor (esto que estás leyendo)
 - ✅ **0.1.0 publicado en npm**
 - ✅ Config de modelo + esfuerzo por agente (wizard + `chamba_get_agent_config`)
+- ✅ Worktrees multi-repo + flujo `/ticket` (por config, copia de `.env`, `.code-workspace`)
 - 🔭 V2: búsqueda semántica del vault, MCP sampling, más bases de conocimiento
 
 Ver [`PLAN.md`](./PLAN.md) para el plan completo de fases.

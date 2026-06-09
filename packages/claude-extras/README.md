@@ -117,6 +117,60 @@ records why — the config still drives every other editor through the MCP tool.
 - **Why does `extreme` become `max` in Claude Code?** Claude Code's effort scale tops
   out at `max`; `extreme` is chamba's name for "the ceiling".
 
+## Multi-repo worktrees + the `/ticket` flow
+
+If you work in a **workspace of several repos** (a parent dir with N git repos), chamba
+can create an isolated worktree per repo for a ticket, reuse or fork the branch, copy
+git-ignored `.env*` files, and write a `.code-workspace` — all driven by config.
+
+```bash
+npx @chamba/claude-extras config worktrees init   # interactive setup
+npx @chamba/claude-extras config worktrees show   # inspect the resolved policy
+```
+
+This writes a `worktrees` block to `~/.chamba/config.json` (or per project in
+`./.chamba/config.json`):
+
+```json
+{
+  "version": 1,
+  "worktrees": {
+    "layout": "sibling",
+    "root": "WORKTREES",
+    "branchPrefix": "ticket/",
+    "baseBranch": "main",
+    "copyEnvFiles": true,
+    "editorWorkspace": "code-workspace",
+    "repos": ["api", "web", "functions"]
+  }
+}
+```
+
+- **layout** — `sibling` puts everything under `<workspace>/WORKTREES/<ticket>/<repo>`;
+  `nested` puts a worktree under each repo.
+- **repos** — omit to autodetect the workspace's git repos.
+- **command** — escape hatch: set it to your own script (e.g.
+  `"./ticket-create.sh {ticket} {repos}"`) and chamba shells out instead of using the
+  built-in. Migrate from a bespoke script to config whenever you want.
+
+Then, in Claude Code:
+
+```
+/ticket TICKET-123
+```
+
+`/ticket` runs the full orchestrator-worker flow: create worktrees →
+`chamba_load_context` → delegate the plan to the **planner** subagent →
+`chamba_review_plan` + the **reviewer** subagent → delegate code to **implementer** and
+tests to **tester** (all inside the worktrees) → `chamba_summarize_to_vault`. It runs to
+the end and stops for your review. It **never commits, merges or pushes** — you review,
+commit and send to code review by hand. Each worker runs with the model + effort you
+configured above.
+
+> **Security:** `copyEnvFiles` copies secrets into the worktree directories. Add your
+> `worktrees.root` (e.g. `WORKTREES/`) to `.gitignore` so they're never committed. It's
+> off by default.
+
 ## License
 
 MIT

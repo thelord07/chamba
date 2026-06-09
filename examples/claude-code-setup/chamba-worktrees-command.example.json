@@ -1,0 +1,6 @@
+{
+  "version": 1,
+  "worktrees": {
+    "command": "./scripts/ticket-create.sh {ticket} {repos}"
+  }
+}

@@ -162,6 +162,7 @@ Other editors read the same config via `chamba_get_agent_config`. See the
 - ✅ Multi-editor docs (you're reading them)
 - ✅ **0.1.0 published on npm**
 - ✅ Per-agent model + effort config (wizard + `chamba_get_agent_config`)
+- ✅ Multi-repo worktrees + `/ticket` flow (config-driven, env copy, `.code-workspace`)
 - 🔭 V2: semantic vault search, MCP sampling, more knowledge bases
 
 See [`PLAN.md`](./PLAN.md) for the full phase plan.
