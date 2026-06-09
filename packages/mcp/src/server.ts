@@ -6,6 +6,8 @@ import { registerCreateWorktree } from './tools/create-worktree.js';
 import { registerGeneratePlan } from './tools/generate-plan.js';
 import { registerListWorktrees } from './tools/list-worktrees.js';
 import { registerLoadContext } from './tools/load-context.js';
+import { registerRecall } from './tools/recall.js';
+import { registerRemember } from './tools/remember.js';
 import { registerReviewPlan } from './tools/review-plan.js';
 import { registerSummarizeToVault } from './tools/summarize-to-vault.js';
 import { registerWorkspaceInit } from './tools/workspace-init.js';
@@ -35,6 +37,8 @@ export function createServer(logger: Logger, services: Services = createNodeServ
   registerCreateWorktree(server, logger, services);
   registerListWorktrees(server, logger, services);
   registerCleanupWorktree(server, logger, services);
+  registerRemember(server, logger, services);
+  registerRecall(server, logger, services);
 
   return server;
 }

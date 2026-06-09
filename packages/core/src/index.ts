@@ -1,5 +1,8 @@
 // @chamba/core — pure harness logic. No Node-specific APIs (principle 6).
 
+export { FilesystemMemoryStore, MEMORY_DIR } from './memory/filesystem-store.js';
+// Memory
+export type { Memory, MemoryStore, RememberInput } from './memory/store.js';
 export type { NoteFields } from './obsidian/note-template.js';
 export { renderNote, slugify } from './obsidian/note-template.js';
 export type { WriteNoteInput, WriteNoteResult } from './obsidian/vault-writer.js';
@@ -26,6 +29,7 @@ export type { DirEntry, FilesystemPort } from './ports/filesystem.js';
 export type { ProcessExecOptions, ProcessPort, ProcessResult } from './ports/process.js';
 export type { ProcessHandler, RecordedCall } from './testing/fake-process.js';
 export { FakeProcess } from './testing/fake-process.js';
+
 // Testing utilities
 export { MemoryFilesystem } from './testing/memory-filesystem.js';
 // Path helpers

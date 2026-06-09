@@ -72,8 +72,18 @@ hand edits.
 | `chamba_create_worktree` | `{ taskSlug, workerId, baseBranch? }` | Creates an isolated git worktree on `chamba/<date>-<task>/<worker>` (or a clear error if not a git repo) |
 | `chamba_list_worktrees` | `{}` | Lists the repo's worktrees (path, HEAD, branch) |
 | `chamba_cleanup_worktree` | `{ branch }` | Removes the worktree dir but **keeps the branch** (no `--force`, no merge) |
+| `chamba_remember` | `{ key, content, tags? }` | Persists knowledge as `.chamba/memory/<key>.md` (appends on existing key) |
+| `chamba_recall` | `{ query }` | Case-insensitive substring search over saved memories |
 
-The full V1 tool set (memory) is detailed in [`PLAN.md`](./PLAN.md).
+The full V1 tool set is detailed in [`PLAN.md`](./PLAN.md).
+
+### Cross-session memory
+
+`chamba_remember` and `chamba_recall` give the editor's model knowledge that
+survives across sessions — without bloating the context window. Each memory is a
+plain, hand-editable markdown file under `.chamba/memory/` with frontmatter
+(`key`, `tags`, `createdAt`, `updatedAt`); re-remembering a key appends a
+timestamped section instead of overwriting. No DB, no JSON — just files you own.
 
 ### Git worktrees for safe parallelism
 

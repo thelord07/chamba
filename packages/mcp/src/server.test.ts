@@ -43,6 +43,8 @@ describe('chamba MCP server', () => {
       'chamba_generate_plan',
       'chamba_list_worktrees',
       'chamba_load_context',
+      'chamba_recall',
+      'chamba_remember',
       'chamba_review_plan',
       'chamba_summarize_to_vault',
       'chamba_workspace_init',
