@@ -1,7 +1,9 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { Logger } from 'pino';
 import { createNodeServices, type Services } from './services.js';
+import { registerGeneratePlan } from './tools/generate-plan.js';
 import { registerLoadContext } from './tools/load-context.js';
+import { registerReviewPlan } from './tools/review-plan.js';
 import { registerSummarizeToVault } from './tools/summarize-to-vault.js';
 import { registerWorkspaceInit } from './tools/workspace-init.js';
 import { registerWorkspaceReload } from './tools/workspace-reload.js';
@@ -25,6 +27,8 @@ export function createServer(logger: Logger, services: Services = createNodeServ
   registerWorkspaceReload(server, logger, services);
   registerLoadContext(server, logger, services);
   registerSummarizeToVault(server, logger, services);
+  registerGeneratePlan(server, logger, services);
+  registerReviewPlan(server, logger, services);
 
   return server;
 }

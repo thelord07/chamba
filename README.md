@@ -67,9 +67,18 @@ hand edits.
 | `chamba_workspace_reload` | `{}` | A diff between the current `.chamba/workspace.md` and a fresh re-scan (no writes) |
 | `chamba_load_context` | `{ task, includeObsidian? }` | Workspace summary plus Obsidian notes relevant to the task |
 | `chamba_summarize_to_vault` | `{ title, content, projectSlug? }` | Writes a structured note to the vault under `proyectos/<date>-<slug>.md` |
+| `chamba_generate_plan` | `{ task, context? }` | A structured plan template (goal, acceptance criteria, subtasks, risks) for the model to fill |
+| `chamba_review_plan` | `{ plan, task, context? }` | Heuristic review: `{ approved, issues, suggestions, riskFlags }` — no LLM |
 
-The full V1 tool set (plan + review, worktrees, memory) is detailed in
-[`PLAN.md`](./PLAN.md).
+The full V1 tool set (worktrees, memory) is detailed in [`PLAN.md`](./PLAN.md).
+
+### Heuristic plan review (no LLM)
+
+`chamba_review_plan` checks a plan's *structure* with plain code — never a model.
+It flags missing acceptance criteria, no tests, subtasks without an assigned
+worker, vague/placeholder steps, files outside the workspace map, and sensitive
+areas (auth / payments / migrations) lacking a risk assessment. The editor's model
+reads the verdict and decides whether to re-plan.
 
 ## Obsidian
 

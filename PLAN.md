@@ -22,7 +22,7 @@
 | 1 | Bootstrap del monorepo + MCP server mínimo | ✅ Completada | 2026-06-09 | 40b029c |
 | 2 | Workspace context + scanner | ✅ Completada | 2026-06-09 | c588a56 |
 | 3 | Obsidian integration | ✅ Completada | 2026-06-09 | 37b8595 |
-| 4 | Plan generation + reviewer (heurístico) | ⏳ Pendiente | — | — |
+| 4 | Plan generation + reviewer (heurístico) | ✅ Completada | 2026-06-09 | _pending_ |
 | 5 | Worktree manager | ⏳ Pendiente | — | — |
 | 6 | Memory store + cross-session context | ⏳ Pendiente | — | — |
 | 7 | Claude Code extras (slash commands, subagents, hooks) | ⏳ Pendiente | — | — |
@@ -440,7 +440,7 @@ CHAMBA_OBSIDIAN_VAULT_PATH=/tmp/test-vault npx @modelcontextprotocol/inspector n
 
 ### Fase 4 — Plan generation + reviewer heurístico
 
-**Estado:** ⏳ Pendiente
+**Estado:** ✅ Completada — 2026-06-09 — _pending_
 
 **Goal:** tools `generate_plan` y `review_plan`. La generación devuelve un **template estructurado**, no un plan completo (el modelo del cliente lo refina). El reviewer aplica validaciones programáticas heurísticas, no llama LLM.
 

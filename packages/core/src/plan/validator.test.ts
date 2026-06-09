@@ -1,0 +1,100 @@
+import { describe, expect, it } from 'vitest';
+import type { Workspace } from '../workspace/workspace.js';
+import { validatePlan } from './validator.js';
+
+const codes = (plan: string, workspace?: Workspace) =>
+  validatePlan({ plan, task: 't', workspace }).issues.map((i) => i.code);
+
+const GOOD_PLAN = `# Plan: add a health check endpoint
+
+## Goal
+Expose GET /health returning 200 with uptime.
+
+## Acceptance criteria
+- [ ] GET /health returns 200 and JSON status ok
+- [ ] Tests cover the new endpoint
+
+## Subtasks
+1. **implementer** — Add the /health route handler in src/routes/health.ts
+2. **tester** — Add a vitest test in src/routes/health.test.ts
+
+## Risks
+- none identified
+
+## Files likely touched
+- src/routes/health.ts
+`;
+
+describe('validatePlan', () => {
+  it('passes a complete, well-structured plan with no errors', () => {
+    const result = validatePlan({ plan: GOOD_PLAN, task: 'add health check' });
+    expect(result.issues.filter((i) => i.severity === 'error')).toEqual([]);
+  });
+
+  it('flags a one-liner plan with multiple errors', () => {
+    expect(codes('implementar health check sin tests')).toEqual(
+      expect.arrayContaining(['no-acceptance-criteria', 'no-tests', 'no-subtasks']),
+    );
+  });
+
+  it('detects missing tests', () => {
+    const plan = `## Acceptance criteria
+- [ ] GET /health returns 200
+
+## Subtasks
+1. **implementer** — add route in src/health.ts`;
+    expect(codes(plan)).toContain('no-tests');
+  });
+
+  it('detects subtasks without an assigned worker', () => {
+    const plan = `## Acceptance criteria
+- [ ] does X
+
+## Subtasks
+1. Build the thing in src/x.ts
+2. Add tests in src/x.test.ts`;
+    expect(codes(plan)).toContain('subtask-without-worker');
+  });
+
+  it('detects a vague (placeholder) subtask as a warning', () => {
+    const plan = `## Acceptance criteria
+- [ ] does X with tests
+
+## Subtasks
+1. **implementer** — TODO
+2. **tester** — add vitest tests for the feature behaviour`;
+    const result = validatePlan({ plan, task: 't' });
+    expect(result.issues.map((i) => i.code)).toContain('vague-subtask');
+    // warning only → still no error-severity issues
+    expect(result.issues.filter((i) => i.severity === 'error')).toEqual([]);
+  });
+
+  it('flags files outside the known workspace modules', () => {
+    const workspace: Workspace = {
+      root: '/r',
+      description: 'x',
+      languages: ['TypeScript'],
+      conventions: [],
+      projects: [{ name: 'r', path: '.' }],
+      folderMap: ['src'],
+    };
+    const plan = `## Acceptance criteria
+- [ ] does X with tests
+
+## Subtasks
+1. **implementer** — edit weird/thing.ts
+2. **tester** — add vitest tests`;
+    const result = validatePlan({ plan, task: 't', workspace });
+    expect(result.riskFlags.join(' ')).toContain('weird/thing.ts');
+  });
+
+  it('requires a risk assessment when touching a sensitive area', () => {
+    const plan = `## Acceptance criteria
+- [ ] includes tests
+
+## Subtasks
+1. **implementer** — update src/auth/login.ts
+2. **tester** — add vitest tests`;
+    expect(codes(plan)).toContain('missing-risk-assessment');
+  });
+});

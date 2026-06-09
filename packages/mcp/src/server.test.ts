@@ -38,7 +38,9 @@ describe('chamba MCP server', () => {
     const { tools } = await client.listTools();
 
     expect(tools.map((t) => t.name).sort()).toEqual([
+      'chamba_generate_plan',
       'chamba_load_context',
+      'chamba_review_plan',
       'chamba_summarize_to_vault',
       'chamba_workspace_init',
       'chamba_workspace_reload',

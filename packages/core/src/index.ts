@@ -4,6 +4,22 @@ export type { NoteFields } from './obsidian/note-template.js';
 export { renderNote, slugify } from './obsidian/note-template.js';
 export type { WriteNoteInput, WriteNoteResult } from './obsidian/vault-writer.js';
 export { VAULT_NOTES_DIR, VaultWriter } from './obsidian/vault-writer.js';
+export type { PlanReview, ReviewInput } from './plan/reviewer.js';
+export { Reviewer } from './plan/reviewer.js';
+export type { GeneratePlanInput, SubtaskSpec, WorkerKind } from './plan/template.js';
+// Plan
+export {
+  generatePlanTemplate,
+  suggestFilesLikelyTouched,
+  suggestSubtasks,
+} from './plan/template.js';
+export type {
+  Issue,
+  IssueSeverity,
+  ValidatePlanInput,
+  ValidationResult,
+} from './plan/validator.js';
+export { validatePlan } from './plan/validator.js';
 export type { ClockPort } from './ports/clock.js';
 // Ports
 export type { DirEntry, FilesystemPort } from './ports/filesystem.js';
@@ -16,6 +32,7 @@ export type { BuiltContext, ContextBuildInput, RelevantNote } from './workspace/
 export { ContextBuilder } from './workspace/context-builder.js';
 export { diffLines, textsEqual } from './workspace/diff.js';
 export type { DetectOptions, VaultDetection } from './workspace/obsidian-detector.js';
+
 // Obsidian
 export { ObsidianDetector } from './workspace/obsidian-detector.js';
 export { WorkspaceScanner } from './workspace/scanner.js';
