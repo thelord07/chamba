@@ -36,7 +36,8 @@
   },
   "dependencies": {
     "@chamba/adapters": "workspace:*",
-    "@chamba/core": "workspace:*"
+    "@chamba/core": "workspace:*",
+    "@inquirer/prompts": "^7.0.0"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

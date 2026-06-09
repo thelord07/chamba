@@ -20,7 +20,7 @@ export const roleSchema = z.enum([...AGENT_ROLES] as [AgentRole, ...AgentRole[]]
 export const modelSchema = z.string().refine(
   (id) => getModel(id) !== undefined,
   (id) => ({
-    message: `unknown model '${id}'; run 'chamba-config models' to list valid model ids`,
+    message: `unknown model '${id}'; run the config 'models' command to list valid model ids`,
   }),
 );
 
