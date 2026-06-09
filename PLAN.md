@@ -19,7 +19,7 @@
 
 | # | Fase | Estado | Fecha | Commit |
 |---|---|---|---|---|
-| 1 | Bootstrap del monorepo + MCP server mínimo | ✅ Completada | 2026-06-09 | _pending_ |
+| 1 | Bootstrap del monorepo + MCP server mínimo | ✅ Completada | 2026-06-09 | 40b029c |
 | 2 | Workspace context + scanner | ⏳ Pendiente | — | — |
 | 3 | Obsidian integration | ⏳ Pendiente | — | — |
 | 4 | Plan generation + reviewer (heurístico) | ⏳ Pendiente | — | — |
@@ -311,7 +311,7 @@ Cada fase tiene:
 
 ### Fase 1 — Bootstrap del monorepo + MCP server mínimo 📢
 
-**Estado:** ✅ Completada — 2026-06-09 — _pending_
+**Estado:** ✅ Completada — 2026-06-09 — 40b029c
 
 **Goal:** `npx @chamba/mcp` arranca un MCP server con una sola tool funcional (`chamba_workspace_show`), inspeccionable con MCP Inspector. Sin abstracciones, sin layers — el smallest thing that works.
 
