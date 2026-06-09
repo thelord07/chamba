@@ -1,35 +1,33 @@
 # PLAN — Construcción de **chamba**
 
 > **Cómo usar este documento**
-> Este es el plan maestro para construir `chamba`, un AI agent harness en TypeScript open-source. Está escrito para que **Claude Code lo ejecute por fases**, con verification gates entre cada una. Todo lo que esté en bloques `> Claude Code:` son instrucciones directas para la sesión de Claude Code.
+> Este es el plan maestro para construir `chamba`, un MCP server open-source que añade capacidades de orchestrator-worker, workspace-awareness, git worktrees y Obsidian integration a cualquier editor compatible con MCP (Claude Code, Cursor, VS Code con Copilot, Windsurf, Cline, OpenCode, JetBrains, Trae). Está escrito para que **Claude Code lo ejecute por fases**, con verification gates entre cada una. Los bloques `> Claude Code:` son instrucciones directas para la sesión de Claude Code.
 >
 > **Flujo de uso recomendado:**
 > 1. Crea un repo público vacío en GitHub llamado `chamba`.
-> 2. Commitea este `PLAN.md` y el `CLAUDE.md` del Anexo A.
-> 3. Abre Claude Code en el repo. Dile: *"Lee PLAN.md y ejecuta la Fase 1 completa. No pases a la Fase 2 hasta que yo apruebe."*
-> 4. Al final de cada fase, revisa el commit, corre los acceptance criteria manualmente, aprueba o pide ajustes.
-> 5. **Claude Code debe actualizar el estado de cada fase** en este mismo `PLAN.md` cuando la termine: cambiar el campo `**Estado:**` de `⏳ Pendiente` a `✅ Completada — {fecha} — commit {sha-corto}`, **y** actualizar la fila correspondiente en la tabla de "Estado de las fases". Las dos ubicaciones deben estar siempre sincronizadas.
+> 2. Commitea este `PLAN.md` y el `CLAUDE.md`.
+> 3. Abre Claude Code en el repo. Dile: *"Lee PLAN.md y CLAUDE.md. Confirma alcance y principios. Ejecuta la Fase 1. No avances a Fase 2 hasta que yo apruebe."*
+> 4. Al final de cada fase, revisa el commit, corre los acceptance criteria, aprueba o pide ajustes.
+> 5. **Claude Code debe actualizar el estado de cada fase** en este `PLAN.md`: cambiar `⏳ Pendiente` a `✅ Completada — {fecha} — commit {sha-corto}`, **y** actualizar la fila correspondiente en la tabla "Estado de las fases". Las dos ubicaciones deben estar siempre sincronizadas.
 > 6. Al final de las fases marcadas con 📢, publica el post de LinkedIn sugerido para construir tracción.
 
 ---
 
 ## Estado de las fases
 
-> **Claude Code:** mantén esta tabla actualizada. Cuando empieces una fase, marca `🚧 En progreso`. Cuando termines y commitees, marca `✅ Completada` con fecha y commit SHA corto. Si quedas bloqueado, marca `❌ Bloqueada` y describe brevemente por qué en la celda de fecha. Esta tabla y el campo `**Estado:**` de cada fase son la fuente única de verdad sobre el progreso del proyecto.
+> **Claude Code:** mantén esta tabla actualizada. Cuando empieces una fase, marca `🚧 En progreso`. Cuando termines y commitees, marca `✅ Completada` con fecha y commit SHA corto. Si quedas bloqueado, marca `❌ Bloqueada` y describe brevemente por qué.
 
 | # | Fase | Estado | Fecha | Commit |
 |---|---|---|---|---|
-| 1 | Bootstrap + ejemplo mínimo | ✅ Completada | 2026-06-09 | d6e4e7f |
-| 2 | Núcleo de @chamba/core | ⏳ Pendiente | — | — |
-| 3 | Providers reales + tools nativas | ⏳ Pendiente | — | — |
-| 4 | Compaction + permisos + memoria | ⏳ Pendiente | — | — |
-| 5 | MCP support | ⏳ Pendiente | — | — |
-| 5.5 | Workspace + Obsidian | ⏳ Pendiente | — | — |
-| 6 | Subagents + orchestrator + reviewer | ⏳ Pendiente | — | — |
-| 7 | CLI con Ink | ⏳ Pendiente | — | — |
-| 8 | Server HTTP/SSE | ⏳ Pendiente | — | — |
-| 8.5 | chamba como MCP server (Cursor/VSCode/etc) | ⏳ Pendiente | — | — |
-| 9 | Release 1.0.0 + tracción | ⏳ Pendiente | — | — |
+| 1 | Bootstrap del monorepo + MCP server mínimo | ✅ Completada | 2026-06-09 | _pending_ |
+| 2 | Workspace context + scanner | ⏳ Pendiente | — | — |
+| 3 | Obsidian integration | ⏳ Pendiente | — | — |
+| 4 | Plan generation + reviewer (heurístico) | ⏳ Pendiente | — | — |
+| 5 | Worktree manager | ⏳ Pendiente | — | — |
+| 6 | Memory store + cross-session context | ⏳ Pendiente | — | — |
+| 7 | Claude Code extras (slash commands, subagents, hooks) | ⏳ Pendiente | — | — |
+| 8 | Documentación multi-editor + ejemplos | ⏳ Pendiente | — | — |
+| 9 | Release 1.0.0 + push de tracción | ⏳ Pendiente | — | — |
 
 **Símbolos:** ⏳ Pendiente — 🚧 En progreso — ✅ Completada — ❌ Bloqueada
 
@@ -37,56 +35,59 @@
 
 ## 1. Contexto y objetivo
 
-**chamba** es un AI agent harness en TypeScript, agnóstico de modelo, con soporte de subagentes y patrón orchestrator-worker. Open-source, MIT, publicado en npm.
+**chamba** es un MCP server open-source en TypeScript. Expone un conjunto coherente de tools que cualquier editor con MCP client puede consumir desde su chat: orchestrator-worker, workspace context, git worktrees, integración Obsidian, plan + review, memory.
 
-**De dónde viene el nombre.** "Chamba" es la palabra coloquial latina para *trabajo*. El harness le da chamba al modelo: le pasa la pega, supervisa, valida, y se encarga de toda la coordinación. Personalidad LATAM intencional como punto diferenciador frente a los harnesses gringos.
+**De dónde viene el nombre.** "Chamba" es la palabra coloquial latina para *trabajo*. El nombre es personalidad LATAM intencional como punto diferenciador frente a las herramientas gringas.
 
-**Inspirado por** byo-coding-agent (BettaTech), Claude Code, OpenCode y Aider. No reemplaza a ninguno; es la versión productiva, agnóstica, con MCP de primera clase, **workspace-aware** y con orchestrator-worker incluido.
+**Inspirado por** byo-coding-agent (BettaTech) en lo conceptual, lapzo-tools en el patrón MCP. No reemplaza a ninguno; añade un conjunto de capacidades de orquestación que hoy no existen empaquetadas de esta forma.
+
+**Por qué construirlo así (y no como harness propio):**
+
+- chamba **no llama al LLM**. Eso lo hace el editor del usuario (Cursor con su modelo, Claude Code con la suscripción Max del usuario, VS Code con Copilot, etc.).
+- chamba solo expone **tools y patterns**: escanear workspaces, generar planes, validarlos, crear worktrees, escribir resúmenes al vault de Obsidian, etc.
+- Esto elimina el problema de la API key — el editor paga su propio modelo.
+- Una sola implementación funciona en **todos los editores compatibles con MCP** desde el día uno.
 
 **Para qué lo construyo:**
-- Base reutilizable entre mis side projects (VoxCash, fixbody.app, experimentos futuros).
+- Base reutilizable entre mis side projects (VoxCash, fixbody.app, futuros experimentos).
 - Material para mi contenido en LinkedIn — cada fase es un post natural en "Deploy on Friday 🔥" y #MenteDeDesarrollador.
 - Vehículo para encontrar tracción en GitHub y construir reputación técnica más allá del trabajo de día.
-- Aprender harness engineering en serio, no como consumidor de Claude Code, sino entendiendo cómo se construye.
 
 **Done de V1 significa:**
-- Un usuario puede correr `npx chamba` en su terminal y conversar con un agente que ejecuta tools en su filesystem.
-- Un desarrollador puede `npm install @chamba/core` y embeber el harness en su propia app.
-- Un desarrollador puede correr `chamba serve` y exponer el harness vía HTTP/SSE.
-- El sistema soporta cambiar de Anthropic a OpenAI con un solo cambio de config.
-- El orchestrator puede delegar subtareas a executors especializados (orchestrator-worker pattern).
-- Tools y MCP servers se conectan declarativamente, sin tocar el core.
-- **chamba entiende el contexto de un workspace** (estructura del proyecto + vault de Obsidian si existe) y lo usa para informar planes y ejecuciones.
-- **Existe un comando `/orchestrator <tarea>`** que dispara el flujo completo: cargar contexto → generar plan → auto-evaluar plan → ejecutar en paralelo → testear → resumir y documentar en el vault.
-- **chamba se puede invocar desde el chat de cualquier editor con MCP client** (Cursor, VS Code con Copilot, Windsurf, Cline, JetBrains, Trae) corriendo `chamba mcp` como server. Los comandos clave (orchestrate, workspace init, summarize) quedan disponibles como tools directamente en el chat del editor.
-- **El orchestrator aísla cada worker en su propio git worktree** cuando el proyecto es un repo git. Workers en paralelo no se pisan archivos, cada uno trabaja en su propia rama. Al terminar, las ramas quedan abiertas para que el humano las revise y mergee manualmente. Si el proyecto no es un repo git, esta capacidad se desactiva automáticamente y el orchestrator delega secuencialmente.
+- `npx @chamba/mcp` arranca un MCP server stdio funcional.
+- 10+ tools MCP bien diseñadas, schemas claros, documentación por tool.
+- Configurable desde Cursor (`.cursor/mcp.json`), Claude Code (`~/.claude.json`), VS Code (`.vscode/mcp.json`), y otros editores compatibles con MCP estándar.
+- Workspace-aware: entiende el directorio del usuario y opcionalmente integra con vault de Obsidian.
+- Soporta git worktrees para aislamiento de tareas en paralelo.
+- Plan + reviewer (heurístico, no LLM) para validar planes antes de ejecutar.
+- Extras opcionales para Claude Code (slash commands, subagents pre-configurados, hooks).
 - README listo para Hacker News / Reddit / LinkedIn.
 
 ---
 
 ## 2. Principios de diseño no-negociables
 
-Los 10 principios que **Claude Code no debe romper** durante la implementación. Si Claude Code encuentra una tensión genuina con alguno, **debe detenerse y preguntar** antes de violarlo.
+Los **10 principios** que Claude Code no debe romper. Si Claude Code encuentra tensión genuina con alguno, **debe detenerse y preguntar**.
 
-1. **Ortogonalidad de las 3 capas.** Providers, Tools y Compaction son extension points independientes. Una tool nunca puede asumir un provider específico. Una estrategia de compaction nunca puede asumir una tool específica.
+1. **chamba no llama LLMs.** Cero. Ningún archivo del repo importa `@anthropic-ai/sdk` ni `openai` ni equivalente. El razonamiento lo hace el modelo del cliente que invoca las tools MCP. Si Claude Code se encuentra escribiendo una llamada a un modelo, está violando este principio.
 
-2. **Provider-agnóstico desde el primer commit.** No hay código de Anthropic ni de OpenAI fuera del adapter correspondiente. Si tenemos que decidir entre "lo más rápido para Anthropic" y "lo más portable", siempre gana lo portable.
+2. **MCP server como producto principal.** Todo lo que hacemos se materializa en tools MCP. Si una capacidad no se puede modelar como una tool MCP con schema Zod claro, hay que repensarla antes de implementarla.
 
-3. **MCP es ciudadano de primera clase.** Las tools nativas (bash, fs, etc.) y las tools MCP comparten el mismo `Tool` interface. Ninguna parte del core debe distinguir entre "tools nativas" y "tools MCP".
+3. **Cero API keys requeridas para usar chamba.** El usuario solo necesita un editor con MCP client. No hay variables de entorno tipo `ANTHROPIC_API_KEY` ni `OPENAI_API_KEY` en ningún ejemplo del repo.
 
-4. **Una sola dependencia externa por capa.** Si un problema ya está resuelto por una librería establecida, la usamos. Pero **no apilamos** librerías que hacen lo mismo. Stack definitivo en sección 4.
+4. **Multi-cliente desde el primer commit.** Cualquier tool nueva debe documentar cómo se invoca desde Cursor, Claude Code, VS Code y otros editores. Si solo funciona en uno, repensar.
 
-5. **Tests obligatorios antes de cerrar una fase.** Si una fase no tiene tests verdes, no se commitea como completa. El `MockProvider` se crea en la Fase 2 precisamente para que las fases siguientes tengan algo barato contra qué testear.
+5. **Tools idempotentes y observables.** Las tools tienen efectos secundarios concretos (escribir archivos, crear worktrees, etc.) pero son idempotentes cuando es posible, y siempre devuelven output estructurado que el modelo cliente puede razonar.
 
-6. **Cada fase termina con algo demoable.** Nada de "fases de refactorización interna". Cada fase produce un comando ejecutable o una capacidad observable nueva — algo que se pueda mostrar en LinkedIn.
+6. **El core (`@chamba/core`) no importa Node-specific APIs** como `fs` o `child_process` directamente. Cualquier capacidad OS-level va detrás de un port/adapter. Esto permite testabilidad y, en el futuro, edge runtime.
 
-7. **El core (`@chamba/core`) no importa Node-specific APIs** como `fs` o `child_process` directamente. Cualquier capacidad que toque el sistema operativo va detrás de un port/adapter. Esto permite testabilidad y, en el futuro, browser/edge compat.
+7. **Sin frameworks pesados.** Nada de NestJS, nada de LangChain, nada de Mastra. TypeScript puro con dependencias mínimas.
 
-8. **Sin frameworks pesados.** Nada de NestJS, nada de LangChain, nada de Mastra. La librería debe ser puro TypeScript con dependencias mínimas. Hono o Fastify para el server, no NestJS.
+8. **Type-first.** Schemas Zod para todas las tools. Tipos explícitos en contratos públicos. Cero `any` excepto donde sea estrictamente necesario, con justificación.
 
-9. **Type-first.** Todos los contratos públicos tienen tipos explícitos. No se usa `any` excepto en adapters de SDKs externos donde es estrictamente necesario, con `// eslint-disable-next-line` y justificación.
+9. **Tests obligatorios antes de cerrar una fase.** Sin tests verdes no se commitea como completa.
 
-10. **Errores explícitos.** Las funciones que pueden fallar devuelven `Result<T, E>` (vía `neverthrow`) o lanzan errores tipados. No hay `try/catch` que tragan errores silenciosamente.
+10. **Cada fase termina con algo demoable.** Una tool nueva invocable, una capacidad observable. Nada de "fase de refactorización interna".
 
 ---
 
@@ -96,82 +97,46 @@ Los 10 principios que **Claude Code no debe romper** durante la implementación.
 
 ```
 chamba/
-├── PLAN.md                          # Este documento
-├── CLAUDE.md                        # Contexto persistente para Claude Code
-├── README.md                        # README público, marketing-grade
-├── README.es.md                     # Versión en español
+├── PLAN.md
+├── CLAUDE.md
+├── README.md                        # Marketing-grade, multi-editor
+├── README.es.md
 ├── CONTRIBUTING.md
 ├── LICENSE                          # MIT
-├── CHANGELOG.md                     # Generado por changesets
+├── CHANGELOG.md
 ├── package.json
 ├── pnpm-workspace.yaml
 ├── tsconfig.base.json
 ├── biome.json
 ├── vitest.config.ts
 ├── .changeset/
-├── .github/
-│   ├── workflows/
-│   │   ├── ci.yml
-│   │   ├── release.yml
-│   │   └── docs.yml
-│   ├── ISSUE_TEMPLATE/
-│   └── PULL_REQUEST_TEMPLATE.md
+├── .github/workflows/
+│   ├── ci.yml
+│   └── release.yml
 │
 ├── packages/
 │   ├── core/                        # @chamba/core
 │   │   ├── src/
 │   │   │   ├── index.ts
-│   │   │   ├── harness.ts
-│   │   │   ├── repl.ts
-│   │   │   ├── agent-loop.ts
-│   │   │   ├── api/
-│   │   │   │   ├── message.ts
-│   │   │   │   ├── block.ts
-│   │   │   │   ├── tool-def.ts
-│   │   │   │   └── response.ts
-│   │   │   ├── provider/
-│   │   │   │   ├── provider.ts
-│   │   │   │   ├── anthropic.ts
-│   │   │   │   ├── openai.ts
-│   │   │   │   └── mock.ts
-│   │   │   ├── tool/
-│   │   │   │   ├── tool.ts
-│   │   │   │   ├── registry.ts
-│   │   │   │   ├── bash.ts
-│   │   │   │   ├── read-file.ts
-│   │   │   │   ├── write-file.ts
-│   │   │   │   └── mcp-adapter.ts
-│   │   │   ├── compact/
-│   │   │   │   ├── strategy.ts
-│   │   │   │   ├── safe-split.ts    # CRÍTICO
-│   │   │   │   ├── none.ts
-│   │   │   │   ├── sliding-window.ts
-│   │   │   │   └── summarize.ts
-│   │   │   ├── permission/
-│   │   │   │   ├── policy.ts
-│   │   │   │   ├── always-ask.ts
-│   │   │   │   ├── always-allow.ts
-│   │   │   │   └── allowlist.ts
+│   │   │   ├── workspace/
+│   │   │   │   ├── workspace.ts
+│   │   │   │   ├── scanner.ts
+│   │   │   │   ├── obsidian-detector.ts
+│   │   │   │   └── context-builder.ts
+│   │   │   ├── worktree/
+│   │   │   │   ├── manager.ts
+│   │   │   │   ├── git-detector.ts
+│   │   │   │   └── branch-naming.ts
+│   │   │   ├── plan/
+│   │   │   │   ├── template.ts        # Templates de plan estructurado
+│   │   │   │   ├── validator.ts       # Validaciones heurísticas (no LLM)
+│   │   │   │   └── reviewer.ts        # Checklist de revisión
+│   │   │   ├── obsidian/
+│   │   │   │   ├── vault-writer.ts
+│   │   │   │   └── note-template.ts
 │   │   │   ├── memory/
 │   │   │   │   ├── store.ts
 │   │   │   │   └── filesystem-store.ts
-│   │   │   ├── workspace/                    # NUEVO (Fase 5.5)
-│   │   │   │   ├── workspace.ts              # Tipos y loader
-│   │   │   │   ├── scanner.ts                # Escanea dir y genera draft
-│   │   │   │   ├── obsidian-detector.ts      # Detecta vault Obsidian
-│   │   │   │   └── context-builder.ts        # Compone contexto para el agente
-│   │   │   ├── subagent/
-│   │   │   │   ├── subagent.ts
-│   │   │   │   ├── orchestrator.ts
-│   │   │   │   ├── reviewer.ts               # NUEVO (Fase 6)
-│   │   │   │   └── delegate-tool.ts
-│   │   │   ├── worktree/                     # NUEVO (Fase 6) — aislamiento por worker
-│   │   │   │   ├── manager.ts                # WorktreeManager: crea, limpia, lista
-│   │   │   │   ├── git-detector.ts           # Detecta si root es repo git
-│   │   │   │   └── branch-naming.ts          # Política de nombres de rama
-│   │   │   ├── mcp/
-│   │   │   │   ├── client.ts
-│   │   │   │   └── server-config.ts
 │   │   │   ├── ports/
 │   │   │   │   ├── filesystem.ts
 │   │   │   │   ├── process.ts
@@ -181,866 +146,537 @@ chamba/
 │   │   ├── test/
 │   │   └── package.json
 │   │
-│   ├── adapters/                    # @chamba/adapters
+│   ├── adapters/                    # @chamba/adapters — Node impls
 │   │   ├── src/
 │   │   │   ├── node-filesystem.ts
 │   │   │   ├── node-process.ts
 │   │   │   └── system-clock.ts
 │   │   └── package.json
 │   │
-│   ├── cli/                         # @chamba/cli — binario `chamba`
+│   ├── mcp/                         # @chamba/mcp — el producto principal
 │   │   ├── src/
-│   │   │   ├── main.ts
-│   │   │   ├── ui/
-│   │   │   │   ├── app.tsx
-│   │   │   │   ├── input.tsx
-│   │   │   │   ├── transcript.tsx
-│   │   │   │   ├── debug-panel.tsx
-│   │   │   │   ├── plan-review.tsx           # NUEVO (Fase 7)
-│   │   │   │   └── approval-prompt.tsx
-│   │   │   ├── commands/
-│   │   │   │   ├── registry.ts
-│   │   │   │   ├── help.ts
-│   │   │   │   ├── provider.ts
-│   │   │   │   ├── model.ts
-│   │   │   │   ├── tokens.ts
-│   │   │   │   ├── debug.ts
-│   │   │   │   ├── compact.ts
-│   │   │   │   ├── clear.ts
-│   │   │   │   ├── tools.ts
-│   │   │   │   ├── subagents.ts
-│   │   │   │   ├── workspace.ts              # NUEVO — /workspace init|show|reload
-│   │   │   │   ├── orchestrator.ts           # NUEVO — /orq <tarea>
-│   │   │   │   └── worktrees.ts              # NUEVO — /worktrees (lista activos)
+│   │   │   ├── main.ts              # Entry point del MCP server
+│   │   │   ├── server.ts            # MCP server setup con @modelcontextprotocol/sdk
+│   │   │   ├── tools/
+│   │   │   │   ├── index.ts         # Registry de todas las tools
+│   │   │   │   ├── workspace-init.ts
+│   │   │   │   ├── workspace-show.ts
+│   │   │   │   ├── workspace-reload.ts
+│   │   │   │   ├── load-context.ts
+│   │   │   │   ├── generate-plan.ts
+│   │   │   │   ├── review-plan.ts
+│   │   │   │   ├── create-worktree.ts
+│   │   │   │   ├── list-worktrees.ts
+│   │   │   │   ├── cleanup-worktree.ts
+│   │   │   │   ├── summarize-to-vault.ts
+│   │   │   │   ├── remember.ts
+│   │   │   │   └── recall.ts
+│   │   │   ├── schemas/             # Zod schemas para inputs/outputs
+│   │   │   ├── logging.ts           # pino → archivo, NUNCA stdout
 │   │   │   └── config.ts
 │   │   ├── bin/
-│   │   │   └── chamba
+│   │   │   └── chamba-mcp
 │   │   └── package.json
 │   │
-│   └── server/                      # @chamba/server
+│   └── claude-extras/               # @chamba/claude-extras (opcional)
 │       ├── src/
-│       │   ├── main.ts
-│       │   ├── routes/
-│       │   │   ├── sessions.ts
-│       │   │   ├── messages.ts
-│       │   │   ├── orchestrator.ts           # NUEVO — POST /orchestrator
-│       │   │   └── tools.ts
-│       │   ├── auth.ts
-│       │   └── session-manager.ts
-│       ├── Dockerfile
-│       └── package.json
-│
-│   └── mcp/                         # @chamba/mcp — expone chamba como MCP server (NUEVO Fase 8.5)
-│       ├── src/
-│       │   ├── main.ts              # Entry point; arranca stdio MCP server
-│       │   ├── server.ts            # Configura el MCP server con @modelcontextprotocol/sdk
-│       │   ├── tools/
-│       │   │   ├── orchestrate.ts   # Tool: chamba_orchestrate(task)
-│       │   │   ├── workspace.ts     # Tools: chamba_workspace_init|show|reload
-│       │   │   ├── summarize.ts     # Tool: chamba_summarize_to_vault
-│       │   │   └── plan.ts          # Tool: chamba_generate_plan (sin ejecutar)
-│       │   └── config.ts
+│       │   ├── install.ts           # `chamba install-claude-extras`
+│       │   ├── slash-commands/      # /orq, /workspace, /worktrees (markdown)
+│       │   ├── subagents/           # implementer.md, reviewer.md, tester.md
+│       │   └── hooks/               # PreToolUse, PostToolUse validations
 │       ├── bin/
-│       │   └── chamba-mcp           # Binario que se invoca como command desde editores
+│       │   └── chamba-install
 │       └── package.json
 │
 └── examples/
-    ├── minimal/                     # ~200 líneas, sin abstracciones
-    ├── library-usage/               # Embed @chamba/core en una app
-    ├── mcp-sqlite/                  # Demo MCP local con SQLite
-    ├── obsidian-orchestrator/       # NUEVO — workspace + Obsidian + orchestrator
-    ├── editor-integration/          # NUEVO (Fase 8.5) — configs de Cursor/VSCode/etc
-    └── orchestrator-team/           # Demo orchestrator-worker puro
+    ├── cursor-setup/                # .cursor/mcp.json + walkthrough
+    ├── claude-code-setup/           # ~/.claude.json + walkthrough
+    ├── vscode-setup/                # .vscode/mcp.json + walkthrough
+    ├── windsurf-setup/
+    ├── opencode-setup/
+    └── obsidian-orchestrator/       # Demo end-to-end con vault Obsidian
 ```
 
-### El directorio `.chamba/` del usuario (no del repo)
+### El directorio `.chamba/` del usuario
 
-Cuando un usuario corre `chamba` en una carpeta, esta es la estructura que el harness crea/usa:
+Cuando alguien usa chamba en un proyecto, este es el directorio que chamba lee/escribe (vía sus tools MCP, invocadas por el modelo del editor):
 
 ```
-mi-proyecto/                        # Carpeta del usuario (cualquier proyecto)
+mi-proyecto/                        # Carpeta del usuario
 ├── ...código del proyecto...
-└── .chamba/                        # Generado por chamba
-    ├── workspace.md                # Mapa del workspace (generado por /workspace init, editable a mano)
-    ├── config.json                 # MCP servers, providers, permission policy
-    ├── agents/                     # System prompts de los sub-agentes
-    │   ├── orchestrator.md
-    │   ├── reviewer.md
-    │   ├── implementer.md
-    │   └── tester.md
-    ├── plans/                      # Planes generados por el orchestrator
-    │   └── 2026-06-09-auth-magic-links.md
-    ├── worktrees/                  # NUEVO (Fase 6) — worktrees activos del orchestrator
-    │   └── 2026-06-09-auth-magic-links/
-    │       ├── backend-worker/     # git worktree con rama chamba/2026-06-09-auth-magic-links/backend-worker
-    │       └── frontend-worker/    # git worktree con rama chamba/2026-06-09-auth-magic-links/frontend-worker
-    └── memory/                     # Memoria persistente entre sesiones
-        └── {sessionId}/
-            └── *.md
+└── .chamba/                        # Creado por la tool chamba_workspace_init
+    ├── workspace.md                # Mapa del workspace (editable a mano)
+    ├── plans/                      # Planes generados
+    │   └── 2026-06-09-add-health-check.md
+    ├── worktrees/                  # Git worktrees activos
+    │   └── 2026-06-09-add-health-check/
+    │       └── implementer/        # git worktree con rama chamba/...
+    └── memory/                     # Notas persistentes entre sesiones
+        └── *.md
 ```
 
-**Importante:** este directorio es para el usuario de chamba, no para el repo de chamba. El repo de chamba **no** tiene `.chamba/` (excepto en `examples/` para demos).
+### Tools MCP expuestas en V1 (lista completa)
 
-### Interfaces clave (pseudocódigo TypeScript)
+| Tool | Inputs | Output | LLM? |
+|---|---|---|---|
+| `chamba_workspace_init` | `{ root?: string }` | `{ created: bool, path: string, contents: string }` | No |
+| `chamba_workspace_show` | `{}` | `{ contents: string }` | No |
+| `chamba_workspace_reload` | `{}` | `{ diff: string, suggestions: string[] }` | No |
+| `chamba_load_context` | `{ task: string, includeObsidian?: bool }` | `{ context: string, relevantNotes?: string[] }` | No |
+| `chamba_generate_plan` | `{ task: string, context: string }` | `{ planTemplate: string, suggestedSubtasks: SubtaskSpec[] }` | No |
+| `chamba_review_plan` | `{ plan: string, task: string, context: string }` | `{ approved: bool, issues: Issue[], suggestions: string[] }` | No |
+| `chamba_create_worktree` | `{ taskSlug: string, workerId: string, baseBranch?: string }` | `{ path: string, branch: string }` | No |
+| `chamba_list_worktrees` | `{}` | `{ worktrees: WorktreeHandle[] }` | No |
+| `chamba_cleanup_worktree` | `{ branch: string }` | `{ removed: bool, branchKept: bool }` | No |
+| `chamba_summarize_to_vault` | `{ title: string, content: string, projectSlug?: string }` | `{ notePath: string }` | No |
+| `chamba_remember` | `{ key: string, content: string }` | `{ saved: bool, path: string }` | No |
+| `chamba_recall` | `{ query: string }` | `{ matches: Memory[] }` | No |
 
-> **Claude Code:** estas son las firmas exactas. Implementa siguiendo estas signatures. Si ajustas, documenta el por qué en el commit.
+**Ninguna tool llama a un LLM.** El modelo del cliente las invoca y razona sobre los outputs. Esto es lo que hace que chamba funcione en Cursor, Claude Code, VS Code, etc. sin importar qué modelo use cada uno.
 
-```typescript
-// @chamba/core/api/message.ts
-export type Role = 'user' | 'assistant' | 'system';
+### Cómo se ve el flujo orchestrator-worker desde el editor
 
-export interface Message {
-  role: Role;
-  content: Block[];
-}
-
-export type Block =
-  | { type: 'text'; text: string }
-  | { type: 'tool_use'; id: string; name: string; input: unknown }
-  | { type: 'tool_result'; toolUseId: string; content: string; isError: boolean };
-
-// @chamba/core/api/tool-def.ts
-export interface ToolDef {
-  name: string;
-  description: string;
-  inputSchema: JSONSchema7;
-}
-
-// @chamba/core/api/response.ts
-export interface Response {
-  blocks: Block[];
-  stopReason: 'end_turn' | 'tool_use' | 'max_tokens' | 'stop_sequence';
-  usage: { inputTokens: number; outputTokens: number; cacheReadTokens?: number };
-}
-
-// @chamba/core/provider/provider.ts
-export interface Provider {
-  readonly name: string;
-  getModel(): string;
-  setModel(name: string): void;
-  send(args: {
-    systemPrompt: string;
-    messages: Message[];
-    tools: ToolDef[];
-    signal?: AbortSignal;
-  }): Promise<Response>;
-}
-
-// @chamba/core/tool/tool.ts
-export interface Tool {
-  definition(): ToolDef;
-  execute(input: unknown, ctx: ToolContext): Promise<ToolResult>;
-}
-
-export interface ToolContext {
-  cwd: string;
-  filesystem: FilesystemPort;
-  process: ProcessPort;
-  signal: AbortSignal;
-}
-
-export type ToolResult =
-  | { ok: true; content: string }
-  | { ok: false; error: string };
-
-// @chamba/core/compact/strategy.ts
-export interface CompactionStrategy {
-  readonly name: string;
-  compact(messages: Message[], provider: Provider): Promise<Message[]>;
-}
-
-// @chamba/core/permission/policy.ts
-export interface PermissionPolicy {
-  shouldAllow(toolName: string, input: unknown): Promise<Decision>;
-}
-
-export type Decision =
-  | { allow: true }
-  | { allow: false; reason: string }
-  | { allow: 'ask'; };
-
-// @chamba/core/workspace/workspace.ts  (NUEVO Fase 5.5)
-export interface Workspace {
-  root: string;
-  hasObsidianVault: boolean;
-  vaultPath?: string;
-  description: string;             // Resumen de alto nivel
-  conventions: string[];           // Convenciones explícitas
-  activeProjects: ProjectRef[];
-  toMarkdown(): string;            // Serializa a workspace.md
-}
-
-export interface WorkspaceScanner {
-  scan(root: string): Promise<Workspace>;
-  detectVault(root: string): Promise<string | null>;
-}
-
-export interface ContextBuilder {
-  build(workspace: Workspace, task: string): Promise<string>;
-  // Devuelve el bloque de contexto a inyectar en el system prompt del orchestrator
-}
-
-// @chamba/core/subagent/reviewer.ts  (NUEVO Fase 6)
-export interface PlanReview {
-  approved: boolean;
-  gaps: string[];
-  suggestions: string[];
-  riskFlags: string[];
-}
-
-export interface Reviewer {
-  review(plan: string, context: string, task: string): Promise<PlanReview>;
-}
-
-// @chamba/core/worktree/manager.ts  (NUEVO Fase 6)
-export interface WorktreeHandle {
-  branch: string;             // e.g. "chamba/2026-06-09-add-health-check/backend-worker"
-  path: string;               // path absoluto al worktree creado
-  baseBranch: string;         // rama desde la que se ramificó
-  workerId: string;
-  taskSlug: string;
-  createdAt: string;          // ISO timestamp
-}
-
-export interface WorktreeManager {
-  isGitRepo(root: string): Promise<boolean>;
-  create(opts: {
-    root: string;
-    workerId: string;
-    taskSlug: string;
-    baseBranch?: string;      // por defecto la rama actual
-  }): Promise<WorktreeHandle>;
-  list(root: string): Promise<WorktreeHandle[]>;
-  /**
-   * Cleanup NO borra branches ni hace merge.
-   * Solo remueve el directorio de worktree, dejando la rama intacta para review humano.
-   * El humano hace merge a mano cuando esté listo.
-   */
-  cleanup(handle: WorktreeHandle): Promise<void>;
-}
-
-// @chamba/core/harness.ts
-export class Harness {
-  constructor(opts: {
-    provider: Provider;
-    tools: Tool[];
-    compaction: CompactionStrategy;
-    permission: PermissionPolicy;
-    memory?: MemoryStore;
-    workspace?: Workspace;          // NUEVO Fase 5.5
-    systemPrompt: string;
-    onEvent?: (event: HarnessEvent) => void;
-  });
-
-  async send(userInput: string): Promise<AsyncIterable<HarnessEvent>>;
-  async runOrchestrator(task: string): Promise<OrchestratorResult>;  // NUEVO Fase 6
-  async addSubagent(config: SubagentConfig): Promise<void>;
-  reset(): void;
-  getUsage(): UsageStats;
-}
-
-export interface OrchestratorResult {
-  plan: string;
-  reviews: PlanReview[];
-  executions: SubagentExecution[];
-  testResults: TestResult[];
-  summary: string;
-  vaultNotePath?: string;          // Si se escribió resumen a Obsidian
-  pendingBranches?: string[];      // Ramas creadas en worktrees que quedan abiertas para review humano
-}
 ```
+Usuario en Cursor: "@chamba orchestrate add health check endpoint"
+  ↓
+Modelo de Cursor recibe el prompt y razona
+  ↓
+Modelo invoca: chamba_load_context({ task: "add health check..." })
+  ↓
+chamba lee .chamba/workspace.md + busca notas relevantes → devuelve context
+  ↓
+Modelo razona y produce un plan inicial
+  ↓
+Modelo invoca: chamba_review_plan({ plan, task, context })
+  ↓
+chamba corre validaciones heurísticas (¿menciona acceptance criteria?
+  ¿toca solo módulos relevantes? ¿hay riesgo evidente?) → devuelve feedback
+  ↓
+Modelo ajusta el plan si hay issues
+  ↓
+Modelo invoca: chamba_create_worktree({ taskSlug, workerId: "implementer" })
+  ↓
+chamba crea git worktree → devuelve path
+  ↓
+Modelo cambia su working directory al worktree y trabaja ahí
+  (usando SUS tools nativas: edit, bash, etc.)
+  ↓
+Al terminar, modelo invoca: chamba_summarize_to_vault({ title, content })
+  ↓
+chamba escribe nota estructurada al vault de Obsidian
+  ↓
+Resultado final visible para el usuario en el chat de Cursor
+```
+
+**chamba aporta:** workspace context, plan validation, worktree isolation, vault writing. **El modelo aporta:** razonamiento, decisión, código. División de responsabilidades limpia.
 
 ---
 
 ## 4. Stack y dependencias justificadas
 
-Cada dependencia tiene una razón para estar y una razón por la que no se eligió la alternativa obvia.
+| Capa | Dependencia | Versión | Por qué |
+|---|---|---|---|
+| Build tool | `tsup` | ^8 | Bundle por paquete, dual ESM/CJS, sin config |
+| Lint + format | `biome` | ^2 | Una sola dep, 10x más rápido que ESLint+Prettier |
+| Tests | `vitest` | ^2 | TS sin transpiler aparte, watch rápido |
+| Validación | `zod` | ^3 | Schemas + inferencia de tipos TS |
+| Result types | `neverthrow` | ^8 | `Result<T,E>` ergonómico |
+| MCP SDK | `@modelcontextprotocol/sdk` | latest | SDK oficial de Anthropic |
+| Logging | `pino` | ^9 | Estructurado, rápido, sale a archivo (CRÍTICO en MCP stdio) |
+| Workspace | `pnpm` | ^9 | Workspaces nativos eficientes |
+| Versionado | `changesets` | ^2 | Estándar para monorepos publicables en npm |
 
-| Capa | Dependencia | Versión | Por qué | Por qué NO la alternativa |
-|---|---|---|---|---|
-| Build tool | `tsup` | ^8 | Bundle por paquete, dual ESM/CJS, sin config | `tsc` solo no genera CJS limpio; `vite` es overkill |
-| Lint + format | `biome` | ^2 | Una sola dep, 10x más rápido que ESLint+Prettier | ESLint+Prettier = 2 deps, 2 configs, 2 procesos |
-| Tests | `vitest` | ^2 | Compatible con TS sin transpiler aparte, watch rápido | `jest` requiere `ts-jest` o `babel-jest`, lento |
-| Validación | `zod` | ^3 | Schemas que también generan tipos TS | `yup` no infiere tipos tan bien; `valibot` es más nuevo |
-| Result types | `neverthrow` | ^8 | `Result<T,E>` ergonómico | `fp-ts` es enorme |
-| HTTP server | `hono` | ^4 | Mínimo, type-safe, SSE nativo | `express` no tiene types nativos; `fastify` es más pesado |
-| TUI | `ink` | ^5 | React para terminal, componente-based | `blessed` está abandonado |
-| MCP client | `@modelcontextprotocol/sdk` | latest | SDK oficial | No hay alternativa madura |
-| Anthropic SDK | `@anthropic-ai/sdk` | latest | SDK oficial | — |
-| OpenAI SDK | `openai` | latest | SDK oficial | — |
-| Logging | `pino` | ^9 | Estructurado, rápido | `winston` es más lento y verboso |
-| Workspace | `pnpm` | ^9 | Workspaces nativos eficientes | `npm workspaces` más lento |
-| Versionado | `changesets` | ^2 | Estándar para monorepos publicables en npm | `lerna` está en mantenimiento |
+**Lo que NO usamos (lista deliberada):**
 
-**MCP servers de terceros que vamos a recomendar (no son dependencias, son configuración del usuario):**
-- `obsidian-mcp` — para vaults de Obsidian. Se instala vía `npx`.
-- MCP servers oficiales del registry de Anthropic (filesystem, github, postgres, etc.) según necesidad del usuario.
+- **`@anthropic-ai/sdk`, `openai`, cualquier SDK de LLM.** chamba no llama modelos. Si Claude Code intenta añadir uno, está violando el principio 1.
+- **`@modelcontextprotocol/inspector` como dependencia de runtime.** Solo se usa para tests/dev, va en `devDependencies`.
+- **LangChain, Mastra, frameworks de agentes.** Innecesarios; el editor del usuario ya es el "framework de agente".
+- **Hono, Express, Fastify.** chamba no es un HTTP server. Es un MCP server stdio.
+- **Ink, blessed, TUIs.** El editor del usuario ya es la TUI.
 
-**Lo que NO usamos y por qué:**
+**MCP servers de terceros que recomendamos al usuario (no son deps):**
 
-- **LangChain / LangGraph** — exactamente lo que estamos construyendo nosotros. Sería absurdo.
-- **Vercel AI SDK** — considerado seriamente. Nos da provider abstraction gratis. Pero (a) nos ataría a su forma de hacer tool calling, (b) nuestro objetivo es entender la abstracción, no consumirla. Si en el futuro queremos sacrificar control por velocidad, refactorizar `provider/` para usarlo por debajo es ~1 día.
-- **NestJS** — sobreingeniería absoluta. Hono cubre lo necesario.
-- **Mastra, Inngest agent kit, OpenAI Agents SDK** — frameworks. Pelean con el modelo mental de harness.
+- `obsidian-mcp` para integración profunda con vault (búsqueda semántica de notas).
+- Otros MCP servers oficiales según necesite el usuario.
 
 ---
 
 ## 5. Plan de ejecución por fases
 
 Cada fase tiene:
-- **Goal** — qué se logra al final.
-- **Entregables** — archivos concretos a crear/modificar.
-- **Acceptance criteria** — comandos exactos que tienen que pasar.
-- **Definition of Done** — el commit final no se hace hasta cumplir todo.
+- **Goal**, **Entregables**, **Acceptance criteria**, **DoD**.
 - 📢 marca dónde generar contenido para LinkedIn.
-
-> **Claude Code:** ejecuta una fase a la vez. Al terminar, espera aprobación humana antes de avanzar. Si un AC falla, no inventes workarounds; reporta el problema y espera instrucciones.
 
 ---
 
-### Fase 1 — Bootstrap del monorepo + ejemplo mínimo 📢
+### Fase 1 — Bootstrap del monorepo + MCP server mínimo 📢
 
-**Estado:** ✅ Completada — 2026-06-09 — d6e4e7f
+**Estado:** ✅ Completada — 2026-06-09 — _pending_
 
-**Goal:** que `pnpm install && pnpm --filter @chamba/examples-minimal start` levante un REPL conversando con Claude en ~200 líneas en un solo archivo, sin abstracciones. La esencia del harness antes de meter capas.
+**Goal:** `npx @chamba/mcp` arranca un MCP server con una sola tool funcional (`chamba_workspace_show`), inspeccionable con MCP Inspector. Sin abstracciones, sin layers — el smallest thing that works.
 
 **Entregables:**
 - `package.json`, `pnpm-workspace.yaml`, `tsconfig.base.json`, `biome.json`, `vitest.config.ts`.
 - `.gitignore`, `.nvmrc` (Node 22 LTS), `.editorconfig`.
-- `LICENSE` (MIT), `CONTRIBUTING.md`.
-- `packages/core/package.json` con dependencias declaradas, solo `index.ts` con `export {};`.
-- `examples/minimal/main.ts` — implementación monolítica directa con `@anthropic-ai/sdk`:
-  - REPL loop con `readline`.
-  - Agent loop interno que maneja `tool_use` blocks.
-  - 3 tools hardcoded: `bash`, `read_file`, `write_file`.
-  - Approval prompt antes de cada tool execution.
-  - Sin abstracciones, sin interfaces. Código intencionalmente "feo y directo".
-- `examples/minimal/package.json` con script `start`.
-- `README.md` raíz versión inicial (se pule después).
+- `LICENSE` (MIT), `CONTRIBUTING.md` mínimo.
+- `packages/mcp/src/main.ts` — entry point que arranca server stdio.
+- `packages/mcp/src/server.ts` — setup MCP server con `@modelcontextprotocol/sdk`.
+- `packages/mcp/src/tools/workspace-show.ts` — primera tool, lee `.chamba/workspace.md` del cwd si existe, devuelve contenido o `null`.
+- `packages/mcp/src/logging.ts` — pino configurado para sacar a `~/.chamba/logs/mcp-{pid}.log`. **NUNCA a stdout.**
+- `packages/mcp/bin/chamba-mcp` — shebang script invocable.
+- `README.md` inicial con quick start (se pule en fases posteriores).
 
 **Acceptance criteria:**
 ```bash
-pnpm install                                              # No errors
-pnpm biome check .                                        # No errors
-pnpm --filter @chamba/examples-minimal exec tsc --noEmit  # No errors
-ANTHROPIC_API_KEY=sk-ant-... pnpm --filter @chamba/examples-minimal start
-# Debe abrir el REPL. Probar:
-#   > list the files here
-# El agente pide aprobación para bash, ejecuta, responde.
-```
+pnpm install
+pnpm biome check .
+pnpm --filter @chamba/mcp build
 
-**DoD:**
-- `examples/minimal/main.ts` tiene **menos de 250 líneas**.
-- Commit: `feat: bootstrap monorepo + minimal agent loop example`.
-
-**📢 Post de LinkedIn al cerrar la fase:** *"Hice un agente en 200 líneas — y lo más interesante no es que funcione, es lo que **no** tiene. Spoiler: lo voy a romper en pedazos en los próximos posts."* Serie: Deploy on Friday 🔥.
-
----
-
-### Fase 2 — Núcleo de `@chamba/core`: API types, Provider interface, MockProvider, agent loop
-
-**Estado:** ⏳ Pendiente
-
-**Goal:** primera versión abstraída con Provider polymorphism y MockProvider para que todo sea testeable sin API real.
-
-**Entregables:**
-- `packages/core/src/api/` completo (Message, Block, ToolDef, Response).
-- `packages/core/src/provider/provider.ts` (interface).
-- `packages/core/src/provider/mock.ts` — MockProvider con `enqueueResponse(response)` y `getCalls()`.
-- `packages/core/src/agent-loop.ts` — bucle interno desacoplado. Recibe `Provider`, `Tool[]`, `messages`, devuelve `messages` actualizados.
-- `packages/core/src/tool/tool.ts` + `tool/registry.ts`.
-- Tests en `packages/core/test/agent-loop.test.ts`:
-  - Loop termina con `stopReason: 'end_turn'`.
-  - Loop ejecuta tools y reinvoca al provider.
-  - Loop maneja errores de tool sin crashear.
-  - Loop respeta `AbortSignal`.
-
-**Acceptance criteria:**
-```bash
-pnpm --filter @chamba/core test                # All green
-pnpm --filter @chamba/core build               # Genera dist/
-pnpm --filter @chamba/core exec tsc --noEmit   # No errors
-```
-
-**DoD:**
-- Coverage del agent loop > 85%.
-- `MockProvider` se usa en todos los tests. Cero tests llaman a Anthropic real.
-- **Actualizar el README raíz** añadiendo un primer borrador del paso 9 ("Use as a library") de la sección "Step-by-step usage guide": un snippet TypeScript mínimo (10-15 líneas) que importe `MockProvider` y muestre cómo instanciar un agent loop básico. Este snippet se completa en Fase 3 con providers reales.
-- Commit: `feat(core): agent loop with provider abstraction and mock provider`.
-
----
-
-### Fase 3 — AnthropicProvider + OpenAIProvider + tools nativas 📢
-
-**Estado:** ⏳ Pendiente
-
-**Goal:** dos providers reales implementados contra el mismo interface, y las 3 tools nativas usando ports.
-
-**Entregables:**
-- `packages/core/src/ports/` — interfaces `FilesystemPort`, `ProcessPort`, `ClockPort`.
-- `packages/adapters/src/` — implementaciones Node de esos ports.
-- `packages/core/src/provider/anthropic.ts` — adapter para `@anthropic-ai/sdk`.
-- `packages/core/src/provider/openai.ts` — idem para `openai`.
-- `packages/core/src/tool/bash.ts`, `read-file.ts`, `write-file.ts` — usan los ports.
-- Tests para cada provider con `nock` o `msw`.
-- Tests para cada tool con `FilesystemPort` en memoria.
-
-**Acceptance criteria:**
-```bash
-pnpm --filter @chamba/core test
-# Smoke tests (requieren API keys):
-ANTHROPIC_API_KEY=... pnpm tsx scripts/smoke-anthropic.ts
-OPENAI_API_KEY=... pnpm tsx scripts/smoke-openai.ts
-```
-
-**DoD:**
-- El mismo test de integración del agent loop pasa con Anthropic y con OpenAI (parametrizado).
-- Las tools no importan `fs` ni `child_process` directamente desde `@chamba/core`.
-- Commit: `feat(core): anthropic + openai providers + native tools via ports`.
-
-**📢 Post de LinkedIn:** *"Mi agente ya no depende de Claude. Cambio una línea y corre en GPT. Te muestro el patrón en 3 minutos."* Tema: provider abstraction como el lock-in más fácil de evitar.
-
----
-
-### Fase 4 — Compaction strategies + SafeSplitPoint + Permission policies + Memory
-
-**Estado:** ⏳ Pendiente
-
-**Goal:** las tres capas que convierten el agent loop en algo usable a largo plazo: gestión de contexto, control de seguridad, persistencia.
-
-**Entregables:**
-- `packages/core/src/compact/`:
-  - `strategy.ts` (interface).
-  - `safe-split.ts` — implementación que garantiza no separar un `tool_use` de su `tool_result`. **Crítico, prioriza tests exhaustivos.**
-  - `none.ts`, `sliding-window.ts`, `summarize.ts`.
-- `packages/core/src/permission/`:
-  - `policy.ts` (interface).
-  - `always-allow.ts`, `always-ask.ts`, `allowlist.ts`.
-  - El agent-loop consulta la policy antes de cada tool execution.
-- `packages/core/src/memory/`:
-  - `store.ts` (interface).
-  - `filesystem-store.ts` — guarda en `~/.chamba/memory/{sessionId}/*.md`.
-  - Tools `remember` y `recall`.
-- `packages/core/src/harness.ts` — clase pública que compone todo.
-- Tests exhaustivos para SafeSplitPoint (mínimo 10 casos edge).
-
-**Acceptance criteria:**
-```bash
-pnpm --filter @chamba/core test
-# Tests específicos de SafeSplitPoint deben cubrir:
-# - mensaje normal de texto al final
-# - tool_use sin tool_result al final → excluye el tool_use
-# - tool_result sin tool_use previo → incluye el tool_use anterior
-# - secuencia tool_use → tool_result → tool_use → tool_result al final → respeta pares
-# - mensaje single con multiple tool_use blocks → all-or-nothing
-```
-
-**DoD:**
-- `Harness` class instanciable con composición completa.
-- Commit: `feat(core): compaction, permissions, memory + harness class`.
-
----
-
-### Fase 5 — MCP support 📢
-
-**Estado:** ⏳ Pendiente
-
-**Goal:** tools provistas por MCP servers externos, indistinguibles de las tools nativas desde el core.
-
-**Entregables:**
-- `packages/core/src/mcp/client.ts` — wrapper sobre `@modelcontextprotocol/sdk`. Soporta stdio y SSE.
-- `packages/core/src/mcp/server-config.ts` — schema Zod para configuración de servers MCP (formato compatible con Claude Code: `{ command, args, env }`).
-- `packages/core/src/tool/mcp-adapter.ts` — adapta una tool MCP al `Tool` interface. Coexiste con nativas en el mismo registry sin que el agent-loop se entere.
-- Demo: `examples/mcp-sqlite/main.ts` — agente que conecta a un MCP server de SQLite local, crea una DB ejemplo, ejecuta queries. Funciona sin servicios externos para que cualquiera que clone el repo lo pueda probar.
-- Tests con MCP server mock (child process que habla el protocolo).
-
-**Acceptance criteria:**
-```bash
-pnpm --filter @chamba/core test
-pnpm --filter @chamba/examples-mcp-sqlite start
-# > how many users are in the users table?
-# El agente usa la tool MCP y responde con un número real.
-```
-
-**DoD:**
-- Una tool MCP se registra exactamente con `registry.register(await MCPAdapter.fromConfig(config))`. **Cero código especial en agent-loop.**
-- Commit: `feat(core): MCP client + adapter for native interop`.
-
-**📢 Post de LinkedIn:** *"Conecté mi agente a una base de datos en 4 líneas. Sin tools custom, sin adaptadores. Esto es MCP."* Tema: por qué MCP cambia las reglas de los harnesses caseros.
-
----
-
-### Fase 5.5 — Workspace context + Obsidian integration 📢
-
-**Estado:** ⏳ Pendiente
-
-**Goal:** chamba entiende el contexto del directorio donde se ejecuta. Si hay un vault de Obsidian, lo detecta y lo usa. Si no hay `workspace.md`, lo genera (con tu aprobación). El contexto del workspace se inyecta automáticamente en futuras conversaciones y planes.
-
-**Por qué esta fase importa:** sin contexto del workspace, el orchestrator de la Fase 6 trabajaría a ciegas. Esta fase es lo que diferencia "un harness genérico" de "un harness que entiende dónde vivo y cómo trabajo".
-
-**Entregables:**
-
-- `packages/core/src/workspace/workspace.ts` — tipos `Workspace`, `ProjectRef` y loader que lee `.chamba/workspace.md`.
-
-- `packages/core/src/workspace/scanner.ts` — clase `WorkspaceScanner`:
-  - `scan(root)` recorre el directorio (respeta `.gitignore`), identifica archivos clave (`README*`, `package.json`, `pyproject.toml`, `Cargo.toml`, etc.), detecta lenguajes, framework principal, estructura.
-  - Genera un `workspace.md` draft con secciones: descripción, convenciones detectadas, proyectos activos, mapa de carpetas.
-
-- `packages/core/src/workspace/obsidian-detector.ts`:
-  - Detecta vault de Obsidian buscando el directorio `.obsidian/` en `root` o en `~/Documents/`, `~/Notes/`, y rutas comunes.
-  - Permite especificar el path manualmente vía config si la auto-detección falla.
-  - Devuelve `{ found: boolean, path?: string, noteCount?: number }`.
-
-- `packages/core/src/workspace/context-builder.ts`:
-  - `build(workspace, task)` produce un bloque markdown que se inyecta en el system prompt del orchestrator.
-  - Contiene: descripción del workspace + convenciones + lista de proyectos activos + (si hay Obsidian) lista de notas potencialmente relevantes según el task (búsqueda por keywords).
-
-- **Nuevas tools nativas:**
-  - `init_workspace` — genera `.chamba/workspace.md` draft escaneando el directorio actual.
-  - `read_workspace` — lee el `workspace.md` actual.
-  - `update_workspace` — actualiza secciones específicas del workspace.md.
-  - `summarize_to_vault` — si hay vault de Obsidian, crea una nota estructurada en `vault/proyectos/{fecha}-{slug}.md` con: tarea original, plan ejecutado, archivos tocados, decisiones tomadas, próximos pasos.
-
-- **MCP server recomendado:** documentar en README cómo configurar `obsidian-mcp` en `.chamba/config.json`:
-  ```json
-  {
-    "mcpServers": {
-      "obsidian": {
-        "command": "npx",
-        "args": ["-y", "obsidian-mcp", "--vault", "$OBSIDIAN_VAULT_PATH"]
-      }
-    }
-  }
-  ```
-
-- **Hooks de eventos nuevos:** `workspace.initialized`, `workspace.updated`, `vault.note_created` — para que el CLI/server los muestren al usuario.
-
-- Tests:
-  - Scanner detecta correctamente un dir Node (con `package.json`), un dir Python (con `pyproject.toml`), un dir mixto.
-  - Obsidian-detector encuentra `.obsidian/` en diferentes ubicaciones; falla limpiamente si no existe.
-  - Context-builder produce markdown válido y trimea a un tamaño máximo configurable (por defecto 2000 tokens).
-  - Tools `init_workspace` y `summarize_to_vault` con `FilesystemPort` en memoria.
-
-**Acceptance criteria:**
-```bash
-pnpm --filter @chamba/core test
+# Verificación con MCP Inspector:
+npx @modelcontextprotocol/inspector node packages/mcp/dist/main.js
+# Debe mostrar 1 tool: chamba_workspace_show
 
 # Smoke manual:
-cd /tmp && mkdir test-workspace && cd test-workspace
-echo '{"name":"test","dependencies":{"express":"^4"}}' > package.json
-npx tsx /path/to/chamba/scripts/smoke-workspace.ts
-# Debe:
-# 1. Escanear el dir
-# 2. Generar .chamba/workspace.md con secciones correctas
-# 3. Detectar que no hay vault Obsidian (ok)
-# 4. Producir contexto inyectable
-
-# Con vault Obsidian:
-OBSIDIAN_VAULT_PATH=~/Obsidian/MiVault npx tsx scripts/smoke-workspace-obsidian.ts
-# Debe detectar el vault, contar notas, y listar las relevantes para el task de prueba
+mkdir /tmp/test && cd /tmp/test
+echo "# test workspace" > .chamba/workspace.md
+node /path/to/chamba/packages/mcp/dist/main.js < /dev/null
+# (en realidad esto requiere stdio handshake; basta con el Inspector)
 ```
 
 **DoD:**
-- El scanner respeta `.gitignore` y `.dockerignore`. No lee binarios. No lee `node_modules/`.
-- El `workspace.md` generado es legible por humanos y editable a mano. **El usuario debe poder modificarlo y chamba debe respetar las ediciones.**
-- Si el usuario edita `workspace.md` manualmente, el scanner no debe sobrescribirlo sin confirmación.
-- `summarize_to_vault` falla con mensaje claro si no hay vault configurado.
-- Commit: `feat(core): workspace context + obsidian integration`.
+- El server NO escribe a stdout fuera del protocolo MCP (verificar con grep en logs del Inspector).
+- Commit: `feat: bootstrap monorepo + minimal MCP server with workspace_show tool`.
 
-**📢 Post de LinkedIn:** *"Mi agente ahora entiende mi vault de Obsidian. Le pido algo y antes de actuar, busca contexto en mis notas. Esto cambia cómo trabajo."* Tema: por qué un agente sin contexto de tu workspace es un asistente genérico, no un asistente personal.
+**📢 Post de LinkedIn:** *"Empecé chamba: un MCP server que añade orquestación + workspace context a Cursor, Claude Code y otros editores. Sin API keys, usa el modelo de tu editor. Fase 1: el server arranca y devuelve una tool. La cosa más chiquita que funciona."* Serie: Deploy on Friday 🔥.
 
 ---
 
-### Fase 6 — Subagentes + orchestrator-worker pattern + Reviewer 📢
+### Fase 2 — Workspace context + scanner
 
 **Estado:** ⏳ Pendiente
 
-**Goal:** el harness instancia subagentes con su propio provider, tools, system prompt y permission policy. Implementa el flujo completo del orchestrator: **carga contexto → genera plan → reviewer auto-evalúa plan → ejecuta workers en paralelo → tester valida → summarize a vault**.
+**Goal:** las 3 tools de workspace funcionales: init (escanea el dir y genera `workspace.md`), show (ya existe), reload (re-escanea y devuelve diff sin sobrescribir).
 
 **Entregables:**
-
-- `packages/core/src/subagent/subagent.ts` — clase `Subagent` = Harness restringido con parent reference. Hereda workspace del parent si no se especifica uno propio. **Recibe un `cwd` específico al instanciarse — si el orchestrator le pasa un worktree, todas las tools del subagent operan ahí.**
-
-- `packages/core/src/subagent/delegate-tool.ts` — tool `delegate_to_subagent` que recibe `{ agent, task, context }`, instancia el subagent, ejecuta, devuelve resumen.
-
-- `packages/core/src/worktree/manager.ts` — `WorktreeManager` que gestiona git worktrees:
-  - `isGitRepo(root)` — `git rev-parse --is-inside-work-tree`.
-  - `create({ root, workerId, taskSlug, baseBranch })` — crea worktree en `.chamba/worktrees/{taskSlug}/{workerId}/` con rama nueva `chamba/{taskSlug}/{workerId}`. Usa el `ProcessPort` para invocar `git worktree add`.
-  - `list(root)` — parsea `git worktree list --porcelain`.
-  - `cleanup(handle)` — **solo** ejecuta `git worktree remove` (sin `--force` por defecto). **NUNCA borra la rama ni hace merge.** La rama queda viva para que el humano la revise.
-
-- `packages/core/src/worktree/git-detector.ts` — detecta si el `cwd` es un repo git. Resultado se cachea por sesión.
-
-- `packages/core/src/worktree/branch-naming.ts` — convención de nombres: `chamba/{YYYY-MM-DD}-{task-slug}/{worker-id}`. Sanitiza para que git no se queje (lowercase, sin espacios, sin caracteres reservados).
-
-- `packages/core/src/subagent/reviewer.ts` — `Reviewer` class (sin cambios respecto al plan anterior).
-
-- `packages/core/src/subagent/orchestrator.ts` — `createOrchestrator(opts)` que configura un Harness con:
-  - System prompt que prohíbe Edit/Write/Bash directos.
-  - Tools restringidas: `read_file`, `grep`, `search_notes` (si hay Obsidian), `delegate_to_subagent`, `summarize_to_vault`.
-  - Workspace context inyectado automáticamente.
-  - Reviewer integrado en el flow.
-  - **WorktreeManager integrado.** Antes de delegar a cada subagent, si el repo es git, el orchestrator crea un worktree y se lo pasa al subagent como su `cwd`. Si no es git, los workers comparten el `cwd` original y el orchestrator los serializa (no corre dos workers en paralelo en el mismo directorio).
-  - Subagentes registrados disponibles para delegación.
-
-- **Flujo completo del orchestrator (versión actualizada con worktrees):**
-  ```
-  1. Recibir task
-  2. Cargar contexto (workspace.md + búsqueda en vault si aplica)
-  3. Generar plan inicial → .chamba/plans/{fecha}-{slug}.md
-  4. Llamar reviewer.review(plan)
-  5. Si approved=false: re-planear con feedback, volver a paso 4 (max 3 iteraciones)
-  6. Mostrar plan al humano para aprobación final (vía evento; en CLI esto pausa, en server espera POST)
-  7. Para cada tarea del plan que va a un worker:
-     7a. Si el repo es git: WorktreeManager.create() → worktree dedicado en .chamba/worktrees/
-     7b. Si no es git: usar cwd original; encolar serialmente
-     7c. Delegar al subagent con su cwd correspondiente
-  8. Cada worker termina → tester valida → si falla, replantea esa tarea en el MISMO worktree
-  9. Al terminar TODOS los workers:
-     - WorktreeManager.cleanup() para cada handle (borra el dir, NO la rama)
-     - El orchestrator lista las ramas creadas en el summary para que el humano sepa qué mergear
-  10. Llamar summarize_to_vault con resumen completo incluyendo la lista de ramas pendientes de review
-  11. Devolver OrchestratorResult al caller
-  ```
-
-- `examples/orchestrator-team/main.ts` — demo concreto: orchestrator + reviewer + implementer + tester construyendo un mini módulo en un repo git de demo. **Debe mostrar la creación de los worktrees, ejecución paralela, y al final el listado de ramas pendientes de merge.**
-
-- `examples/obsidian-orchestrator/` — demo end-to-end con vault Obsidian (sin cambios respecto al plan anterior).
-
-- Tests verifican:
-  - Un subagent puede ejecutar tools que el orchestrator no puede.
-  - El orchestrator recibe el resumen del subagent como `tool_result`.
-  - Subagents corren en paralelo cuando el orchestrator delega múltiples tareas **y el repo es git**.
-  - Subagents corren serialmente cuando el repo **no es git**.
-  - WorktreeManager.create crea el worktree correctamente y devuelve un handle válido.
-  - WorktreeManager.cleanup remueve el directorio pero la rama sigue existiendo (`git branch --list chamba/*` la muestra).
-  - El reviewer puede rechazar un plan y forzar re-planeo.
-  - El orchestrator escala correctamente cuando hay loop infinito de rechazos (corta después de 3 iteraciones).
-  - Si `git worktree add` falla (rama ya existe, conflicto, etc.), el orchestrator reporta error claro y no continúa con esa tarea.
+- `packages/core/src/workspace/workspace.ts` — tipos `Workspace`, `ProjectRef`, loader.
+- `packages/core/src/workspace/scanner.ts`:
+  - `scan(root)` recorre directorio respetando `.gitignore`.
+  - Identifica archivos clave (`README*`, `package.json`, `pyproject.toml`, `Cargo.toml`, etc.).
+  - Detecta lenguajes, framework principal, estructura.
+  - Genera `workspace.md` con secciones: descripción, convenciones, proyectos activos, mapa.
+- `packages/core/src/ports/` — interfaces `FilesystemPort`, `ProcessPort`, `ClockPort`.
+- `packages/adapters/src/` — implementaciones Node.
+- `packages/mcp/src/tools/workspace-init.ts`:
+  - Schema input: `{ root?: string }`.
+  - Si `.chamba/workspace.md` ya existe, NO sobrescribe — devuelve `{ alreadyExists: true, currentContents }` para que el modelo decida.
+  - Si no existe, escanea y genera.
+- `packages/mcp/src/tools/workspace-reload.ts`:
+  - Re-escanea el dir actual.
+  - Devuelve un diff entre el `workspace.md` actual y el resultado del escaneo. **No sobrescribe.**
+  - El modelo decide si actualizar.
+- Tests con `FilesystemPort` en memoria para scanner.
 
 **Acceptance criteria:**
 ```bash
-pnpm --filter @chamba/core test
-
-# Demo orchestrator-worker puro:
-pnpm --filter @chamba/examples-orchestrator-team start
-# El orchestrator descompone una tarea, el reviewer la audita,
-# y los workers la ejecutan en paralelo.
-
-# Demo con vault Obsidian:
-pnpm --filter @chamba/examples-obsidian-orchestrator start
-# El orchestrator carga contexto del vault, genera plan que cita notas,
-# y al terminar escribe resumen al vault.
+pnpm -r test
+npx @modelcontextprotocol/inspector node packages/mcp/dist/main.js
+# Debe listar 3 tools: workspace_init, workspace_show, workspace_reload
+# Invocar workspace_init en un dir de prueba → debe crear .chamba/workspace.md
 ```
 
 **DoD:**
-- Subagents corren con su propio context window (no comparten messages con parent).
-- Reviewer rechaza al menos un escenario en los tests (caso de plan obviamente incompleto).
-- El demo `obsidian-orchestrator` muestra al menos una cita a una nota del vault en el plan generado.
-- **WorktreeManager funcional**: si corres el demo orchestrator-team en un repo git, después de terminar debes poder hacer `git branch --list 'chamba/*'` y ver las ramas creadas por los workers, sin merged y sin borradas.
-- **Detección git robusta**: si corres el demo en un directorio que NO es git, el orchestrator delega serialmente sin intentar crear worktrees, y lo anuncia en su output ("non-git workspace, workers run sequentially").
-- Commit: `feat(core): subagents + orchestrator-worker pattern + reviewer + worktrees + obsidian flow`.
-
-**📢 Post de LinkedIn:** *"Mi agente ahora delega como un tech lead. Genera plan, lo audita, lo ejecuta en paralelo, lo prueba, y deja todo documentado en mi vault de Obsidian. ¿Por qué este patrón cambia todo?"* Tema: orchestrator-worker explicado para developers, con énfasis en el reviewer como gate crítico y en la conexión con el sistema de notas personal. Va en #MenteDeDesarrollador porque conecta directamente con la práctica de tech leadership humano.
+- Scanner respeta `.gitignore` y `.dockerignore`. No lee binarios. No lee `node_modules/`.
+- `workspace.md` generado es legible y editable a mano.
+- Si el usuario lo edita, `reload` NO lo sobrescribe — devuelve diff.
+- Commit: `feat(workspace): scanner + init/show/reload tools`.
 
 ---
 
-### Fase 7 — `@chamba/cli`: CLI con Ink + comandos `/workspace` y `/orq` 📢
+### Fase 3 — Obsidian integration 📢
 
 **Estado:** ⏳ Pendiente
 
-**Goal:** la TUI usable diariamente. Comandos para inicializar workspace y disparar el orchestrator desde una sola línea.
+**Goal:** chamba detecta si hay vault Obsidian, inyecta búsqueda contextual en `load_context`, y puede escribir resúmenes estructurados al vault vía `summarize_to_vault`.
 
 **Entregables:**
-- `packages/cli/src/main.ts` — entry point con `commander`.
-- `packages/cli/src/ui/app.tsx` — componente raíz Ink: transcript scrolleable, input box, status bar.
-- `packages/cli/src/ui/debug-panel.tsx` — panel toggleable con último payload enviado/recibido.
-- `packages/cli/src/ui/approval-prompt.tsx` — modal de aprobación con yes/no/always-for-this-tool.
-- `packages/cli/src/ui/plan-review.tsx` — UI específico para revisar el plan del orchestrator antes de ejecutar:
-  - Muestra el plan en formato markdown renderizado.
-  - Muestra el feedback del reviewer.
-  - Opciones: approve, edit (abre `$EDITOR`), reject (descarta plan y pide nuevo).
-
-- `packages/cli/src/commands/` — slash commands:
-  - `/help`
-  - `/provider`, `/model`, `/tokens`, `/debug`, `/compact`, `/clear`, `/tools`, `/subagents`, `/exit`
-  - **`/workspace init`** — escanea dir actual, genera `.chamba/workspace.md`, lo abre en `$EDITOR` para aprobación.
-  - **`/workspace show`** — muestra el workspace.md actual.
-  - **`/workspace reload`** — re-escanea y mergea con el workspace.md existente (no sobrescribe, propone diff).
-  - **`/orq <tarea>`** o **`/orchestrator <tarea>`** — dispara el flujo completo de orchestrator. Muestra plan-review UI cuando el plan está listo, después muestra progreso en vivo de los workers en paralelo. **Al final, muestra una sección de "branches pendientes" listando los worktrees creados y los comandos `git merge` sugeridos** para que el humano pueda revisar y mergear con un copy-paste.
-  - **`/worktrees`** — nuevo comando que lista los worktrees activos de chamba en el repo actual (parsea `git worktree list`). Útil para limpiar manualmente si quedaron worktrees zombi por crash o Ctrl+C abrupto.
-
-- `packages/cli/src/config.ts` — carga `.chamba/config.json` del CWD + `~/.chamba/config.json` global (CWD overrides global).
-- `packages/cli/bin/chamba` — shebang script para `npx chamba` o install global.
-- Soporte historial multi-línea (Shift+Enter).
-- Spinner mientras el provider piensa.
-- Auto-detección de workspace al arrancar: si hay `.chamba/workspace.md`, lo carga; si no, sugiere `/workspace init`.
+- `packages/core/src/workspace/obsidian-detector.ts`:
+  - Detecta vault buscando `.obsidian/` en `root`, `~/Documents/`, `~/Notes/`, rutas comunes.
+  - Permite override vía env var `CHAMBA_OBSIDIAN_VAULT_PATH`.
+  - Devuelve `{ found, path?, noteCount? }`.
+- `packages/core/src/workspace/context-builder.ts`:
+  - `build(workspace, task)` produce bloque markdown con contexto.
+  - Si hay vault: busca por keywords del task notas relevantes (búsqueda simple por contenido, no semántica en V1).
+  - Limita output a tamaño configurable (default ~2000 tokens estimados).
+- `packages/core/src/obsidian/vault-writer.ts`:
+  - Crea nota en `vault/proyectos/{fecha}-{slug}.md` con frontmatter YAML estándar.
+  - Estructura: título, fecha, tags, resumen, plan, decisiones, archivos tocados, próximos pasos, links.
+- `packages/core/src/obsidian/note-template.ts`:
+  - Template editable para usuarios que quieran customizar el formato.
+- `packages/mcp/src/tools/load-context.ts`:
+  - Input: `{ task, includeObsidian? }`.
+  - Output: contexto del workspace + (si aplica) notas relevantes.
+- `packages/mcp/src/tools/summarize-to-vault.ts`:
+  - Input: `{ title, content, projectSlug? }`.
+  - Falla con mensaje claro si no hay vault configurado.
+- `examples/obsidian-orchestrator/` — demo con vault de prueba.
 
 **Acceptance criteria:**
 ```bash
-pnpm --filter @chamba/cli build
-node packages/cli/bin/chamba
-# Verificar interactivamente:
-# - / muestra autocompletado de slash commands
-# - /workspace init genera workspace.md correctamente
-# - /workspace show lo renderiza bien
-# - /orq "agrega un endpoint health check" dispara el flow completo:
-#   muestra plan, plan-review UI, espera aprobación, ejecuta, muestra progreso, summary final
-# - /debug on muestra el panel
-# - Approval prompt antes de cada tool
-# - /provider openai cambia provider sin reiniciar
-# - Ctrl+C limpia y sale sin orphan processes
+pnpm -r test
+# Smoke con vault simulado:
+CHAMBA_OBSIDIAN_VAULT_PATH=/tmp/test-vault npx @modelcontextprotocol/inspector node packages/mcp/dist/main.js
+# Invocar load_context({ task: "auth", includeObsidian: true }) → debe listar notas relevantes
+# Invocar summarize_to_vault({ title: "test", content: "..." }) → debe crear nota
 ```
 
 **DoD:**
-- `pnpm pack` genera tarball instalable globalmente.
-- Asciinema o GIF demo grabado para el README, mostrando especialmente el flujo `/orq`.
-- El UI de plan-review es navegable con teclado (no requiere mouse).
-- **Actualizar el README raíz** añadiendo una versión inicial (no final, eso es Fase 9) de la sección "Step-by-step usage guide" cubriendo los pasos 1-8 y 11-12 del listado de Fase 9. Los pasos 9 (library usage) y 10 (server usage) se completan después en sus respectivas fases. El README de Fase 9 solo pule y agrega lo que falta, no escribe de cero.
-- Commit: `feat(cli): TUI with ink + workspace and orchestrator commands`.
+- Si no hay vault, `summarize_to_vault` devuelve error claro: `{ error: "No Obsidian vault configured. Set CHAMBA_OBSIDIAN_VAULT_PATH or use the obsidian-mcp server" }`.
+- Las notas escritas tienen frontmatter YAML válido (parseable por Obsidian).
+- Commit: `feat(obsidian): vault detection, context injection, vault writer`.
 
-**📢 Post de LinkedIn:** *"chamba ya tiene CLI. `npx chamba`, después `/orq agrega auth con magic links` y se encarga del resto. GIF abajo."* Aquí es donde se busca tracción real con un demo concreto.
+**📢 Post de LinkedIn:** *"chamba ahora habla con tu vault de Obsidian. Le pides una tarea desde Cursor, busca contexto en tus notas, y al terminar deja un resumen estructurado de vuelta en el vault. Tu segundo cerebro y tu agente, sincronizados."* Tema: cómo MCP convierte tu vault en memoria persistente para cualquier agente.
 
 ---
 
-### Fase 8 — `@chamba/server`: HTTP/SSE 📢
+### Fase 4 — Plan generation + reviewer heurístico
 
 **Estado:** ⏳ Pendiente
 
-**Goal:** harness expuesto vía HTTP para integrar desde otras apps. SSE para streaming. Endpoint específico para el orchestrator.
+**Goal:** tools `generate_plan` y `review_plan`. La generación devuelve un **template estructurado**, no un plan completo (el modelo del cliente lo refina). El reviewer aplica validaciones programáticas heurísticas, no llama LLM.
 
 **Entregables:**
-- `packages/server/src/main.ts` — server Hono en puerto configurable.
-- Endpoints:
-  - `POST /sessions` — crea sesión, devuelve `sessionId`.
-  - `GET /sessions/:id` — estado (transcript, usage, workspace cargado).
-  - `POST /sessions/:id/messages` — envía mensaje, devuelve SSE stream: `text_delta`, `tool_call_request`, `tool_call_result`, `done`.
-  - `POST /sessions/:id/approvals` — responde a un tool_call_request pendiente.
-  - **`POST /sessions/:id/orchestrator`** — dispara flow del orchestrator. SSE stream con eventos: `plan_generated`, `plan_reviewed`, `plan_approval_required`, `worker_started`, `worker_progress`, `worker_completed`, `test_started`, `test_completed`, `summary_written`, `done`.
-  - `POST /sessions/:id/orchestrator/approve-plan` — aprueba o rechaza un plan pendiente.
-  - `POST /sessions/:id/workspace/init` — inicializa workspace en el dir del server.
-  - `GET /sessions/:id/workspace` — devuelve workspace.md actual.
-  - `GET /tools` — lista de tools disponibles.
-- `packages/server/src/session-manager.ts` — ciclo de vida en memoria, cleanup tras 30min.
-- `packages/server/src/auth.ts` — validación por API key vía header.
-- Tests de integración estilo `supertest`.
-- OpenAPI spec con `@hono/zod-openapi`.
-- `Dockerfile` para deploy fácil.
+- `packages/core/src/plan/template.ts`:
+  - `PlanTemplate` con secciones: goal, acceptance criteria, subtasks (con tipo y worker sugerido), risks, files-likely-touched.
+  - Función `generateTemplate(task, context, workspace)` devuelve un template con placeholders que el modelo llena.
+- `packages/core/src/plan/validator.ts`:
+  - Reglas heurísticas chequeables sin LLM:
+    - ¿Tiene acceptance criteria explícitos?
+    - ¿Las subtasks tienen worker asignado?
+    - ¿Hay subtasks sin descripción concreta?
+    - ¿Toca archivos fuera de los módulos mencionados en workspace.md?
+    - ¿Hay risk flags evidentes (toca `auth/`, toca `payments/`, toca `database/migrations/`)?
+- `packages/core/src/plan/reviewer.ts`:
+  - `Reviewer.review(plan, context, task)` → `PlanReview`.
+  - Devuelve `{ approved, issues: [], suggestions: [], riskFlags: [] }`.
+  - El modelo del cliente recibe esto y decide si re-planea.
+- `packages/mcp/src/tools/generate-plan.ts`:
+  - Input: `{ task, context }`.
+  - Output: template estructurado para que el modelo lo refine.
+- `packages/mcp/src/tools/review-plan.ts`:
+  - Input: `{ plan, task, context }`.
+  - Output: review estructurado.
+- Tests con planes de ejemplo (algunos pasan, algunos fallan validaciones específicas).
 
 **Acceptance criteria:**
 ```bash
-pnpm --filter @chamba/server start
-# Otra terminal:
-curl -X POST http://localhost:3000/sessions -H "X-API-Key: dev"
-# → { sessionId: "..." }
-
-# Disparar orchestrator vía HTTP:
-curl -N -X POST http://localhost:3000/sessions/{id}/orchestrator \
-  -H "X-API-Key: dev" -H "Content-Type: application/json" \
-  -d '{"task":"add a health check endpoint"}'
-# → SSE stream con eventos del flow completo
+pnpm -r test
+# Smoke:
+# generate_plan({ task: "add health check", context: "..." }) → template con secciones
+# review_plan({ plan: "implementar health check sin tests", ... }) → { approved: false, issues: ["no tests mentioned"] }
+# review_plan({ plan: "<plan completo y bien estructurado>", ... }) → { approved: true }
 ```
 
 **DoD:**
-- OpenAPI spec en `/openapi.json`.
-- Imagen Docker construible y corre.
-- El stream SSE del orchestrator emite todos los eventos del flow en orden correcto.
-- **Actualizar el README raíz** completando el paso 10 ("Use as a service") de la sección "Step-by-step usage guide" con los comandos `curl` reales y un ejemplo de payload de respuesta.
-- Commit: `feat(server): HTTP/SSE with orchestrator endpoint`.
-
-**📢 Post de LinkedIn:** *"chamba ahora corre como servicio. Puedes embeberlo en tu app web, dispararle el orchestrator desde un POST, y suscribirte a los eventos. SSE all the way."* Tema: por qué exponer un harness como servicio en vez de llamar al SDK directo.
+- Reviewer detecta al menos 5 anti-patrones diferentes en planes (sin tests, sin acceptance criteria, sin workers asignados, archivos no relacionados, falta de risk assessment).
+- Cero llamadas a LLM. Verificable revisando imports de `plan/`.
+- Commit: `feat(plan): template generator + heuristic reviewer`.
 
 ---
 
-### Fase 8.5 — `@chamba/mcp` (chamba como MCP server) 📢
+### Fase 5 — Worktree manager 📢
 
 **Estado:** ⏳ Pendiente
 
-**Goal:** chamba se puede invocar desde el chat de Cursor, VS Code con Copilot, Windsurf, Cline, JetBrains, Trae y cualquier editor con MCP client. El usuario no instala una extensión — añade una entrada en el archivo de config MCP de su editor y queda disponible. Mismo patrón que usaste con lapzo-tools.
-
-**Por qué importa:** sin esta fase, chamba vive solo en su propia terminal. Con esta fase, chamba se vuelve **una capa que vive transversalmente en cualquier flujo donde ya estés trabajando** — pides cosas a chamba desde donde tengas el cursor parpadeando, no tienes que cambiar de ventana.
+**Goal:** tools `create_worktree`, `list_worktrees`, `cleanup_worktree`. Permite a los modelos crear aislamiento real para trabajo en paralelo.
 
 **Entregables:**
-
-- `packages/mcp/src/server.ts` — instancia un MCP server usando `@modelcontextprotocol/sdk` (`StdioServerTransport`). Se compone internamente de un `Harness` de `@chamba/core` con workspace cargado y los sub-agentes registrados.
-
-- **Tools expuestas vía MCP** (cada una con su schema Zod claro):
-  - `chamba_orchestrate({ task, mode })` — dispara el flow completo del orchestrator. `mode` puede ser `'plan-only'` (devuelve plan sin ejecutar), `'execute'` (planifica + ejecuta), `'execute-with-approval'` (planifica, espera approval via prompt-tool, ejecuta).
-  - `chamba_workspace_init({ root? })` — inicializa workspace.md en el dir actual o el path especificado.
-  - `chamba_workspace_show()` — devuelve el workspace.md actual como string.
-  - `chamba_workspace_reload()` — re-escanea y devuelve diff propuesto.
-  - `chamba_summarize_to_vault({ title, content, projectSlug? })` — escribe nota estructurada al vault.
-  - `chamba_generate_plan({ task })` — solo genera plan, no ejecuta. Útil para que el editor pida un plan y el humano decida cómo seguir.
-
-- `packages/mcp/bin/chamba-mcp` — shebang script que arranca el server en modo stdio. Es lo que los editores invocan como `command`.
-
-- **Configuraciones de ejemplo** en `examples/editor-integration/` con README específico por editor:
-  - `cursor.mcp.json` — para `.cursor/mcp.json`:
-    ```json
-    {
-      "mcpServers": {
-        "chamba": {
-          "command": "npx",
-          "args": ["-y", "@chamba/mcp"],
-          "env": {
-            "ANTHROPIC_API_KEY": "${ANTHROPIC_API_KEY}",
-            "CHAMBA_WORKSPACE_ROOT": "${workspaceFolder}"
-          }
-        }
-      }
-    }
-    ```
-  - `vscode.mcp.json` — para `.vscode/mcp.json` (campo `"servers"` en vez de `"mcpServers"`, esta diferencia agarra a todos).
-  - `windsurf.config.md` — instrucciones.
-  - `jetbrains.config.md` — instrucciones.
-  - `trae.config.md` — instrucciones con disclaimer de "compatible si Trae soporta MCP, verificar al usar".
-
-- **Documentación de cada tool** en `packages/mcp/README.md` con ejemplos de invocación desde cada editor:
-  - En Cursor: `@chamba orchestrate "agrega health check endpoint"`.
-  - En VS Code Copilot Chat (Agent mode): `#chamba_orchestrate add a health check endpoint`.
-  - En Windsurf/Cline: análogo.
-
-- **Configuración por workspace.** El server descubre el workspace del editor automáticamente vía variable de entorno (`CHAMBA_WORKSPACE_ROOT`) que el editor expone. Si no está, usa `process.cwd()`.
-
-- **Logging seguro.** Los MCP servers stdio no pueden escribir a stdout (rompe el protocolo). Logs van a `~/.chamba/logs/mcp-{pid}.log` con `pino`.
-
-- **Tests:**
-  - El MCP server arranca, declara las tools correctas con sus schemas.
-  - Una llamada a `chamba_orchestrate` con MockProvider devuelve un resultado válido.
-  - El server maneja correctamente la cancelación (signal) cuando el editor cierra la conexión.
-  - Sin escribir a stdout fuera del protocolo MCP.
+- `packages/core/src/worktree/git-detector.ts`:
+  - `isGitRepo(root)` con `git rev-parse --is-inside-work-tree`. Cachea por sesión.
+- `packages/core/src/worktree/branch-naming.ts`:
+  - Convención: `chamba/{YYYY-MM-DD}-{task-slug}/{worker-id}`.
+  - Sanitiza para git (lowercase, sin espacios, sin caracteres reservados).
+- `packages/core/src/worktree/manager.ts`:
+  - `create({ root, taskSlug, workerId, baseBranch })` → crea en `.chamba/worktrees/{taskSlug}/{workerId}/`.
+  - `list(root)` → parsea `git worktree list --porcelain`.
+  - `cleanup(handle)` → SOLO `git worktree remove` sin `--force`. **NUNCA borra branch ni mergea.**
+- `packages/mcp/src/tools/create-worktree.ts`:
+  - Si el repo no es git: devuelve `{ error: "Not a git repo, worktree skipped. Worker should use main cwd." }`.
+  - Si es git: crea y devuelve handle.
+- `packages/mcp/src/tools/list-worktrees.ts`:
+  - Devuelve array de handles activos.
+- `packages/mcp/src/tools/cleanup-worktree.ts`:
+  - Input: `{ branch }`.
+  - Borra el dir del worktree pero mantiene la rama.
+  - Output: `{ removed: true, branchKept: true, mergeSuggestion: "git merge --no-ff <branch>" }`.
 
 **Acceptance criteria:**
 ```bash
-# 1. Build y publish local
-pnpm --filter @chamba/mcp build
-pnpm pack --filter @chamba/mcp
+pnpm -r test
+# Smoke en repo git limpio:
+# create_worktree({ taskSlug: "test", workerId: "w1" }) → handle con path real
+# git branch --list 'chamba/*' → debe mostrar la rama creada
+# cleanup_worktree({ branch }) → dir removido, branch sigue existiendo
 
-# 2. Smoke manual con MCP Inspector (oficial de Anthropic):
-npx @modelcontextprotocol/inspector npx @chamba/mcp
-# El inspector debe mostrar las 6 tools listadas correctamente.
-
-# 3. Smoke manual con Cursor:
-# - Crear .cursor/mcp.json en un repo dummy con la config de ejemplo
-# - Abrir Cursor, abrir el chat, escribir: "@chamba show me the workspace"
-# - Debe invocar chamba_workspace_show y devolver el contenido
-
-# 4. Smoke manual con VS Code Copilot (si tienes acceso):
-# - .vscode/mcp.json con la config de ejemplo
-# - Abrir Copilot Chat en Agent mode
-# - "#chamba_workspace_show"
-# - Aprobar el dialog de confirmación
-# - Debe devolver el workspace.md
+# Smoke en repo NO git:
+# create_worktree({ ... }) → { error: "Not a git repo..." }
 ```
 
 **DoD:**
-- El paquete `@chamba/mcp` se publica como binario invocable con `npx @chamba/mcp`.
-- Configuración funciona en al menos **Cursor + VS Code Copilot** verificada manualmente. El resto de editores (Windsurf, Cline, JetBrains, Trae) se documentan con disclaimer "compatible vía MCP estándar; reportar issue si algo falla".
-- El MCP server **no rompe el protocolo escribiendo a stdout** (verificar con MCP Inspector).
-- **Actualizar el README raíz** añadiendo el paso 11 ("Use chamba from your editor") de la sección "Step-by-step usage guide" con instrucciones específicas por editor.
-- Commit: `feat(mcp): expose chamba as MCP server for editor integration`.
+- Detección git robusta (verificado con dir git y dir no-git).
+- Cleanup NUNCA borra la rama. Verificado con grep en código + test específico.
+- Sin `--force` en `git worktree remove` (test con worktree dirty falla limpio).
+- Commit: `feat(worktree): manager + 3 tools (create/list/cleanup)`.
 
-**📢 Post de LinkedIn:** *"chamba ahora vive dentro de Cursor, VS Code y demás. Le hablas desde el chat de tu editor y dispara el orchestrator completo sin abrir terminal."* Tema: cómo MCP convierte cualquier herramienta CLI en algo invocable desde tu editor favorito. **Este post tiene alta probabilidad de pegar fuerte** porque cualquier dev que use Cursor lo entiende inmediatamente.
+**📢 Post de LinkedIn:** *"Mi agente ahora puede trabajar en 3 tareas en paralelo sin pisarse archivos. Cada tarea, su propio git worktree. Cuando termina, las ramas quedan abiertas para que yo decida qué mergear. Aislamiento real, control humano."* Tema: por qué git worktrees + agentes = el patrón que faltaba para paralelismo seguro.
+
+---
+
+### Fase 6 — Memory store + cross-session context
+
+**Estado:** ⏳ Pendiente
+
+**Goal:** tools `remember` y `recall`. El modelo puede persistir conocimiento entre sesiones sin depender de la ventana de contexto.
+
+**Entregables:**
+- `packages/core/src/memory/store.ts` — interface `MemoryStore`.
+- `packages/core/src/memory/filesystem-store.ts`:
+  - Guarda cada memoria como `.chamba/memory/{slug}.md` con frontmatter (key, tags, createdAt).
+  - Búsqueda simple: por keyword en contenido y en tags.
+- `packages/mcp/src/tools/remember.ts`:
+  - Input: `{ key, content, tags? }`.
+  - Crea archivo markdown. Si la key existe, append con timestamp.
+- `packages/mcp/src/tools/recall.ts`:
+  - Input: `{ query }`.
+  - Output: array de memorias relevantes con paths y contenido.
+- Tests con `FilesystemPort` en memoria.
+
+**Acceptance criteria:**
+```bash
+pnpm -r test
+# Smoke:
+# remember({ key: "auth-decisions", content: "We use magic links via Resend" })
+# → archivo creado en .chamba/memory/
+# recall({ query: "auth" }) → devuelve la memoria anterior
+```
+
+**DoD:**
+- Memorias son archivos markdown editables a mano (no JSON ni DB).
+- Búsqueda funciona case-insensitive y por substring.
+- Commit: `feat(memory): filesystem-based store + remember/recall tools`.
+
+---
+
+### Fase 7 — Claude Code extras (slash commands, subagents, hooks) 📢
+
+**Estado:** ⏳ Pendiente
+
+**Goal:** paquete opcional `@chamba/claude-extras` que se instala con `npx @chamba/claude-extras install` y añade slash commands, subagents pre-configurados y hooks a `~/.claude/`. Aprovecha las tools MCP de chamba para dar una experiencia más fluida en Claude Code específicamente.
+
+**Por qué es opcional:** los usuarios de Cursor, VS Code, etc. ya tienen todo lo que necesitan vía MCP. Esto es solo para los que usan Claude Code y quieren atajos.
+
+**Entregables:**
+- `packages/claude-extras/src/install.ts`:
+  - Detecta si Claude Code está instalado.
+  - Copia archivos a `~/.claude/agents/`, `~/.claude/commands/`, `~/.claude/hooks/`.
+  - Configura `~/.claude.json` añadiendo chamba como MCP server.
+  - **NO sobrescribe** si los archivos existen — pregunta o pide flag `--force`.
+- `packages/claude-extras/src/slash-commands/`:
+  - `/orq.md` — comando que orquesta una tarea usando las tools de chamba.
+  - `/workspace.md` — atajo para workspace_init/show/reload.
+  - `/worktrees.md` — lista y limpieza de worktrees.
+  - `/recall.md` — busca en memoria.
+- `packages/claude-extras/src/subagents/`:
+  - `implementer.md` — system prompt de un worker que implementa código.
+  - `reviewer.md` — system prompt de un reviewer estricto.
+  - `tester.md` — system prompt de un worker que escribe y corre tests.
+- `packages/claude-extras/src/hooks/`:
+  - `PostToolUse-validate-worktree.sh` — verifica que el modelo no edite fuera del worktree asignado.
+  - `PreToolUse-warn-destructive.sh` — pide aprobación extra en ops destructivas.
+- `packages/claude-extras/bin/chamba-install` — entry point.
+
+**Acceptance criteria:**
+```bash
+# En máquina con Claude Code instalado:
+npx @chamba/claude-extras install
+# Output: "Installed 4 slash commands, 3 subagents, 2 hooks. Added chamba MCP server to ~/.claude.json"
+
+# Verificar:
+ls ~/.claude/commands/orq.md     # debe existir
+ls ~/.claude/agents/implementer.md
+cat ~/.claude.json | grep chamba  # debe estar el server registrado
+
+# En Claude Code:
+# /orq agrega health check endpoint
+# → debe disparar el flow completo usando las tools de chamba
+```
+
+**DoD:**
+- Install funciona idempotente (correr 2 veces no rompe nada, avisa qué ya existe).
+- Uninstall disponible: `npx @chamba/claude-extras uninstall`.
+- Los slash commands referencian las tools MCP correctamente.
+- Commit: `feat(claude-extras): slash commands, subagents, hooks installer for Claude Code`.
+
+**📢 Post de LinkedIn:** *"Si usas Claude Code: `npx @chamba/claude-extras install` y obtienes /orq, /workspace, /worktrees + 3 subagentes (implementer, reviewer, tester) listos. Si usas Cursor o VSCode, ya los tenías vía MCP. Todos contentos."* Tema: cómo diseñar herramientas que respeten el editor del usuario.
+
+---
+
+### Fase 8 — Documentación multi-editor + ejemplos 📢
+
+**Estado:** ⏳ Pendiente
+
+**Goal:** README robusto + ejemplos funcionales para los 5 editores principales. Esta es la fase que más impacto va a tener en tracción.
+
+**Entregables:**
+
+- `README.md` raíz completo en inglés con:
+  - Hero con tagline en una línea.
+  - GIF de la tool funcionando en Cursor.
+  - "Why chamba?" con 4-5 bullets.
+  - **Sección "Use chamba from your editor"** con configuración exacta por editor (la sección más importante del README).
+  - Lista de tools con ejemplos de invocación.
+  - "How it works" con diagrama del flujo (modelo del editor invoca tools de chamba).
+  - Comparison con Claude Code subagents nativos, lapzo-tools, otros MCP servers.
+  - Roadmap.
+  - Badges (npm, downloads, CI, license).
+
+- `README.es.md` — versión en español natural latino.
+
+- `examples/cursor-setup/`:
+  - `.cursor/mcp.json` listo para pegar.
+  - `README.md` con walkthrough paso a paso.
+  - Screenshots o GIF.
+  - Comandos de ejemplo: `@chamba load context for "add auth"`.
+
+- `examples/claude-code-setup/`:
+  - Snippet para `~/.claude.json`.
+  - Mención del paquete opcional `@chamba/claude-extras`.
+  - Walkthrough de `/orq`.
+
+- `examples/vscode-setup/`:
+  - `.vscode/mcp.json` (campo `"servers"`, no `"mcpServers"` — explicar la diferencia).
+  - Walkthrough con Copilot Chat en Agent mode.
+
+- `examples/windsurf-setup/`, `examples/opencode-setup/`:
+  - Configs y walkthroughs específicos.
+
+- `examples/obsidian-orchestrator/`:
+  - Demo end-to-end: vault de prueba, configuración chamba + obsidian-mcp juntos, comando de ejemplo que carga contexto del vault y deja resumen.
+
+**Acceptance criteria:**
+```bash
+# Validación humana en máquinas distintas:
+# - En una Mac con Cursor: seguir cursor-setup/README.md exacto → debe funcionar
+# - En una máquina con Claude Code: seguir claude-code-setup → debe funcionar
+# - Probar al menos uno más (VSCode o Windsurf)
+```
+
+**DoD:**
+- Cada ejemplo tiene su propio README ejecutable paso a paso.
+- README raíz pasa el "5-second test": un visitante entiende qué es chamba en 5 segundos.
+- Al menos un GIF en el README mostrando uso real.
+- Commit: `docs: multi-editor setup guides + comprehensive README`.
+
+**📢 Post de LinkedIn:** *"chamba ya tiene guías de setup para Cursor, Claude Code, VSCode, Windsurf y OpenCode. Mismo MCP server, 5 editores, cero API keys. Link en comentarios."* Tema: por qué una herramienta multi-editor desde el día uno es estratégicamente superior.
 
 ---
 
@@ -1048,192 +684,57 @@ npx @modelcontextprotocol/inspector npx @chamba/mcp
 
 **Estado:** ⏳ Pendiente
 
-**Goal:** publicar en npm, pulir README, lanzar campaña de visibilidad.
+**Goal:** publicar en npm, lanzar campaña de visibilidad.
 
 **Entregables:**
-- README.md raíz completo en inglés:
-  - Hero con tagline en una línea.
-  - GIF de la CLI funcionando con `/orq`.
-  - "Why chamba?" con 4-5 bullets diferenciadores (incluir workspace-awareness y orchestrator-worker como destacados).
-  - **Sección "Step-by-step usage guide"** — la guía obligatoria que tiene que estar sí o sí. Debe cubrir, en orden, cada uno de estos pasos con comandos exactos y output esperado:
-    1. **Install** — `npm install -g @chamba/cli` (o `npx chamba` sin instalar).
-    2. **Configure API keys** — crear `~/.chamba/config.json` con `ANTHROPIC_API_KEY` u `OPENAI_API_KEY`. Mostrar el JSON completo de ejemplo.
-    3. **Run for the first time** — `chamba` arranca el REPL. Decir qué se ve y qué se puede preguntar primero.
-    4. **Initialize workspace** — `/workspace init` escanea el directorio, genera `.chamba/workspace.md`, lo abre en `$EDITOR` para revisión. Explicar qué pone chamba ahí y cómo editarlo.
-    5. **(Optional) Connect Obsidian vault** — añadir el bloque MCP de `obsidian-mcp` al `config.json` con ejemplo. Decir cómo verificar que conectó (`/tools` muestra las tools del vault).
-    6. **Have a basic conversation** — ejemplo concreto de pedir algo simple ("list files in this dir") y mostrar el flow de approval prompt.
-    7. **Run the orchestrator** — el ejemplo estrella. `/orq "add a health check endpoint"` y narrar paso a paso lo que pasa: contexto se carga, plan se genera, reviewer audita, humano aprueba, workers ejecutan en paralelo, tester valida, summary aparece en el vault (si hay) o en consola.
-    8. **Switch provider mid-conversation** — `/provider openai` y mostrar que sigue funcionando.
-    9. **Use as a library** — bloque de código TypeScript con `import { Harness } from '@chamba/core'` mínimo (10-15 líneas) creando una instancia y mandando un mensaje.
-    10. **Use as a service** — `chamba serve` levanta el server, ejemplo de `curl` para crear sesión + mandar mensaje. Link al `openapi.json`.
-    11. **Use chamba from your editor** — configurar chamba como MCP server en Cursor (`.cursor/mcp.json`), VS Code con Copilot (`.vscode/mcp.json`), Windsurf, Cline, JetBrains, Trae. Mostrar el JSON de config exacto por editor, cómo invocar `chamba_orchestrate` desde el chat de cada uno, y screenshots o snippets de resultado. **Esta es la sección que más conversiones va a generar** porque la mayoría de devs viven dentro de Cursor o VSCode hoy.
-    12. **Customize agents** — cómo editar los `.md` de `.chamba/agents/` (orchestrator, reviewer, implementer, tester) para ajustar a tu workspace. Ejemplo concreto: añadir una regla al orchestrator tipo "always check existing patterns first".
-    13. **Common issues** — al menos 4 troubleshooting comunes: API key no detectada, MCP server no conecta, permission policy bloqueando algo, editor no detecta chamba como MCP server.
-  - "How it works" con diagrama del flow completo (workspace → orchestrator → reviewer → workers → tester → vault).
-  - Comparison table vs Claude Code, OpenCode, Aider, LangChain.
-  - Roadmap.
-  - Badges (npm version, downloads, CI status, license).
-- `README.es.md` — versión completa en español, incluyendo la **misma sección de paso a paso traducida**. No es traducción literal; adaptar ejemplos al español natural latino.
-- `CHANGELOG.md` generado por changesets.
-- Release de `0.1.0` o `1.0.0-rc.1` en npm (los 4 paquetes).
+- Release `0.1.0` o `1.0.0-rc.1` en npm para los 4 paquetes (`@chamba/core`, `@chamba/adapters`, `@chamba/mcp`, `@chamba/claude-extras`).
+- `CHANGELOG.md` generado.
 - Posts preparados para:
-  - LinkedIn (español, audiencia LATAM dev).
-  - X/Twitter (inglés, audiencia global).
-  - Hacker News (Show HN: chamba).
-  - Reddit r/LocalLLaMA y r/programming.
-  - dev.to artículo largo explicando harness engineering con chamba como ejemplo, incluyendo el patrón workspace-aware.
-  - r/ObsidianMD — post específico mostrando la integración con vaults.
+  - LinkedIn (español, audiencia LATAM dev) — post largo del journey.
+  - X/Twitter (inglés) — hilo con GIF.
+  - Hacker News — "Show HN: chamba — MCP server adding orchestrator-worker patterns to any AI editor".
+  - Reddit r/LocalLLaMA, r/programming, r/ObsidianMD, r/cursor.
+  - dev.to — artículo técnico de profundidad.
 
 **Acceptance criteria:**
 ```bash
-npm view @chamba/core             # Muestra info real del paquete
-npm view @chamba/cli
-npm view @chamba/server
-npx chamba                        # Funciona desde npm sin clonar nada
+npm view @chamba/mcp                  # info real del paquete
+npm view @chamba/claude-extras
+npx @chamba/mcp                       # arranca el server desde npm sin clonar
 ```
 
 **DoD:**
-- README pasa el "5-second test": un visitante entiende qué es y por qué importa en 5 segundos.
-- **El step-by-step funciona literal**: alguien que no haya tocado chamba antes puede seguir los 12 pasos sin pegarse en ninguno. Para validarlo, en una VM o container limpio, ejecutar los pasos uno por uno y confirmar que cada uno produce el output documentado. Cualquier paso que falle, se arregla antes de publicar.
+- Los 4 paquetes públicos y instalables.
+- En máquina limpia (VM o container): `npm i -g @chamba/mcp`, configurar en Cursor, funciona.
 - Star count inicial registrado (baseline).
 - Commit: `chore: release 0.1.0`.
 
-**📢 Posts simultáneos:**
-- LinkedIn: post largo en español contando el journey de las 9 fases.
-- X: hilo en inglés con el GIF.
-- Hacker News: "Show HN: chamba — TypeScript AI agent harness with workspace-aware orchestrator and first-class MCP".
-- dev.to: artículo técnico de profundidad.
-- r/ObsidianMD: post de "use Obsidian as memory for your AI agent".
+**📢 Posts simultáneos en todos los canales.**
 
 ---
 
 ## 6. Fuera de scope de V1
 
-Para evitar feature creep. Cada uno puede ser V2.
-
-- **Streaming de tokens dentro del agent loop.** V1 espera response completo. Streaming va en V1.5.
-- **Prompt caching de Anthropic.** Va cuando el coste duela.
-- **Web UI separada del CLI.** El server expone HTTP; cualquier frontend habla con él.
-- **Modelos locales (Ollama, llama.cpp).** Nuevo provider, trivial arquitectónicamente, no V1.
-- **Persistencia de sesiones en DB.** V1 en memoria. La estructura permite adapter después.
-- **Marketplace de tools.** Interface listo, no hay UI.
-- **OpenTelemetry tracing.** Event bus listo, instrumentación va después.
-- **Multi-tenancy en server.** Hoy single-API-key.
-- **Agent Teams con mailbox peer-to-peer.** Subagent V1 es jerárquico. Mailbox horizontal va en V2.
-- **Auto-update del workspace.md basado en cambios del dir.** V1 requiere `/workspace reload` manual.
-- **Búsqueda semántica vectorial en el vault.** V1 usa búsqueda por keywords vía MCP. Embeddings va en V2.
-- **Integración con otras herramientas de notas** (Logseq, Notion, etc.). V1 enfocado en Obsidian. Otras vienen después.
+- **Búsqueda semántica vectorial.** V1 usa búsqueda por keyword. Embeddings va en V2.
+- **MCP sampling para usar el modelo del cliente desde chamba.** Lo investigamos en V2 — hoy pocos clientes lo soportan.
+- **Modo standalone con LLM propio.** Toda la conversación inicial sobre "harness propio" queda fuera deliberadamente — esto es V2 si la tracción lo justifica.
+- **Agent Teams con mailbox peer-to-peer.** Subagents en V1 son configurados via `@chamba/claude-extras`. Mailbox horizontal va en V2.
+- **Integración con Logseq, Notion, Roam.** V1 enfocado en Obsidian + filesystem. Otras vienen después.
+- **Tracing con OpenTelemetry.** Logs estructurados con pino suficientes en V1.
+- **Auto-update del workspace.md por file watchers.** V1 requiere `chamba_workspace_reload` manual invocado por el modelo.
+- **Web UI o dashboard.** Si alguien lo quiere, lo construye encima del MCP server.
 
 ---
 
-## 7. Anexo A — CLAUDE.md sugerido
+## 7. Checklist de validación final (post-V1)
 
-> **Claude Code:** este archivo va en la raíz del repo. Es tu contexto persistente en cada sesión.
+- [ ] **E1.** Añadir una tool nueva siguiendo el patrón de las existentes. Aparece en `npx @chamba/mcp` automáticamente.
+- [ ] **E2.** Customizar el reviewer añadiendo una nueva regla heurística (ej: "warning si toca más de 10 archivos").
+- [ ] **E3.** Configurar chamba en un editor MCP-compatible que no esté en la lista de ejemplos (sugerido: Cline) y verificar que funciona.
+- [ ] **E4.** Crear un slash command custom para Claude Code que combine 3+ tools de chamba en un flujo (ej: `/quickship` que hace load_context → generate_plan → review_plan → create_worktree).
+- [ ] **E5.** Correr el flow completo en un repo git de prueba: workspace_init → load_context → generate_plan → review_plan → create_worktree (paralelo x3) → cleanup_worktree → summarize_to_vault. Verificar que las 3 ramas quedan abiertas, el resumen en el vault es correcto, y no hubo errores.
 
-```markdown
-# chamba — Contexto de proyecto
-
-## Qué es
-chamba es un AI agent harness open-source en TypeScript. Monorepo pnpm con:
-- `@chamba/core` — librería pura, sin Node APIs directas
-- `@chamba/adapters` — implementaciones Node de los ports
-- `@chamba/cli` — TUI con Ink, binario `chamba`
-- `@chamba/server` — HTTP/SSE con Hono
-
-Side project público, MIT, busca tracción en GitHub y npm. Inspirado en byo-coding-agent (BettaTech), Claude Code, OpenCode, Aider.
-
-**Diferenciadores clave:**
-- Provider-agnóstico desde día uno.
-- MCP de primera clase.
-- Workspace-aware: entiende el directorio donde corre y opcionalmente integra con vault de Obsidian.
-- Orchestrator-worker con reviewer integrado.
-
-## Principios no-negociables
-Lee PLAN.md sección 2. Los 10 principios son ley.
-
-## Cómo trabajamos
-- Una fase del PLAN a la vez. No saltarse fases.
-- Tests verdes antes de cualquier commit.
-- Commits con conventional commits format.
-- Si tienes que romper un principio, primero pregunta.
-- Si una decisión de diseño no está en PLAN.md ni acá, pregunta antes de improvisar.
-
-## Tracking de progreso (importante)
-Cuando termines una fase debes:
-1. Actualizar el campo `**Estado:**` de esa fase en PLAN.md de `⏳ Pendiente` a `✅ Completada — YYYY-MM-DD — {sha-corto}`.
-2. Actualizar la fila correspondiente en la tabla "Estado de las fases" del inicio del documento.
-3. Al iniciar una fase, marcar ambos lugares como `🚧 En progreso`.
-4. Si te quedas bloqueado, marcar `❌ Bloqueada` y poner razón breve en la celda de fecha.
-5. Ambas ubicaciones (campo `**Estado:**` y tabla) deben estar siempre sincronizadas.
-6. El commit que cierra una fase debe incluir el update a PLAN.md como parte del mismo commit.
-
-## Actualizaciones incrementales al README
-El README crece fase por fase, no se escribe entero en Fase 9. Cada fase que añade capacidad visible al usuario debe actualizar la sección "Step-by-step usage guide" del README según el DoD de esa fase. Fase 9 solo pule, no escribe de cero.
-
-## Stack confirmado
-- Node 22 LTS, TypeScript 5.6+
-- pnpm workspaces
-- vitest, biome, tsup
-- hono, ink, zod, neverthrow, pino
-- @anthropic-ai/sdk, openai, @modelcontextprotocol/sdk
-- NO uses: NestJS, LangChain, Mastra, Vercel AI SDK, ESLint+Prettier
-
-## Comandos comunes
-- `pnpm install`
-- `pnpm -r build`
-- `pnpm -r test`
-- `pnpm --filter @chamba/core test`
-- `pnpm biome check .`
-- `pnpm biome check --write .`
-- `pnpm changeset` — registrar cambio para release
-- `pnpm changeset version` — bump versions
-- `pnpm changeset publish` — release a npm
-
-## Convenciones de código
-- Exports nombrados, no default (excepto `bin/chamba`).
-- Archivos kebab-case: `agent-loop.ts`.
-- Tipos e interfaces PascalCase.
-- Funciones y variables camelCase.
-- Constantes globales SCREAMING_SNAKE_CASE.
-- Errores son clases extendiendo `Error` con `name` explícito.
-- Cero `any` excepto en adapters de SDKs externos, justificado.
-
-## Estructura de tests
-- Co-located: `agent-loop.test.ts` junto a `agent-loop.ts`.
-- Sufijo `.test.ts`.
-- Usar `MockProvider` para todo lo que no sea test de provider real.
-- Smoke tests con API real van en `scripts/smoke-*.ts`, no en `test/`.
-
-## Cuándo preguntar al humano
-- Antes de saltarse fases del plan.
-- Antes de añadir dependencias no listadas en PLAN.md sección 4.
-- Antes de violar uno de los principios de PLAN.md sección 2.
-- Antes de modificar este CLAUDE.md o PLAN.md.
-- Si los acceptance criteria fallan después de 2 intentos honestos.
-
-## Tono del proyecto (importante para README y docs)
-- chamba es un proyecto LATAM, sin pena. README en inglés y español.
-- Tono claro, directo, sin marketing-bullshit.
-- En español, voseo o tuteo neutral. Sin chilenismos ni mexicanismos exclusivos.
-- En inglés, técnico pero accesible. Sin "revolutionize", "leverage", "synergy".
-```
-
----
-
-## 8. Checklist de validación final (post-V1)
-
-Los 5 ejercicios de bettatech traducidos a chamba + 3 ejercicios específicos del workspace/orchestrator/worktrees. Si los 8 pasan, el harness está realmente vivo, extensible y consciente del contexto.
-
-- [ ] **E1.** Añadir un tool `git_diff` siguiendo el patrón de `read-file.ts`. Verificar que aparece en `/tools` y el modelo lo invoca.
-- [ ] **E2.** Añadir una `CompactionStrategy` llamada `TokenBudget` que descarta mensajes antiguos hasta estar bajo un umbral configurable.
-- [ ] **E3.** Añadir una `PermissionPolicy` llamada `AskOnlyForDangerous` que aprueba automáticamente `read_*` y `grep`, y pide aprobación solo para `bash` y `write_*`.
-- [ ] **E4.** Añadir un tercer provider (sugerido: Ollama local). Sin tocar agent-loop ni tools.
-- [ ] **E5.** Test e2e simulando conversación de 5 turnos con tool calls, con `MockProvider`, sin tocar APIs reales.
-- [ ] **E6.** Configurar un vault Obsidian de pruebas, correr `/workspace init`, después `/orq "documenta el patrón observer"`. Verificar que el plan cita notas del vault y que el resumen final aparece como nota nueva.
-- [ ] **E7.** Customizar el reviewer con un system prompt específico (ej: "eres muy estricto con seguridad") y verificar que rechaza planes que serían aprobados por el reviewer default.
-- [ ] **E8.** En un repo git limpio, correr `/orq "crea endpoints health, metrics y version en paralelo"`. Verificar: (a) se crean 3 worktrees en `.chamba/worktrees/`, (b) cada worker trabaja en su propio worktree sin pisar a los otros, (c) al terminar las 3 ramas quedan abiertas (no merged, no borradas), (d) el summary lista las ramas con los comandos `git merge` sugeridos. Después correr el mismo `/orq` en un directorio NO git y verificar que el orchestrator detecta y delega serialmente.
-
-Si los 8 pasan: hay harness real, agnóstico, extensible, testeable, workspace-aware, con orchestrator-worker funcional y aislamiento real por worker. Y construiste material para 8 posts adicionales en LinkedIn ("cómo añadir un X a chamba").
+Si los 5 pasan: chamba está realmente vivo, extensible y consciente del contexto. Y construiste material para 5 posts adicionales en LinkedIn.
 
 ---
 

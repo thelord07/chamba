@@ -1,74 +1,74 @@
 # chamba
 
-> An open-source AI agent harness in TypeScript. Provider-agnostic, MCP-first,
-> workspace-aware, with a built-in orchestrator-worker pattern.
+> An open-source **MCP server** that adds orchestrator-worker patterns, workspace
+> context, git worktrees and Obsidian integration to any MCP-capable editor —
+> Claude Code, Cursor, VS Code (Copilot), Windsurf, Cline, OpenCode, JetBrains, Trae.
 
-**chamba** is the LATAM word for *work* — *la chamba*. The harness gives the model
-its chamba: it hands over the task, supervises, validates, and takes care of all
-the coordination. Built in public, phase by phase.
+**chamba** is the LATAM word for *work* — *la chamba*. chamba does the coordination
+work so your editor's model can focus on reasoning and code.
 
 > ⚠️ **Early days.** chamba is being built incrementally following
-> [`PLAN.md`](./PLAN.md). Phase 1 (this one) ships a deliberately tiny, abstraction-free
-> agent loop so you can see the essence before the layers arrive.
+> [`PLAN.md`](./PLAN.md). Phase 1 (this one) ships the smallest thing that works:
+> the MCP server boots over stdio and exposes one tool, `chamba_workspace_show`.
 
-## Why chamba
+## The key idea: chamba does NOT call an LLM
 
-- **Provider-agnostic from commit one.** Swap Anthropic for OpenAI with one config change.
-- **MCP as a first-class citizen.** Native tools and MCP tools share the same interface.
-- **chamba is also an MCP server.** Invoke it from the chat of any MCP-capable editor
-  (Cursor, VS Code, Windsurf, Cline, JetBrains, Trae).
-- **Workspace-aware.** It understands the directory it runs in, and optionally your
-  Obsidian vault.
-- **Orchestrator-worker with a reviewer gate.** Plan → audit → execute in parallel → test → document.
+chamba never talks to a model. **Your editor's model does the reasoning** and calls
+chamba's tools. That means:
+
+- **Zero API keys.** No `ANTHROPIC_API_KEY`, no `OPENAI_API_KEY`. Your editor already
+  pays for its own model.
+- **Every MCP editor, day one.** One implementation works in Cursor, Claude Code,
+  VS Code, Windsurf, Cline, and more.
+- chamba just exposes **tools and patterns**: scan workspaces, generate plan
+  templates, validate them heuristically, create git worktrees, write structured
+  summaries to your Obsidian vault.
 
 ## Packages
 
 | Package | What it is |
 |---|---|
-| `@chamba/core` | Pure harness library: API types, providers, agent loop, tools, compaction |
+| `@chamba/mcp` | **The product.** A stdio MCP server exposing chamba's tools |
+| `@chamba/core` | Pure logic (workspace, plan, worktree, obsidian, memory). No Node APIs directly |
 | `@chamba/adapters` | Node implementations of the ports (filesystem, process, clock) |
-| `@chamba/cli` | Ink TUI, the `chamba` binary |
-| `@chamba/server` | HTTP/SSE server with Hono |
-| `@chamba/mcp` | MCP server that exposes chamba to editors |
+| `@chamba/claude-extras` | Optional: slash commands, subagents, hooks for Claude Code |
 
 Most of these arrive in later phases. See [`PLAN.md`](./PLAN.md) for the roadmap.
 
-## Step-by-step usage guide
-
-> This section grows phase by phase. Right now it covers the minimal example only.
-
-### Try the minimal agent (Phase 1)
-
-The fastest way to see what a harness is. ~200 lines, one file, no abstractions:
-a REPL that talks to Claude and runs `bash`, `read_file` and `write_file` tools,
-asking for your approval before each one.
+## Try it (Phase 1)
 
 ```bash
 git clone https://github.com/<your-org>/chamba.git
 cd chamba
 pnpm install
-
-ANTHROPIC_API_KEY=sk-ant-... pnpm --filter @chamba/examples-minimal start
+pnpm --filter @chamba/mcp build
 ```
 
-Then, at the prompt:
+Inspect the running server with the MCP Inspector — you should see one tool,
+`chamba_workspace_show`:
 
-```
-you: list the files here
-  ⚡ tool: bash
-     input: {"command":"ls -la"}
-     approve? [y/N] y
-
-chamba: Here are the files in the current directory ...
+```bash
+npx @modelcontextprotocol/inspector node packages/mcp/dist/main.js
 ```
 
-Type `/exit` to quit. The whole thing lives in
-[`examples/minimal/main.ts`](./examples/minimal/main.ts) — read it, it's short.
+The tool reads `.chamba/workspace.md` from the directory where the editor launched
+chamba and returns its contents (or tells you none exists yet). Creating that file
+lands as a tool in Phase 2.
+
+## Tools (so far)
+
+| Tool | Input | Output |
+|---|---|---|
+| `chamba_workspace_show` | `{}` | Contents of `.chamba/workspace.md`, or a "not found" note |
+
+The full V1 tool set (workspace init/reload, load context, plan + review, worktrees,
+Obsidian summaries, memory) is detailed in [`PLAN.md`](./PLAN.md).
 
 ## Requirements
 
 - Node 22 LTS
 - pnpm 9+
+- An editor with an MCP client (to actually use the tools)
 
 ## Development
 
@@ -78,6 +78,10 @@ pnpm -r build
 pnpm -r test
 pnpm biome check .
 ```
+
+> Note for MCP authors: a stdio MCP server must never write to stdout except the
+> protocol itself. chamba logs to `~/.chamba/logs/mcp-{pid}.log` via pino — never
+> `console.log`. See [`packages/mcp/src/logging.ts`](./packages/mcp/src/logging.ts).
 
 ## License
 
