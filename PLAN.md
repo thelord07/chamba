@@ -23,7 +23,7 @@
 | 2 | Workspace context + scanner | ✅ Completada | 2026-06-09 | c588a56 |
 | 3 | Obsidian integration | ✅ Completada | 2026-06-09 | 37b8595 |
 | 4 | Plan generation + reviewer (heurístico) | ✅ Completada | 2026-06-09 | 89f69b3 |
-| 5 | Worktree manager | ✅ Completada | 2026-06-09 | _pending_ |
+| 5 | Worktree manager | ✅ Completada | 2026-06-09 | 6c1012b |
 | 6 | Memory store + cross-session context | ⏳ Pendiente | — | — |
 | 7 | Claude Code extras (slash commands, subagents, hooks) | ⏳ Pendiente | — | — |
 | 8 | Documentación multi-editor + ejemplos | ⏳ Pendiente | — | — |
@@ -485,7 +485,7 @@ pnpm -r test
 
 ### Fase 5 — Worktree manager 📢
 
-**Estado:** ✅ Completada — 2026-06-09 — _pending_
+**Estado:** ✅ Completada — 2026-06-09 — 6c1012b
 
 **Goal:** tools `create_worktree`, `list_worktrees`, `cleanup_worktree`. Permite a los modelos crear aislamiento real para trabajo en paralelo.
 
