@@ -26,7 +26,7 @@
 | 5 | Worktree manager | ✅ Completada | 2026-06-09 | 6c1012b |
 | 6 | Memory store + cross-session context | ✅ Completada | 2026-06-09 | d8c1cbc |
 | 7 | Claude Code extras (slash commands, subagents, hooks) | ✅ Completada | 2026-06-09 | 7ead405 |
-| 8 | Documentación multi-editor + ejemplos | ✅ Completada | 2026-06-09 | _pending_ |
+| 8 | Documentación multi-editor + ejemplos | ✅ Completada | 2026-06-09 | 324eb08 |
 | 9 | Release 1.0.0 + push de tracción | ⏳ Pendiente | — | — |
 
 **Símbolos:** ⏳ Pendiente — 🚧 En progreso — ✅ Completada — ❌ Bloqueada
@@ -622,7 +622,7 @@ cat ~/.claude.json | grep chamba  # debe estar el server registrado
 
 ### Fase 8 — Documentación multi-editor + ejemplos 📢
 
-**Estado:** ✅ Completada — 2026-06-09 — _pending_
+**Estado:** ✅ Completada — 2026-06-09 — 324eb08
 
 **Goal:** README robusto + ejemplos funcionales para los 5 editores principales. Esta es la fase que más impacto va a tener en tracción.
 
