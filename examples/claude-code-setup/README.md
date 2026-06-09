@@ -54,3 +54,22 @@ Without the extras, just ask in plain language:
 Use chamba: load context for "add auth with magic links", generate a plan, and
 review it before we start.
 ```
+
+## Per-project model config (optional)
+
+Drop a `.chamba/config.json` in a repo to override the model + effort per role
+just for that project. See [`chamba-config.example.json`](./chamba-config.example.json):
+
+```json
+{
+  "version": 1,
+  "overrides": {
+    "reviewer": { "model": "claude-sonnet-4-6" },
+    "implementer": { "model": "claude-haiku-4-5", "effort": "low" }
+  }
+}
+```
+
+It layers over your global `~/.chamba/config.json` (and the built-in defaults),
+per role and per field. Inspect the result with
+`npx @chamba/claude-extras config show`.

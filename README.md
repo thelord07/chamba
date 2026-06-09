@@ -121,6 +121,14 @@ npx @chamba/claude-extras uninstall
 Idempotent, never overwrites your files (`--force` to force), preserves other MCP
 servers in `~/.claude.json`. Then: `/orq add a health check endpoint`.
 
+**Per-agent config.** First install runs a wizard to pick a model + effort per role
+(orchestrator, planner, reviewer, implementer, tester, summarizer, researcher), with
+efficient defaults pre-set — powerful models for reasoning, fast/cheap ones for
+mechanical work. Reconfigure with `npx @chamba/claude-extras config <show|set|wizard|…>`.
+chamba still never calls a model: this only tells your editor's model how to delegate.
+Other editors read the same config via `chamba_get_agent_config`. See the
+[claude-extras README](./packages/claude-extras/README.md#configuration-per-agent-model--effort).
+
 ## Packages
 
 | Package | What it is |
@@ -151,6 +159,7 @@ servers in `~/.claude.json`. Then: `/orq add a health check endpoint`.
 - ✅ Claude Code extras
 - ✅ Multi-editor docs (you're reading them)
 - ✅ **0.1.0 published on npm**
+- ✅ Per-agent model + effort config (wizard + `chamba_get_agent_config`)
 - 🔭 V2: semantic vault search, MCP sampling, more knowledge bases
 
 See [`PLAN.md`](./PLAN.md) for the full phase plan.

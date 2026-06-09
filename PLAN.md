@@ -28,7 +28,7 @@
 | 7 | Claude Code extras (slash commands, subagents, hooks) | ✅ Completada | 2026-06-09 | 7ead405 |
 | 8 | Documentación multi-editor + ejemplos | ✅ Completada | 2026-06-09 | 324eb08 |
 | 9 | Release 1.0.0 + push de tracción | ✅ Completada | 2026-06-09 | bb6db0a |
-| 10 | Configuración por-agente (modelo + esfuerzo) | 🚧 En progreso | 2026-06-09 | — |
+| 10 | Configuración por-agente (modelo + esfuerzo) | ✅ Completada | 2026-06-09 | _pending_ |
 
 **Símbolos:** ⏳ Pendiente — 🚧 En progreso — ✅ Completada — ❌ Bloqueada
 
@@ -716,7 +716,7 @@ npx @chamba/mcp                       # arranca el server desde npm sin clonar
 
 ### Fase 10 — Configuración por-agente (modelo + esfuerzo)
 
-**Estado:** 🚧 En progreso — 2026-06-09
+**Estado:** ✅ Completada — 2026-06-09 — _pending_ — 5 sub-fases (10.1 a643300, 10.2 92e868f, 10.3 f97e67b, 10.4 46a735e, 10.5 _pending_). Tool #13 `chamba_get_agent_config`; wizard + `config` CLI; subagents generados desde config. 41 tests nuevos, biome limpio. Catálogo multi-provider (Anthropic/OpenAI/Gemini/Ollama). Changeset `per-agent-config` (minor → 0.2.0).
 
 **Goal:** sistema de configuración que deja al usuario elegir **modelo** y **nivel de
 esfuerzo** por **rol** (orchestrator, planner, reviewer, implementer, tester, summarizer,

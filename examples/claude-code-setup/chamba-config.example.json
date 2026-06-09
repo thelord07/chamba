@@ -1,0 +1,7 @@
+{
+  "version": 1,
+  "overrides": {
+    "reviewer": { "model": "claude-sonnet-4-6" },
+    "implementer": { "model": "claude-haiku-4-5", "effort": "low" }
+  }
+}
