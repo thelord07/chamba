@@ -28,6 +28,7 @@
 | 7 | Claude Code extras (slash commands, subagents, hooks) | ✅ Completada | 2026-06-09 | 7ead405 |
 | 8 | Documentación multi-editor + ejemplos | ✅ Completada | 2026-06-09 | 324eb08 |
 | 9 | Release 1.0.0 + push de tracción | ✅ Completada | 2026-06-09 | bb6db0a |
+| 10 | Configuración por-agente (modelo + esfuerzo) | 🚧 En progreso | 2026-06-09 | — |
 
 **Símbolos:** ⏳ Pendiente — 🚧 En progreso — ✅ Completada — ❌ Bloqueada
 
@@ -710,6 +711,43 @@ npx @chamba/mcp                       # arranca el server desde npm sin clonar
 - Commit: `chore: release 0.1.0`.
 
 **📢 Posts simultáneos en todos los canales.**
+
+---
+
+### Fase 10 — Configuración por-agente (modelo + esfuerzo)
+
+**Estado:** 🚧 En progreso — 2026-06-09
+
+**Goal:** sistema de configuración que deja al usuario elegir **modelo** y **nivel de
+esfuerzo** por **rol** (orchestrator, planner, reviewer, implementer, tester, summarizer,
+researcher), con defaults eficientes pre-configurados y override por proyecto. **No viola el
+principio #1:** chamba no llama LLMs; la config es metadata declarativa que el editor del
+usuario (Claude Code vía frontmatter, otros editores vía la tool `chamba_get_agent_config`)
+consume para decidir qué modelo usar al delegar.
+
+El detalle completo (5 sub-fases 10.1–10.5, catálogo de modelos, mapeo de `effort` por
+proveedor, edge cases, acceptance criteria) vive en [`PLAN-fase-10.md`](./PLAN-fase-10.md).
+
+**Sub-fases:**
+- **10.1** — `@chamba/core`: roles, catálogo de modelos, defaults hardcoded, schema Zod,
+  loader con merge por-campo (default ← global ← project), `buildHint`.
+- **10.2** — `@chamba/mcp`: tool `chamba_get_agent_config` (tool #13, solo-lectura).
+- **10.3** — `@chamba/claude-extras`: render de frontmatter (`model`+`effort` traducido) y
+  `applyConfig` idempotente para regenerar `~/.claude/agents/*.md` desde el config.
+- **10.4** — wizard interactivo no-bloqueante al instalar + bin `chamba-config`
+  (`show/models/wizard/edit/set/reset/apply`).
+- **10.5** — docs (sección Configuration con tabla razonada + FAQ + override) + changeset.
+
+**Decisiones confirmadas:** `effort` abstracto (`low|medium|high|extreme`) mapeado por
+proveedor; defaults hardcoded en `core/src/config/defaults.ts`; `@inquirer/prompts` como dep
+nueva aprobada; `zod` vuelve a runtime de core; los 3 subagents existentes
+(implementer/reviewer/tester) reciben frontmatter generado, los otros 4 roles quedan vía
+tool+CLI.
+
+**DoD:** ver `PLAN-fase-10.md` §"DoD de la Fase 10". En resumen: build+test+biome verdes en
+todo el repo; tool MCP responde para los 7 roles sin config previa; ciclo
+`install --defaults` → `set` → `apply` regenera subagents; override por proyecto refleja en
+la tool; config corrupto degrada a defaults+warning; changeset registrado.
 
 ---
 

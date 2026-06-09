@@ -1,8 +1,36 @@
 // @chamba/core — pure harness logic. No Node-specific APIs (principle 6).
 
+// Config (per-agent model + effort)
+export { DEFAULT_CONFIG } from './config/defaults.js';
+export type {
+  ConfigSource,
+  ConfigSourceKind,
+  LoadConfigOptions,
+  LoadConfigResult,
+} from './config/loader.js';
+export { ConfigError, loadConfig } from './config/loader.js';
+export { buildHint, resolveRole } from './config/resolve.js';
+export type { AgentRole, Effort, ReasoningPriority } from './config/roles.js';
+export {
+  AGENT_ROLES,
+  EFFORT_LEVELS,
+  REASONING_PRIORITIES,
+  ROLE_DESCRIPTIONS,
+} from './config/roles.js';
+export type { ConfigFile, ParseResult } from './config/schema.js';
+export { configFileSchema, parseChambaConfig } from './config/schema.js';
+export type { AgentConfig, ChambaConfig, ResolvedConfig } from './config/types.js';
 export { FilesystemMemoryStore, MEMORY_DIR } from './memory/filesystem-store.js';
 // Memory
 export type { Memory, MemoryStore, RememberInput } from './memory/store.js';
+// Model catalog
+export type { ModelInfo, ModelProvider } from './models/catalog.js';
+export {
+  getModel,
+  MODEL_CATALOG,
+  modelsByProvider,
+  resolveEffort,
+} from './models/catalog.js';
 export type { NoteFields } from './obsidian/note-template.js';
 export { renderNote, slugify } from './obsidian/note-template.js';
 export type { WriteNoteInput, WriteNoteResult } from './obsidian/vault-writer.js';
