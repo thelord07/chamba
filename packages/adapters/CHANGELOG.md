@@ -1,5 +1,20 @@
 # @chamba/adapters
 
+## 0.2.1
+
+### Patch Changes
+
+- 678ba4a: Workspace scanner: skip linked git worktrees.
+
+  A linked worktree has a `.git` _file_ (a gitdir pointer) rather than a `.git`
+  directory. The scanner now detects and skips nested worktrees so their
+  checked-out copies no longer show up as duplicate projects in
+  `.chamba/workspace.md`. If chamba is pointed straight at a worktree, it's still
+  scanned (depth 0 is respected).
+
+- Updated dependencies [678ba4a]
+  - @chamba/core@0.2.1
+
 ## 0.2.0
 
 ### Minor Changes
