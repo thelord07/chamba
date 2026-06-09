@@ -29,6 +29,7 @@
 | 8 | Documentación multi-editor + ejemplos | ✅ Completada | 2026-06-09 | 324eb08 |
 | 9 | Release 1.0.0 + push de tracción | ✅ Completada | 2026-06-09 | bb6db0a |
 | 10 | Configuración por-agente (modelo + esfuerzo) | ✅ Completada | 2026-06-09 | 313229c |
+| 11 | Worktrees multi-repo genéricos (workspace-aware) | 🚧 En progreso | 2026-06-09 | — |
 
 **Símbolos:** ⏳ Pendiente — 🚧 En progreso — ✅ Completada — ❌ Bloqueada
 
@@ -748,6 +749,40 @@ tool+CLI.
 todo el repo; tool MCP responde para los 7 roles sin config previa; ciclo
 `install --defaults` → `set` → `apply` regenera subagents; override por proyecto refleja en
 la tool; config corrupto degrada a defaults+warning; changeset registrado.
+
+---
+
+### Fase 11 — Worktrees multi-repo genéricos (workspace-aware)
+
+**Estado:** 🚧 En progreso — 2026-06-09
+
+**Goal:** convertir la creación de worktrees multi-repo (hoy resuelta con scripts bespoke por
+equipo) en una capacidad genérica de chamba, manejada por el `.chamba/config.json` del
+workspace. Arquitectura **híbrida**: built-in genérico por config + escape hatch `command`
+para scripts existentes. Incluye copia de `.env*` (opt-in), generación de `.code-workspace`
+(opt-in), y un slash command `/ticket` orchestrator-worker que delega a los subagents
+configurados (Fase 10) y corre de corrido con un solo gate al final.
+
+El detalle completo (5 sub-fases 11.1–11.5, schema, edge cases, acceptance) vive en
+[`PLAN-fase-11.md`](./PLAN-fase-11.md).
+
+**Sub-fases:**
+- **11.1** — `@chamba/core`: config `worktrees` (tipos/schema/defaults/resolve) + planificación
+  pura (paths sibling/nested, branch por ticket, contenido `.code-workspace`).
+- **11.2** — `@chamba/core`: manager multi-repo sobre ports (reuso de rama local/origin/new),
+  copia de `.env`, escritura del workspace file; detector de repos git del workspace.
+- **11.3** — `@chamba/mcp`: tools `chamba_create_worktrees` + `chamba_cleanup_worktrees`
+  (plural, multi-repo, híbrido built-in/command); las single-repo se mantienen. 15 tools.
+- **11.4** — `@chamba/claude-extras`: `/ticket` con delegación explícita + nuevo subagent
+  `planner.md` + `config worktrees` (wizard) + `/orq` actualizado.
+- **11.5** — docs (multi-repo + nota de seguridad `.env`) + changeset → 0.3.0.
+
+**Decisiones confirmadas:** layout `sibling` por default, `root` = `WORKTREES` (visible);
+copia `.env` y `.code-workspace` opt-in; cleanup multi-repo en V1; `config worktrees init`
+con wizard; `/ticket` autónomo hasta el final, sin commits/merge/push (los hace el humano);
+ejecución en la misma sesión (no Cursor aparte), con el hook validate-worktree de guardia.
+
+**DoD:** ver `PLAN-fase-11.md` §"DoD de la Fase 11".
 
 ---
 

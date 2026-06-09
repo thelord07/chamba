@@ -32,16 +32,42 @@ export const agentConfigSchema = z.object({
 
 export const partialAgentConfigSchema = agentConfigSchema.partial();
 
+/** A relative, traversal-free path component (no `..`, not absolute). */
+const safePathSchema = z.string().refine((s) => !s.includes('..') && !s.startsWith('/'), {
+  message: 'must be a relative path without ".."',
+});
+
+/** The `worktrees` block of a config file (all fields optional). */
+export const worktreeConfigSchema = z
+  .object({
+    layout: z.enum(['sibling', 'nested']).optional(),
+    root: safePathSchema.optional(),
+    branchPrefix: z
+      .string()
+      .refine((s) => !s.includes('..') && !/\s/.test(s), {
+        message: 'branchPrefix must have no spaces and no ".."',
+      })
+      .optional(),
+    baseBranch: z.string().min(1).optional(),
+    copyEnvFiles: z.boolean().optional(),
+    envPruneDirs: z.array(z.string()).optional(),
+    editorWorkspace: z.enum(['code-workspace']).nullable().optional(),
+    repos: z.array(z.string()).nullable().optional(),
+    command: z.string().nullable().optional(),
+  })
+  .strict();
+
 /**
- * What a config file on disk may contain. Both `defaults` and `overrides` are
- * optional and partial per role — a project file can carry just one role's one
- * field. Unknown roles and unknown models are rejected with clear messages.
+ * What a config file on disk may contain. `defaults`/`overrides` are optional
+ * and partial per role; `worktrees` is the optional multi-repo worktree policy.
+ * Unknown roles, unknown models and unknown keys are rejected with clear messages.
  */
 export const configFileSchema = z
   .object({
     version: z.literal(1),
     defaults: z.record(roleSchema, partialAgentConfigSchema).optional(),
     overrides: z.record(roleSchema, partialAgentConfigSchema).optional(),
+    worktrees: worktreeConfigSchema.optional(),
   })
   .strict();
 

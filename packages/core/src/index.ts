@@ -18,8 +18,14 @@ export {
   ROLE_DESCRIPTIONS,
 } from './config/roles.js';
 export type { ConfigFile, ParseResult } from './config/schema.js';
-export { configFileSchema, parseChambaConfig } from './config/schema.js';
+export { configFileSchema, parseChambaConfig, worktreeConfigSchema } from './config/schema.js';
 export type { AgentConfig, ChambaConfig, ResolvedConfig } from './config/types.js';
+export type {
+  PartialWorktreeConfig,
+  WorktreeConfig,
+  WorktreeLayout,
+} from './config/worktrees.js';
+export { DEFAULT_WORKTREE_CONFIG, resolveWorktreeConfig } from './config/worktrees.js';
 export { FilesystemMemoryStore, MEMORY_DIR } from './memory/filesystem-store.js';
 // Memory
 export type { Memory, MemoryStore, RememberInput } from './memory/store.js';
@@ -88,3 +94,12 @@ export type {
   WorktreeHandle,
 } from './worktree/manager.js';
 export { WorktreeError, WorktreeManager } from './worktree/manager.js';
+export type { PlanWorktreesInput, WorktreePlanItem } from './worktree/multi-repo-plan.js';
+export {
+  buildTicketBranch,
+  editorWorkspaceContent,
+  editorWorkspaceDir,
+  planWorktrees,
+  safeTicket,
+  worktreePathFor,
+} from './worktree/multi-repo-plan.js';
