@@ -14,8 +14,8 @@ chamba (the tool) handles the supervising, validating and plumbing around it.
 
 📖 [Español](./README.es.md) · 🧩 [Editor setup guides](./examples/) · 🗺️ [Roadmap](#roadmap)
 
-> ⚠️ Pre-1.0 and built in public, phase by phase ([`PLAN.md`](./PLAN.md)). The full
-> V1 tool set is implemented; release + polish are the last phases.
+> 🎉 **v0.1.0 is live on npm** — `npx @chamba/mcp`. Built in public, phase by phase
+> ([`PLAN.md`](./PLAN.md)). Pre-1.0: usable today, still evolving.
 
 ## Demo
 
@@ -148,8 +148,8 @@ servers in `~/.claude.json`. Then: `/orq add a health check endpoint`.
 - ✅ Git worktree manager
 - ✅ Cross-session memory
 - ✅ Claude Code extras
-- 🚧 Multi-editor docs (you're reading them)
-- ⏳ 1.0.0 release on npm
+- ✅ Multi-editor docs (you're reading them)
+- ✅ **0.1.0 published on npm**
 - 🔭 V2: semantic vault search, MCP sampling, more knowledge bases
 
 See [`PLAN.md`](./PLAN.md) for the full phase plan.

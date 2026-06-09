@@ -123,8 +123,8 @@ servers en `~/.claude.json`. Después: `/orq agrega un endpoint de health check`
 - ✅ Manager de git worktrees
 - ✅ Memoria entre sesiones
 - ✅ Extras para Claude Code
-- 🚧 Docs multi-editor (esto que estás leyendo)
-- ⏳ Release 1.0.0 en npm
+- ✅ Docs multi-editor (esto que estás leyendo)
+- ✅ **0.1.0 publicado en npm**
 - 🔭 V2: búsqueda semántica del vault, MCP sampling, más bases de conocimiento
 
 Ver [`PLAN.md`](./PLAN.md) para el plan completo de fases.

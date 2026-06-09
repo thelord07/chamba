@@ -27,7 +27,7 @@
 | 6 | Memory store + cross-session context | ✅ Completada | 2026-06-09 | d8c1cbc |
 | 7 | Claude Code extras (slash commands, subagents, hooks) | ✅ Completada | 2026-06-09 | 7ead405 |
 | 8 | Documentación multi-editor + ejemplos | ✅ Completada | 2026-06-09 | 324eb08 |
-| 9 | Release 1.0.0 + push de tracción | 🚧 En progreso | — | — |
+| 9 | Release 1.0.0 + push de tracción | ✅ Completada | 2026-06-09 | bb6db0a |
 
 **Símbolos:** ⏳ Pendiente — 🚧 En progreso — ✅ Completada — ❌ Bloqueada
 
@@ -682,7 +682,7 @@ cat ~/.claude.json | grep chamba  # debe estar el server registrado
 
 ### Fase 9 — Release 1.0.0 + push de tracción 📢📢📢
 
-**Estado:** 🚧 En progreso — release preparado (changesets, CI, v0.1.0, metadata); falta publish a npm (requiere login + org @chamba)
+**Estado:** ✅ Completada — 2026-06-09 — bb6db0a — `@chamba/{core,adapters,mcp,claude-extras}@0.1.0` publicados en npm; `npx @chamba/mcp` verificado (12 tools). Pendiente solo lo de marketing (posts 📢) y baseline de stars.
 
 **Goal:** publicar en npm, lanzar campaña de visibilidad.
 
