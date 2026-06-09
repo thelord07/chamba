@@ -85,8 +85,11 @@ export {
 } from './workspace/workspace.js';
 export type { BranchNameInput } from './worktree/branch-naming.js';
 export { buildBranchName, slugifyForGit, worktreeRelativePath } from './worktree/branch-naming.js';
+export { writeEditorWorkspace } from './worktree/editor-workspace.js';
+export { copyEnvFiles } from './worktree/env-copy.js';
 // Worktree
 export { GitDetector } from './worktree/git-detector.js';
+export { detectGitRepos } from './worktree/git-repo-detector.js';
 export type {
   CleanupResult,
   CreateWorktreeInput,
@@ -94,6 +97,13 @@ export type {
   WorktreeHandle,
 } from './worktree/manager.js';
 export { WorktreeError, WorktreeManager } from './worktree/manager.js';
+export type {
+  CleanupMultiResult,
+  CreateMultiInput,
+  MultiRepoWorktreeResult,
+  WorktreeStatus,
+} from './worktree/multi-repo-manager.js';
+export { MultiRepoWorktreeManager } from './worktree/multi-repo-manager.js';
 export type { PlanWorktreesInput, WorktreePlanItem } from './worktree/multi-repo-plan.js';
 export {
   buildTicketBranch,
