@@ -50,6 +50,19 @@ export class MemoryFilesystem implements FilesystemPort {
     this.dirs.add(this.norm(path));
   }
 
+  async remove(path: string): Promise<void> {
+    const norm = this.norm(path);
+    this.files.delete(norm);
+    this.dirs.delete(norm);
+    const prefix = `${norm}/`;
+    for (const file of [...this.files.keys()]) {
+      if (file.startsWith(prefix)) this.files.delete(file);
+    }
+    for (const dir of [...this.dirs]) {
+      if (dir.startsWith(prefix)) this.dirs.delete(dir);
+    }
+  }
+
   async readDir(path: string): Promise<DirEntry[]> {
     const norm = this.norm(path);
     const prefix = norm === '/' ? '/' : `${norm}/`;

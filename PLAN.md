@@ -25,7 +25,7 @@
 | 4 | Plan generation + reviewer (heurístico) | ✅ Completada | 2026-06-09 | 89f69b3 |
 | 5 | Worktree manager | ✅ Completada | 2026-06-09 | 6c1012b |
 | 6 | Memory store + cross-session context | ✅ Completada | 2026-06-09 | d8c1cbc |
-| 7 | Claude Code extras (slash commands, subagents, hooks) | ⏳ Pendiente | — | — |
+| 7 | Claude Code extras (slash commands, subagents, hooks) | ✅ Completada | 2026-06-09 | _pending_ |
 | 8 | Documentación multi-editor + ejemplos | ⏳ Pendiente | — | — |
 | 9 | Release 1.0.0 + push de tracción | ⏳ Pendiente | — | — |
 
@@ -568,7 +568,7 @@ pnpm -r test
 
 ### Fase 7 — Claude Code extras (slash commands, subagents, hooks) 📢
 
-**Estado:** ⏳ Pendiente
+**Estado:** ✅ Completada — 2026-06-09 — _pending_
 
 **Goal:** paquete opcional `@chamba/claude-extras` que se instala con `npx @chamba/claude-extras install` y añade slash commands, subagents pre-configurados y hooks a `~/.claude/`. Aprovecha las tools MCP de chamba para dar una experiencia más fluida en Claude Code específicamente.
 

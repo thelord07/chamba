@@ -77,6 +77,22 @@ hand edits.
 
 The full V1 tool set is detailed in [`PLAN.md`](./PLAN.md).
 
+### Claude Code extras (optional)
+
+Cursor, VS Code and other MCP editors get everything above just by adding the MCP
+server. If you use **Claude Code**, an optional package adds slash commands,
+pre-configured subagents and hooks on top:
+
+```bash
+npx @chamba/claude-extras install     # add /orq, /workspace, /worktrees, /recall,
+                                      # implementer/reviewer/tester agents, 2 hooks,
+                                      # and register the chamba MCP server
+npx @chamba/claude-extras uninstall   # cleanly remove them
+```
+
+It never overwrites existing files (re-run with `--force`) and preserves any other
+MCP servers in `~/.claude.json`.
+
 ### Cross-session memory
 
 `chamba_remember` and `chamba_recall` give the editor's model knowledge that

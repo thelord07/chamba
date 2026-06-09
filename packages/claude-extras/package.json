@@ -1,0 +1,33 @@
+{
+  "name": "@chamba/claude-extras",
+  "version": "0.0.0",
+  "description": "Optional Claude Code extras for chamba: slash commands, subagents and hooks installer",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "chamba-install": "./bin/chamba-install"
+  },
+  "files": [
+    "dist",
+    "bin",
+    "assets"
+  ],
+  "scripts": {
+    "build": "tsup src/cli.ts --format esm --clean",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@chamba/adapters": "workspace:*",
+    "@chamba/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

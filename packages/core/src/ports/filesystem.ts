@@ -17,4 +17,6 @@ export interface FilesystemPort {
   exists(path: string): Promise<boolean>;
   /** Create a directory and any missing parents (recursive). */
   mkdir(path: string): Promise<void>;
+  /** Remove a file or directory (recursive); a no-op if it doesn't exist. */
+  remove(path: string): Promise<void>;
 }

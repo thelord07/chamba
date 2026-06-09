@@ -1,4 +1,4 @@
-import { mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import type { DirEntry, FilesystemPort } from '@chamba/core';
 
 /** Node-backed `FilesystemPort`. */
@@ -31,5 +31,9 @@ export class NodeFilesystem implements FilesystemPort {
 
   async mkdir(path: string): Promise<void> {
     await mkdir(path, { recursive: true });
+  }
+
+  async remove(path: string): Promise<void> {
+    await rm(path, { recursive: true, force: true });
   }
 }
