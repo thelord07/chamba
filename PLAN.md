@@ -19,7 +19,7 @@
 
 | # | Fase | Estado | Fecha | Commit |
 |---|---|---|---|---|
-| 1 | Bootstrap + ejemplo mínimo | ✅ Completada | 2026-06-09 | _pending_ |
+| 1 | Bootstrap + ejemplo mínimo | ✅ Completada | 2026-06-09 | d6e4e7f |
 | 2 | Núcleo de @chamba/core | ⏳ Pendiente | — | — |
 | 3 | Providers reales + tools nativas | ⏳ Pendiente | — | — |
 | 4 | Compaction + permisos + memoria | ⏳ Pendiente | — | — |
@@ -462,7 +462,7 @@ Cada fase tiene:
 
 ### Fase 1 — Bootstrap del monorepo + ejemplo mínimo 📢
 
-**Estado:** ✅ Completada — 2026-06-09 — _pending_
+**Estado:** ✅ Completada — 2026-06-09 — d6e4e7f
 
 **Goal:** que `pnpm install && pnpm --filter @chamba/examples-minimal start` levante un REPL conversando con Claude en ~200 líneas en un solo archivo, sin abstracciones. La esencia del harness antes de meter capas.
 
