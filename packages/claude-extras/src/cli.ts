@@ -13,6 +13,7 @@ function buildInstaller(): Installer {
     assetsDir,
     claudeDir: joinPath(home, '.claude'),
     claudeJsonPath: joinPath(home, '.claude.json'),
+    globalConfigPath: joinPath(home, '.chamba/config.json'),
   });
 }
 
@@ -53,6 +54,14 @@ async function main(): Promise<void> {
     return;
   }
 
+  if (command === 'apply') {
+    const result = await installer.applyConfig();
+    process.stdout.write(
+      `Applied config: ${result.regenerated.length} subagent(s) regenerated, ${result.unchanged.length} unchanged.\n`,
+    );
+    return;
+  }
+
   if (command === undefined || command === 'install') {
     const force = rest.includes('--force');
     const result = await installer.install({ force });
@@ -61,7 +70,7 @@ async function main(): Promise<void> {
   }
 
   process.stderr.write(
-    `Unknown command "${command}". Usage: chamba-install [install|uninstall] [--force]\n`,
+    `Unknown command "${command}". Usage: chamba-install [install|uninstall|apply] [--force]\n`,
   );
   process.exitCode = 1;
 }

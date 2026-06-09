@@ -1,5 +1,10 @@
-import type { FilesystemPort } from '@chamba/core';
-import { joinPath } from '@chamba/core';
+import type { FilesystemPort, ResolvedConfig } from '@chamba/core';
+import { joinPath, loadConfig } from '@chamba/core';
+import {
+  AGENT_ROLE_BY_FILE,
+  parseAgentMarkdown,
+  renderAgentMarkdown,
+} from './agent-frontmatter.js';
 
 /** The Claude Code subdirectory each asset category installs into. */
 export const CATEGORIES = [
@@ -19,6 +24,13 @@ export interface InstallerOptions {
   claudeDir: string;
   /** Target Claude Code MCP config file (e.g. `~/.claude.json`). */
   claudeJsonPath: string;
+  /** Global chamba config (e.g. `~/.chamba/config.json`); defaults used if absent. */
+  globalConfigPath?: string;
+}
+
+export interface ApplyResult {
+  regenerated: string[];
+  unchanged: string[];
 }
 
 export interface InstallResult {
@@ -36,6 +48,8 @@ export interface UninstallResult {
 }
 
 export class Installer {
+  private cachedConfig?: ResolvedConfig;
+
   constructor(private readonly opts: InstallerOptions) {}
 
   /** True if Claude Code seems present (a config dir or file already exists). */
@@ -64,7 +78,7 @@ export class Installer {
           skipped.push(`${dir}/${name}`);
           continue;
         }
-        const content = await this.opts.fs.readFile(joinPath(this.opts.assetsDir, dir, name));
+        const content = await this.materialize(dir, name);
         await this.opts.fs.writeFile(target, content);
         installed.push(`${dir}/${name}`);
         counts[dir] = (counts[dir] ?? 0) + 1;
@@ -89,6 +103,59 @@ export class Installer {
     }
     const mcpRemoved = await this.removeMcpServer();
     return { removed, mcpRemoved };
+  }
+
+  /**
+   * Regenerate the subagent files in `~/.claude/agents/` from the current
+   * config. Idempotent: a file whose rendered content is unchanged is left
+   * untouched. Only role-mapped subagents are (re)generated.
+   */
+  async applyConfig(): Promise<ApplyResult> {
+    const regenerated: string[] = [];
+    const unchanged: string[] = [];
+    const targetDir = joinPath(this.opts.claudeDir, 'agents');
+    await this.opts.fs.mkdir(targetDir);
+
+    for (const name of await this.assetNames('agents')) {
+      if (!AGENT_ROLE_BY_FILE[name]) continue;
+      const content = await this.materialize('agents', name);
+      const target = joinPath(targetDir, name);
+      if ((await this.readIfExists(target)) === content) {
+        unchanged.push(`agents/${name}`);
+        continue;
+      }
+      await this.opts.fs.writeFile(target, content);
+      regenerated.push(`agents/${name}`);
+    }
+
+    return { regenerated, unchanged };
+  }
+
+  /** Read an asset and, for role-mapped subagents, inject model + effort. */
+  private async materialize(dir: string, name: string): Promise<string> {
+    const raw = await this.opts.fs.readFile(joinPath(this.opts.assetsDir, dir, name));
+    if (dir !== 'agents') return raw;
+    const role = AGENT_ROLE_BY_FILE[name];
+    if (!role) return raw;
+    const config = await this.resolveConfig();
+    return renderAgentMarkdown(parseAgentMarkdown(raw), config[role]);
+  }
+
+  private async resolveConfig(): Promise<ResolvedConfig> {
+    if (!this.cachedConfig) {
+      const { config } = await loadConfig(this.opts.fs, { globalPath: this.opts.globalConfigPath });
+      this.cachedConfig = config;
+    }
+    return this.cachedConfig;
+  }
+
+  private async readIfExists(path: string): Promise<string | null> {
+    try {
+      if (!(await this.opts.fs.exists(path))) return null;
+      return await this.opts.fs.readFile(path);
+    } catch {
+      return null;
+    }
   }
 
   private async assetNames(dir: string): Promise<string[]> {

@@ -21,6 +21,7 @@ function build(extra: Record<string, string> = {}) {
     assetsDir: '/assets',
     claudeDir: '/home/.claude',
     claudeJsonPath: '/home/.claude.json',
+    globalConfigPath: '/home/.chamba/config.json',
   });
   return { fs, installer };
 }
@@ -69,6 +70,52 @@ describe('Installer.install', () => {
     const config = JSON.parse(await fs.readFile('/home/.claude.json'));
     expect(config.mcpServers.other).toEqual({ command: 'x' });
     expect(config.mcpServers.chamba).toBeDefined();
+  });
+});
+
+describe('Installer.applyConfig', () => {
+  it('regenerates the three subagents from defaults and is idempotent', async () => {
+    const { fs, installer } = build();
+    const first = await installer.applyConfig();
+    expect(first.regenerated.sort()).toEqual([
+      'agents/implementer.md',
+      'agents/reviewer.md',
+      'agents/tester.md',
+    ]);
+
+    const impl = await fs.readFile('/home/.claude/agents/implementer.md');
+    expect(impl).toContain('model: claude-sonnet-4-6');
+    expect(impl).toContain('effort: medium');
+
+    const second = await installer.applyConfig();
+    expect(second.regenerated).toEqual([]);
+    expect(second.unchanged).toHaveLength(3);
+  });
+
+  it('reflects a config override when regenerating', async () => {
+    const { fs, installer } = build({
+      '/home/.chamba/config.json': JSON.stringify({
+        version: 1,
+        overrides: { implementer: { model: 'claude-haiku-4-5', effort: 'low' } },
+      }),
+    });
+    await installer.applyConfig();
+    const impl = await fs.readFile('/home/.claude/agents/implementer.md');
+    expect(impl).toContain('model: claude-haiku-4-5');
+    expect(impl).toContain('effort: low');
+  });
+
+  it('omits model for a non-Anthropic model and notes inherit', async () => {
+    const { fs, installer } = build({
+      '/home/.chamba/config.json': JSON.stringify({
+        version: 1,
+        overrides: { reviewer: { model: 'gpt-5.5' } },
+      }),
+    });
+    await installer.applyConfig();
+    const reviewer = await fs.readFile('/home/.claude/agents/reviewer.md');
+    expect(reviewer).not.toContain('model: gpt-5.5');
+    expect(reviewer).toContain('not an Anthropic model');
   });
 });
 
