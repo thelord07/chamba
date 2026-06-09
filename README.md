@@ -65,9 +65,21 @@ hand edits.
 | `chamba_workspace_init` | `{ root?: string }` | Scans and writes `.chamba/workspace.md`; if it exists, returns current contents without overwriting |
 | `chamba_workspace_show` | `{}` | Contents of `.chamba/workspace.md`, or a "not found" note |
 | `chamba_workspace_reload` | `{}` | A diff between the current `.chamba/workspace.md` and a fresh re-scan (no writes) |
+| `chamba_load_context` | `{ task, includeObsidian? }` | Workspace summary plus Obsidian notes relevant to the task |
+| `chamba_summarize_to_vault` | `{ title, content, projectSlug? }` | Writes a structured note to the vault under `proyectos/<date>-<slug>.md` |
 
-The full V1 tool set (load context, plan + review, worktrees, Obsidian summaries,
-memory) is detailed in [`PLAN.md`](./PLAN.md).
+The full V1 tool set (plan + review, worktrees, memory) is detailed in
+[`PLAN.md`](./PLAN.md).
+
+## Obsidian
+
+chamba detects an Obsidian vault from `CHAMBA_OBSIDIAN_VAULT_PATH` or common
+locations (`~/Documents`, `~/Notes`, `~/Obsidian`). With a vault present,
+`chamba_load_context` cites notes relevant to your task and `chamba_summarize_to_vault`
+writes structured summaries back — your "second brain" and your agent, in sync.
+See [`examples/obsidian-orchestrator`](./examples/obsidian-orchestrator) for a
+runnable demo vault. Without a vault, `chamba_summarize_to_vault` fails with a clear
+message.
 
 ## Requirements
 

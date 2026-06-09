@@ -15,6 +15,7 @@ function buildServices(files: Record<string, string>, cwd: string): Services {
     process: { exec: async () => ({ stdout: '', stderr: '', exitCode: 0 }) },
     clock: { now: () => new Date('2026-06-09T00:00:00Z'), today: () => '2026-06-09' },
     cwd,
+    homedir: '/home/test',
   };
 }
 
@@ -32,11 +33,13 @@ function textOf(result: unknown): string {
 }
 
 describe('chamba MCP server', () => {
-  it('exposes the three workspace tools', async () => {
+  it('exposes the workspace and obsidian tools', async () => {
     const { client, server } = await connect(buildServices({}, '/proj'));
     const { tools } = await client.listTools();
 
     expect(tools.map((t) => t.name).sort()).toEqual([
+      'chamba_load_context',
+      'chamba_summarize_to_vault',
       'chamba_workspace_init',
       'chamba_workspace_reload',
       'chamba_workspace_show',

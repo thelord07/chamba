@@ -1,16 +1,23 @@
 // @chamba/core — pure harness logic. No Node-specific APIs (principle 6).
 
+export type { NoteFields } from './obsidian/note-template.js';
+export { renderNote, slugify } from './obsidian/note-template.js';
+export type { WriteNoteInput, WriteNoteResult } from './obsidian/vault-writer.js';
+export { VAULT_NOTES_DIR, VaultWriter } from './obsidian/vault-writer.js';
 export type { ClockPort } from './ports/clock.js';
 // Ports
 export type { DirEntry, FilesystemPort } from './ports/filesystem.js';
 export type { ProcessExecOptions, ProcessPort, ProcessResult } from './ports/process.js';
-
 // Testing utilities
 export { MemoryFilesystem } from './testing/memory-filesystem.js';
-
 // Path helpers
 export { basename, dirname, extname, joinPath } from './util/path.js';
+export type { BuiltContext, ContextBuildInput, RelevantNote } from './workspace/context-builder.js';
+export { ContextBuilder } from './workspace/context-builder.js';
 export { diffLines, textsEqual } from './workspace/diff.js';
+export type { DetectOptions, VaultDetection } from './workspace/obsidian-detector.js';
+// Obsidian
+export { ObsidianDetector } from './workspace/obsidian-detector.js';
 export { WorkspaceScanner } from './workspace/scanner.js';
 export type { ProjectRef, Workspace } from './workspace/workspace.js';
 // Workspace

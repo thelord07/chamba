@@ -21,7 +21,7 @@
 |---|---|---|---|---|
 | 1 | Bootstrap del monorepo + MCP server mínimo | ✅ Completada | 2026-06-09 | 40b029c |
 | 2 | Workspace context + scanner | ✅ Completada | 2026-06-09 | c588a56 |
-| 3 | Obsidian integration | ⏳ Pendiente | — | — |
+| 3 | Obsidian integration | ✅ Completada | 2026-06-09 | _pending_ |
 | 4 | Plan generation + reviewer (heurístico) | ⏳ Pendiente | — | — |
 | 5 | Worktree manager | ⏳ Pendiente | — | — |
 | 6 | Memory store + cross-session context | ⏳ Pendiente | — | — |
@@ -394,7 +394,7 @@ npx @modelcontextprotocol/inspector node packages/mcp/dist/main.js
 
 ### Fase 3 — Obsidian integration 📢
 
-**Estado:** ⏳ Pendiente
+**Estado:** ✅ Completada — 2026-06-09 — _pending_
 
 **Goal:** chamba detecta si hay vault Obsidian, inyecta búsqueda contextual en `load_context`, y puede escribir resúmenes estructurados al vault vía `summarize_to_vault`.
 
