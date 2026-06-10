@@ -72,6 +72,7 @@ Para conectar un vault de Obsidian, agregá `"env": { "CHAMBA_OBSIDIAN_VAULT_PAT
 | `chamba_workspace_reload` | `{}` | Un diff vs un re-escaneo (sin escribir) |
 | `chamba_load_context` | `{ task, includeObsidian? }` | Resumen del workspace + notas relevantes del vault |
 | `chamba_summarize_to_vault` | `{ title, content, projectSlug? }` | Escribe una nota al vault |
+| `chamba_vault_status` | `{}` | Ruta del vault resuelta + las notas que chamba ve (diagnóstico) |
 | `chamba_generate_plan` | `{ task, context? }` | Un template de plan para completar |
 | `chamba_review_plan` | `{ plan, task, context? }` | `{ approved, issues, suggestions, riskFlags }` — sin LLM |
 | `chamba_create_worktree` | `{ taskSlug, workerId, baseBranch? }` | Un git worktree aislado |

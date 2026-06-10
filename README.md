@@ -74,6 +74,7 @@ To wire up an Obsidian vault, add `"env": { "CHAMBA_OBSIDIAN_VAULT_PATH": "/path
 | `chamba_workspace_reload` | `{}` | A diff vs a fresh re-scan (no writes) |
 | `chamba_load_context` | `{ task, includeObsidian? }` | Workspace summary + relevant vault notes |
 | `chamba_summarize_to_vault` | `{ title, content, projectSlug? }` | Writes a note to the vault |
+| `chamba_vault_status` | `{}` | Resolved vault path + the notes chamba can see (diagnostic) |
 | `chamba_generate_plan` | `{ task, context? }` | A structured plan template to fill |
 | `chamba_review_plan` | `{ plan, task, context? }` | `{ approved, issues, suggestions, riskFlags }` — no LLM |
 | `chamba_create_worktree` | `{ taskSlug, workerId, baseBranch? }` | An isolated git worktree |
