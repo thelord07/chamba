@@ -1,5 +1,7 @@
 import type { FilesystemPort } from '../ports/filesystem.js';
 import { basename, dirname, extname, joinPath } from '../util/path.js';
+import { detectGitRepos } from '../worktree/git-repo-detector.js';
+import { detectRuleSources } from './rules.js';
 import type { ProjectRef, Workspace } from './workspace.js';
 
 const MAX_DEPTH = 6;
@@ -90,6 +92,13 @@ export class WorkspaceScanner {
     const conventions = await this.detectConventions(root);
     const description = await this.detectDescription(root, rootProject, framework, languages);
 
+    // Repos to scan for coding rules: the root, each child git repo, and each
+    // manifest-based project (deduped).
+    const repoDirs = [
+      ...new Set(['.', ...(await detectGitRepos(this.fs, root)), ...projects.map((p) => p.path)]),
+    ];
+    const ruleSources = await detectRuleSources(this.fs, root, repoDirs);
+
     return {
       root,
       description,
@@ -97,6 +106,7 @@ export class WorkspaceScanner {
       framework,
       conventions,
       projects,
+      ruleSources,
       folderMap: [...acc.topDirs].sort(),
     };
   }

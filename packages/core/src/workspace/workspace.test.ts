@@ -8,6 +8,7 @@ const sample: Workspace = {
   framework: 'Express',
   conventions: ['Biome for lint + format'],
   projects: [{ name: 'proj', path: '.', language: 'TypeScript', framework: 'Express' }],
+  ruleSources: [{ repo: '.', editor: 'Cursor', path: '.cursor/rules/style.mdc' }],
   folderMap: ['src', 'test'],
 };
 
@@ -19,6 +20,7 @@ describe('renderWorkspaceMarkdown', () => {
       '## Languages',
       '## Framework',
       '## Conventions',
+      '## Coding rules',
       '## Active projects',
       '## Folder map',
     ]) {
@@ -32,6 +34,7 @@ describe('renderWorkspaceMarkdown', () => {
     expect(md).toContain('- TypeScript');
     expect(md).toContain('**proj**');
     expect(md).toContain('- src/');
+    expect(md).toContain('.cursor/rules/style.mdc');
   });
 
   it('is deterministic (no timestamps) so reload diffs are meaningful', () => {

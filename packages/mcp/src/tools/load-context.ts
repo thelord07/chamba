@@ -24,9 +24,13 @@ export function registerLoadContext(server: McpServer, logger: Logger, services:
           .boolean()
           .optional()
           .describe('Search the Obsidian vault for relevant notes (default true).'),
+        includeRules: z
+          .boolean()
+          .optional()
+          .describe("Include each repo's coding rules across editors (default true)."),
       },
     },
-    async ({ task, includeObsidian }) => {
+    async ({ task, includeObsidian, includeRules }) => {
       const workspace = await new WorkspaceScanner(services.fs).scan(services.cwd);
 
       let vaultPath: string | undefined;
@@ -38,7 +42,12 @@ export function registerLoadContext(server: McpServer, logger: Logger, services:
         if (detection.found) vaultPath = detection.path;
       }
 
-      const built = await new ContextBuilder(services.fs).build({ workspace, task, vaultPath });
+      const built = await new ContextBuilder(services.fs).build({
+        workspace,
+        task,
+        vaultPath,
+        includeRules,
+      });
       logger.info(
         { tool: TOOL_NAME, vault: vaultPath ?? null, notes: built.relevantNotes.length },
         'context built',

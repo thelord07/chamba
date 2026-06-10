@@ -75,6 +75,7 @@ describe('validatePlan', () => {
       description: 'x',
       languages: ['TypeScript'],
       conventions: [],
+      ruleSources: [],
       projects: [{ name: 'r', path: '.' }],
       folderMap: ['src'],
     };

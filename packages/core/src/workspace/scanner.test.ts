@@ -95,6 +95,25 @@ describe('WorkspaceScanner', () => {
     expect(ws.projects.map((p) => p.name)).toContain('wt-app');
   });
 
+  it('detects coding-rule files across repos, non-exclusively', async () => {
+    const ws = await scan(
+      {
+        '/ws/api/package.json': JSON.stringify({ name: 'api' }),
+        '/ws/api/.cursor/rules/style.mdc': '# style',
+        '/ws/web/package.json': JSON.stringify({ name: 'web' }),
+        '/ws/web/CLAUDE.md': '# claude rules',
+        '/ws/AGENTS.md': '# agents',
+      },
+      '/ws',
+    );
+
+    const paths = ws.ruleSources.map((r) => r.path).sort();
+    expect(paths).toEqual(['AGENTS.md', 'api/.cursor/rules/style.mdc', 'web/CLAUDE.md']);
+    expect(new Set(ws.ruleSources.map((r) => r.editor))).toEqual(
+      new Set(['Agents', 'Cursor', 'Claude Code']),
+    );
+  });
+
   it('respects .gitignore and never includes node_modules', async () => {
     const ws = await scan(
       {

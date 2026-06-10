@@ -74,6 +74,9 @@ export { diffLines, textsEqual } from './workspace/diff.js';
 export type { DetectOptions, VaultDetection } from './workspace/obsidian-detector.js';
 // Obsidian
 export { normalizeVaultPath, ObsidianDetector } from './workspace/obsidian-detector.js';
+export type { RuleConvention, RuleExcerpt, RuleSource } from './workspace/rules.js';
+// Coding rules (multi-editor)
+export { detectRuleSources, RULE_SOURCES, readRuleExcerpts } from './workspace/rules.js';
 export { WorkspaceScanner } from './workspace/scanner.js';
 export type { ProjectRef, Workspace } from './workspace/workspace.js';
 // Workspace

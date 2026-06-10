@@ -30,6 +30,7 @@ describe('generatePlanTemplate', () => {
       description: 'x',
       languages: [],
       conventions: [],
+      ruleSources: [],
       projects: [
         { name: 'root', path: '.' },
         { name: 'api', path: 'packages/api' },

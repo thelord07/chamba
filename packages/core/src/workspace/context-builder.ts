@@ -1,5 +1,6 @@
 import type { FilesystemPort } from '../ports/filesystem.js';
 import { joinPath } from '../util/path.js';
+import { readRuleExcerpts } from './rules.js';
 import type { Workspace } from './workspace.js';
 
 export interface RelevantNote {
@@ -15,6 +16,8 @@ export interface ContextBuildInput {
   task: string;
   /** When set, search this Obsidian vault for notes relevant to the task. */
   vaultPath?: string;
+  /** Include a section with each repo's coding rules (default true). */
+  includeRules?: boolean;
   /** Soft cap on the produced context, in estimated tokens (~4 chars/token). */
   maxTokens?: number;
 }
@@ -64,6 +67,10 @@ export class ContextBuilder {
     const sections: string[] = [this.workspaceSection(input.workspace)];
     let relevantNotes: string[] = [];
 
+    if (input.includeRules !== false && input.workspace.ruleSources.length > 0) {
+      sections.push(await this.codingRulesSection(input.workspace));
+    }
+
     if (input.vaultPath) {
       const notes = await this.searchNotes(input.vaultPath, input.task);
       relevantNotes = notes.map((n) => n.path);
@@ -73,6 +80,23 @@ export class ContextBuilder {
     const maxChars = (input.maxTokens ?? DEFAULT_MAX_TOKENS) * 4;
     const context = clamp(sections.join('\n\n'), maxChars);
     return { context, relevantNotes };
+  }
+
+  /** Each repo's coding rules (read fresh, clamped), non-exclusive across editors. */
+  private async codingRulesSection(ws: Workspace): Promise<string> {
+    const excerpts = await readRuleExcerpts(this.fs, ws.root, ws.ruleSources);
+    if (excerpts.length === 0) return '## Coding rules\n\nNo readable rule files.';
+    const lines = [
+      '## Coding rules',
+      '',
+      'Follow these per-repo rules (any editor). Read the full file for details:',
+      '',
+    ];
+    for (const { source, excerpt } of excerpts) {
+      lines.push(`### \`${source.path}\` — ${source.editor} (${source.repo})`);
+      lines.push('', excerpt, '');
+    }
+    return lines.join('\n').trimEnd();
   }
 
   private workspaceSection(ws: Workspace): string {

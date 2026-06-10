@@ -10,6 +10,7 @@ const workspace: Workspace = {
   framework: 'Express',
   conventions: [],
   projects: [{ name: 'proj', path: '.', language: 'TypeScript' }],
+  ruleSources: [],
   folderMap: ['src'],
 };
 
@@ -44,5 +45,40 @@ describe('ContextBuilder', () => {
     const builder = new ContextBuilder(new MemoryFilesystem({}));
     const built = await builder.build({ workspace, task: 'x', maxTokens: 5 });
     expect(built.context.length).toBeLessThanOrEqual(5 * 4);
+  });
+
+  it('includes a coding rules section with fresh excerpts, non-exclusive', async () => {
+    const fs = new MemoryFilesystem({
+      '/proj/api/.cursor/rules/style.mdc': '# Cursor style\nUse named exports.',
+      '/proj/web/CLAUDE.md': '# Claude rules\nMatch surrounding code.',
+    });
+    const ws: Workspace = {
+      ...workspace,
+      ruleSources: [
+        { repo: 'api', editor: 'Cursor', path: 'api/.cursor/rules/style.mdc' },
+        { repo: 'web', editor: 'Claude Code', path: 'web/CLAUDE.md' },
+      ],
+    };
+    const built = await new ContextBuilder(fs).build({ workspace: ws, task: 'anything' });
+
+    expect(built.context).toContain('## Coding rules');
+    expect(built.context).toContain('api/.cursor/rules/style.mdc');
+    expect(built.context).toContain('Use named exports.');
+    expect(built.context).toContain('web/CLAUDE.md');
+    expect(built.context).toContain('Match surrounding code.');
+  });
+
+  it('skips the rules section when includeRules is false', async () => {
+    const fs = new MemoryFilesystem({ '/proj/CLAUDE.md': '# rules' });
+    const ws: Workspace = {
+      ...workspace,
+      ruleSources: [{ repo: '.', editor: 'Claude Code', path: 'CLAUDE.md' }],
+    };
+    const built = await new ContextBuilder(fs).build({
+      workspace: ws,
+      task: 'x',
+      includeRules: false,
+    });
+    expect(built.context).not.toContain('## Coding rules');
   });
 });

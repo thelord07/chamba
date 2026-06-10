@@ -1,3 +1,5 @@
+import type { RuleSource } from './rules.js';
+
 /** Relative path (from workspace root) of the chamba workspace file. */
 export const WORKSPACE_DIR = '.chamba';
 export const WORKSPACE_FILE = 'workspace.md';
@@ -18,6 +20,8 @@ export interface Workspace {
   framework?: string;
   conventions: string[];
   projects: ProjectRef[];
+  /** Coding-rule files found across repos (Cursor, Claude, Trae, …). */
+  ruleSources: RuleSource[];
   /** Top-level directory names (without trailing slash), sorted. */
   folderMap: string[];
 }
@@ -60,6 +64,20 @@ export function renderWorkspaceMarkdown(ws: Workspace): string {
   lines.push('');
   if (ws.conventions.length > 0) {
     for (const c of ws.conventions) lines.push(`- ${c}`);
+  } else {
+    lines.push('_None detected._');
+  }
+  lines.push('');
+
+  lines.push('## Coding rules');
+  lines.push('');
+  lines.push('> Rule files found per repo (read non-exclusively across editors). chamba');
+  lines.push('> loads their content into context at task time.');
+  lines.push('');
+  if (ws.ruleSources.length > 0) {
+    for (const r of ws.ruleSources) {
+      lines.push(`- \`${r.path}\` — ${r.editor} (${r.repo})`);
+    }
   } else {
     lines.push('_None detected._');
   }
