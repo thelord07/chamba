@@ -1,6 +1,6 @@
 {
   "name": "@chamba/adapters",
-  "version": "0.3.2",
+  "version": "0.4.0",
   "description": "Node implementations of @chamba/core ports (filesystem, process, clock)",
   "license": "MIT",
   "type": "module",
