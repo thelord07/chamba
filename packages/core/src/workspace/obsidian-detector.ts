@@ -1,10 +1,21 @@
 import type { FilesystemPort } from '../ports/filesystem.js';
-import { joinPath } from '../util/path.js';
+import { basename, dirname, joinPath } from '../util/path.js';
 
 export interface VaultDetection {
   found: boolean;
   path?: string;
   noteCount?: number;
+}
+
+/**
+ * The vault is the directory that *contains* `.obsidian` — never `.obsidian`
+ * itself. A common mistake is to point `CHAMBA_OBSIDIAN_VAULT_PATH` at the
+ * `.obsidian` folder; correct it to its parent so writes and note search land
+ * in the real vault.
+ */
+export function normalizeVaultPath(path: string): string {
+  const trimmed = path.replace(/[/\\]+$/, '');
+  return basename(trimmed) === '.obsidian' ? dirname(trimmed) : trimmed;
 }
 
 export interface DetectOptions {
@@ -27,12 +38,9 @@ export class ObsidianDetector {
 
   async detect(opts: DetectOptions): Promise<VaultDetection> {
     if (opts.explicitPath) {
-      if (await this.fs.exists(opts.explicitPath)) {
-        return {
-          found: true,
-          path: opts.explicitPath,
-          noteCount: await this.countNotes(opts.explicitPath),
-        };
+      const vault = normalizeVaultPath(opts.explicitPath);
+      if (await this.fs.exists(vault)) {
+        return { found: true, path: vault, noteCount: await this.countNotes(vault) };
       }
       return { found: false };
     }

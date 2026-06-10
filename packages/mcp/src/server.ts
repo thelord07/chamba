@@ -13,6 +13,7 @@ import { registerRecall } from './tools/recall.js';
 import { registerRemember } from './tools/remember.js';
 import { registerReviewPlan } from './tools/review-plan.js';
 import { registerSummarizeToVault } from './tools/summarize-to-vault.js';
+import { registerVaultStatus } from './tools/vault-status.js';
 import { registerWorkspaceInit } from './tools/workspace-init.js';
 import { registerWorkspaceReload } from './tools/workspace-reload.js';
 import { registerWorkspaceShow } from './tools/workspace-show.js';
@@ -35,6 +36,7 @@ export function createServer(logger: Logger, services: Services = createNodeServ
   registerWorkspaceReload(server, logger, services);
   registerLoadContext(server, logger, services);
   registerSummarizeToVault(server, logger, services);
+  registerVaultStatus(server, logger, services);
   registerGeneratePlan(server, logger, services);
   registerReviewPlan(server, logger, services);
   registerCreateWorktree(server, logger, services);

@@ -120,27 +120,7 @@ export class ContextBuilder {
   }
 
   private async collectMarkdown(root: string): Promise<string[]> {
-    const out: string[] = [];
-    const visit = async (dir: string, depth: number): Promise<void> => {
-      if (depth > NOTE_SCAN_MAX_DEPTH) return;
-      let entries: Awaited<ReturnType<FilesystemPort['readDir']>>;
-      try {
-        entries = await this.fs.readDir(dir);
-      } catch {
-        return;
-      }
-      for (const entry of entries) {
-        const full = joinPath(dir, entry.name);
-        if (entry.isDirectory) {
-          if (SKIP_DIRS.has(entry.name)) continue;
-          await visit(full, depth + 1);
-        } else if (entry.name.toLowerCase().endsWith('.md')) {
-          out.push(full);
-        }
-      }
-    };
-    await visit(root, 0);
-    return out;
+    return listVaultNotes(this.fs, root);
   }
 
   private async tryRead(path: string): Promise<string | null> {
@@ -150,6 +130,34 @@ export class ContextBuilder {
       return null;
     }
   }
+}
+
+/**
+ * All markdown notes under a vault (the same set `chamba_load_context` searches),
+ * skipping `.obsidian`, `.trash`, etc. Useful to show what chamba actually sees.
+ */
+export async function listVaultNotes(fs: FilesystemPort, root: string): Promise<string[]> {
+  const out: string[] = [];
+  const visit = async (dir: string, depth: number): Promise<void> => {
+    if (depth > NOTE_SCAN_MAX_DEPTH) return;
+    let entries: Awaited<ReturnType<FilesystemPort['readDir']>>;
+    try {
+      entries = await fs.readDir(dir);
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      const full = joinPath(dir, entry.name);
+      if (entry.isDirectory) {
+        if (SKIP_DIRS.has(entry.name)) continue;
+        await visit(full, depth + 1);
+      } else if (entry.name.toLowerCase().endsWith('.md')) {
+        out.push(full);
+      }
+    }
+  };
+  await visit(root, 0);
+  return out;
 }
 
 // --- helpers ------------------------------------------------------------------

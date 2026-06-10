@@ -8,6 +8,7 @@ const ASSETS = {
   '/assets/commands/workspace.md': '# workspace',
   '/assets/commands/worktrees.md': '# worktrees',
   '/assets/commands/recall.md': '# recall',
+  '/assets/commands/vault.md': '# vault',
   '/assets/agents/planner.md': '# planner',
   '/assets/agents/implementer.md': '# implementer',
   '/assets/agents/reviewer.md': '# reviewer',
@@ -33,7 +34,7 @@ describe('Installer.install', () => {
     const { fs, installer } = build({ '/home/.claude.json': '{}' });
     const result = await installer.install();
 
-    expect(result.counts).toEqual({ commands: 5, agents: 4, hooks: 2 });
+    expect(result.counts).toEqual({ commands: 6, agents: 4, hooks: 2 });
     expect(result.mcpAdded).toBe(true);
     expect(await fs.exists('/home/.claude/commands/orq.md')).toBe(true);
     expect(await fs.exists('/home/.claude/agents/implementer.md')).toBe(true);
@@ -49,7 +50,7 @@ describe('Installer.install', () => {
     const second = await installer.install();
 
     expect(second.installed).toEqual([]);
-    expect(second.skipped).toHaveLength(11);
+    expect(second.skipped).toHaveLength(12);
     expect(second.mcpAlreadyPresent).toBe(true);
   });
 
@@ -134,7 +135,7 @@ describe('Installer.uninstall', () => {
     await installer.install();
 
     const result = await installer.uninstall();
-    expect(result.removed).toHaveLength(11);
+    expect(result.removed).toHaveLength(12);
     expect(result.mcpRemoved).toBe(true);
     expect(await fs.exists('/home/.claude/commands/orq.md')).toBe(false);
 
