@@ -27,6 +27,12 @@ const SENSITIVE_PATH_RE = /(^|\/)(auth|payments|billing|migrations|secrets?|cred
 const WORKER_RE = /\b(implementer|tester|reviewer|worker)\b/i;
 const TESTS_RE = /\b(tests?|vitest|jest|spec|unit test|integration test)\b/i;
 const PLACEHOLDER_RE = /\b(todo|tbd|fixme|placeholder)\b/i;
+// Intent to remove code (English + Spanish). Used to require a referential-closure check.
+const DELETION_RE =
+  /\b(delete[ds]?|deleting|remove[ds]?|removing|removal|drop(?:ping|s|ped)?|eliminat\w*|deprecat\w*|elimina\w*|borra\w*|quita\w*)\b/i;
+// Mentions of verifying that a removal left nothing dangling/orphaned.
+const ORPHAN_CHECK_RE =
+  /\b(orphan\w*|dead[-\s]?code|unused\s+(?:export|import|symbol|function|code|reference)|referential|callers?|knip|ts-prune|depcheck|type-?check|typecheck|tsc|build\s+(?:passes|green|clean))\b/i;
 
 const DEFAULT_MODULES = new Set([
   'packages',
@@ -126,6 +132,21 @@ export function validatePlan(input: ValidatePlanInput): ValidationResult {
       });
       suggestions.push('Add a concrete entry under "## Risks" describing the risk and mitigation.');
     }
+  }
+
+  // 7. Deletions without a referential-closure check (the backward-orphan gap).
+  if (DELETION_RE.test(plan) && !ORPHAN_CHECK_RE.test(plan)) {
+    issues.push({
+      code: 'deletion-without-orphan-check',
+      severity: 'warning',
+      message:
+        'The plan removes code but never mentions verifying referential closure: ' +
+        'orphaned callers or now-unused exports left behind. Token grep alone misses these.',
+    });
+    suggestions.push(
+      'After removing code, verify nothing was orphaned: run the build/typecheck and a ' +
+        'dead-code check (e.g. knip / ts-prune), not just a grep.',
+    );
   }
 
   return { issues, suggestions, riskFlags };

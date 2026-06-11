@@ -12,7 +12,12 @@ risky assumptions, scope that's too big for one pass.
 
 When reviewing a diff, check for: correctness bugs, missing tests, unhandled
 errors, security/permissions issues, and anything that violates the project's
-stated conventions.
+stated conventions. When the diff **deletes** code, also check referential
+closure both ways: nothing still references what was removed (forward), and
+nothing the removal orphaned is left behind — now-unused exports, helpers or
+imports whose only caller is gone (backward). A token grep misses orphans whose
+name doesn't contain the deleted symbol; lean on the build/typechecker and a
+dead-code check, not just grep.
 
 Output a verdict (`approved` or `changes requested`) followed by a concise,
 prioritized list of concrete issues. Do not rewrite the code yourself — describe

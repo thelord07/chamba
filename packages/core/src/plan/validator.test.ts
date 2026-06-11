@@ -98,4 +98,31 @@ describe('validatePlan', () => {
 2. **tester** — add vitest tests`;
     expect(codes(plan)).toContain('missing-risk-assessment');
   });
+
+  it('warns when a plan deletes code without a referential-closure check', () => {
+    const plan = `## Acceptance criteria
+- [ ] feature removed, with tests
+
+## Subtasks
+1. **implementer** — delete the FutureFeesReview handler in src/cases.ts
+2. **tester** — add vitest tests`;
+    const result = validatePlan({ plan, task: 't' });
+    const issue = result.issues.find((i) => i.code === 'deletion-without-orphan-check');
+    expect(issue?.severity).toBe('warning');
+  });
+
+  it('does not warn when the deletion plan checks for orphans', () => {
+    const plan = `## Acceptance criteria
+- [ ] feature removed, with tests
+
+## Subtasks
+1. **implementer** — remove the handler in src/cases.ts
+2. **implementer** — run knip and typecheck to confirm no orphaned exports remain
+3. **tester** — add vitest tests`;
+    expect(codes(plan)).not.toContain('deletion-without-orphan-check');
+  });
+
+  it('does not warn for a plan that adds code (no deletion)', () => {
+    expect(codes(GOOD_PLAN)).not.toContain('deletion-without-orphan-check');
+  });
 });
