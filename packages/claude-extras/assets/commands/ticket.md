@@ -1,6 +1,6 @@
 ---
 description: Resolve a ticket end-to-end in isolated worktrees, delegating to chamba's agents
-argument-hint: <ticket> [repo ...]
+argument-hint: "[-p <plan-path>] <ticket> [repo ...]"
 ---
 
 You are orchestrating ticket **$ARGUMENTS** end-to-end. chamba provides context,
@@ -14,22 +14,37 @@ irreversible change, a product decision you can't make). You do NOT act on those
 You complete everything else and surface them at the final gate. Autonomy is
 bounded by the plan's gates — it must never silently drop an acceptance criterion.
 
-The first token of the arguments is the ticket id; any further tokens are repos I
-named explicitly. Analyze first, create worktrees only for the repos actually
-touched — do not create a worktree for every repo in the workspace.
+Parse the arguments first. If they start with `-p` or `--plan`, the next token is
+the path to a plan I already wrote (relative to the workspace root, or absolute) —
+read it and skip planning (see step 2). The first non-flag token is the ticket id;
+any tokens after it are repos I named explicitly. Analyze first, create worktrees
+only for the repos actually touched — do not create a worktree for every repo in
+the workspace.
 
 1. Call `chamba_load_context` with the ticket to pull the workspace map (all repos
    and what each one is) + relevant Obsidian notes + each repo's coding rules.
-2. Delegate to the **planner** subagent to produce the plan. The plan MUST state
-   **which repos the ticket touches and why**, with subtasks grouped per repo, and
-   it MUST map **every acceptance criterion of the ticket** to a subtask. If an AC
-   needs a decision you can't make autonomously, the plan marks it
-   **needs-approval** — that is a hard gate, not something to resolve on your own.
-   If I named repos in the arguments, use exactly those; otherwise infer the set
-   from the ticket + the workspace map. List ambiguities as assumptions — do not
-   invent scope.
-3. Run the plan through `chamba_review_plan` and have the **reviewer** subagent
-   audit it. Fix and re-review until approved (max 3 rounds). Do NOT stop to ask me.
+2. Obtain the plan:
+   - **If I passed `-p <plan-path>` and the file exists:** read it and use it as
+     THE plan — do NOT delegate to the planner. Run it through `chamba_review_plan`
+     to sanity-check structure and surface issues, but do NOT bring in the reviewer
+     subagent to rewrite it (I already approved this plan). If the plan doesn't
+     cover a ticket acceptance criterion, or fails to mark a risky item
+     **needs-approval**, note it as a gap and carry it to the final report — don't
+     invent scope to fill it. Then skip to step 4.
+   - **If `-p` was given but the file does not exist:** tell me you couldn't find
+     it, then fall back to generating the plan (next bullet).
+   - **Otherwise (no `-p`):** delegate to the **planner** subagent to produce the
+     plan, then continue to step 3.
+   Either way the plan MUST state **which repos the ticket touches and why**, with
+   subtasks grouped per repo, and map **every acceptance criterion of the ticket**
+   to a subtask. Items needing a decision you can't make autonomously are marked
+   **needs-approval** — a hard gate, not something to resolve on your own. If I
+   named repos in the arguments, use exactly those; otherwise infer the set from
+   the plan + the workspace map. List ambiguities as assumptions — do not invent
+   scope.
+3. (Skip when the plan came from `-p` — already checked in step 2.) Run the plan
+   through `chamba_review_plan` and have the **reviewer** subagent audit it. Fix
+   and re-review until approved (max 3 rounds). Do NOT stop to ask me.
 4. Create isolated worktrees ONLY for the repos the plan identified: call
    `chamba_create_worktrees` with the ticket and that repo list. ALL work happens
    inside these worktrees — never edit the main checkouts.

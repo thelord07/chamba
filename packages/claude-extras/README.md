@@ -159,11 +159,20 @@ Then, in Claude Code:
 /ticket TICKET-123
 ```
 
-`/ticket` runs the full orchestrator-worker flow: create worktrees →
-`chamba_load_context` → delegate the plan to the **planner** subagent →
-`chamba_review_plan` + the **reviewer** subagent → delegate code to **implementer** and
-tests to **tester** (all inside the worktrees) → `chamba_summarize_to_vault`. It runs to
-the end and stops for your review. It **never commits, merges or pushes** — you review,
+If you already wrote a plan (in plan mode, exported to a `.md`, or by hand), reuse it and
+skip the planning step:
+
+```
+/ticket -p ./plans/TICKET-123.md TICKET-123
+```
+
+`/ticket` runs the full orchestrator-worker flow: `chamba_load_context` → delegate the
+plan to the **planner** subagent (or, with `-p <plan-path>`, read your plan and skip
+this) → `chamba_review_plan` + the **reviewer** subagent → create worktrees only for the
+repos the plan touches → delegate code to **implementer** and tests to **tester** (all
+inside the worktrees) → verify the real diff (referential closure + build/typecheck) →
+`chamba_summarize_to_vault`. It runs to the end and stops for your review with an
+acceptance-criteria checklist. It **never commits, merges or pushes** — you review,
 commit and send to code review by hand. Each worker runs with the model + effort you
 configured above.
 
