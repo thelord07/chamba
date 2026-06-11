@@ -1,5 +1,12 @@
 # @chamba/mcp
 
+## 0.5.1
+
+### Patch Changes
+
+- @chamba/adapters@0.5.1
+- @chamba/core@0.5.1
+
 ## 0.5.0
 
 ### Patch Changes

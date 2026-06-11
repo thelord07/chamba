@@ -1,6 +1,6 @@
 {
   "name": "@chamba/claude-extras",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "Optional Claude Code extras for chamba: slash commands, subagents and hooks installer",
   "license": "MIT",
   "type": "module",
