@@ -1,6 +1,6 @@
 {
   "name": "@chamba/mcp",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "chamba MCP server — orchestration, workspace, worktree and Obsidian tools for any MCP-capable editor",
   "license": "MIT",
   "type": "module",

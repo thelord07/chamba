@@ -1,5 +1,16 @@
 # @chamba/mcp
 
+## 0.6.1
+
+### Patch Changes
+
+- 3f4c9c2: Add a `--version` flag (alias `-v`) to both bins.
+
+  `npx @chamba/claude-extras --version` and `npx @chamba/mcp --version` now print the installed version and exit — handy for confirming which version `npx` actually resolved. The MCP server prints and exits before any protocol starts, so it doesn't interfere with normal stdio startup.
+
+  - @chamba/adapters@0.6.1
+  - @chamba/core@0.6.1
+
 ## 0.6.0
 
 ### Minor Changes
