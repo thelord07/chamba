@@ -125,4 +125,36 @@ describe('validatePlan', () => {
   it('does not warn for a plan that adds code (no deletion)', () => {
     expect(codes(GOOD_PLAN)).not.toContain('deletion-without-orphan-check');
   });
+
+  it('warns when the plan has unresolved open questions', () => {
+    const plan = `## Acceptance criteria
+- [ ] does X with tests
+
+## Subtasks
+1. **implementer** — build X in src/x.ts
+2. **tester** — add vitest tests
+
+## Open questions
+- Should non-USD mismatches also stop the manual email path?`;
+    const result = validatePlan({ plan, task: 't' });
+    const issue = result.issues.find((i) => i.code === 'unresolved-open-questions');
+    expect(issue?.severity).toBe('warning');
+  });
+
+  it('does not warn when open questions are marked resolved', () => {
+    const plan = `## Acceptance criteria
+- [ ] does X with tests
+
+## Subtasks
+1. **implementer** — build X in src/x.ts
+2. **tester** — add vitest tests
+
+## Open questions
+- Should non-USD mismatches stop the manual email path? → No, keep manual email.`;
+    expect(codes(plan)).not.toContain('unresolved-open-questions');
+  });
+
+  it('does not warn for a plan without open questions', () => {
+    expect(codes(GOOD_PLAN)).not.toContain('unresolved-open-questions');
+  });
 });

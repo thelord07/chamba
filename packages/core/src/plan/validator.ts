@@ -33,6 +33,9 @@ const DELETION_RE =
 // Mentions of verifying that a removal left nothing dangling/orphaned.
 const ORPHAN_CHECK_RE =
   /\b(orphan\w*|dead[-\s]?code|unused\s+(?:export|import|symbol|function|code|reference)|referential|callers?|knip|ts-prune|depcheck|type-?check|typecheck|tsc|build\s+(?:passes|green|clean))\b/i;
+// An "Open questions" item is resolved when it carries an answer marker.
+const RESOLVED_MARKER_RE =
+  /\b(answers?|answered|resolved|resuelt\w*|respuesta|respondid\w*|decidid\w*|confirmed|confirmad\w*)\b|→|=>/i;
 
 const DEFAULT_MODULES = new Set([
   'packages',
@@ -146,6 +149,26 @@ export function validatePlan(input: ValidatePlanInput): ValidationResult {
     suggestions.push(
       'After removing code, verify nothing was orphaned: run the build/typecheck and a ' +
         'dead-code check (e.g. knip / ts-prune), not just a grep.',
+    );
+  }
+
+  // 8. Open questions left unresolved — answer them before executing.
+  const openQuestions = [
+    ...new Set([
+      ...listItems(getSection(sec, 'open question')),
+      ...listItems(getSection(sec, 'preguntas abiertas')),
+      ...listItems(getSection(sec, 'clarification')),
+    ]),
+  ];
+  const unresolved = openQuestions.filter((q) => isConcrete(q) && !RESOLVED_MARKER_RE.test(q));
+  if (unresolved.length > 0) {
+    issues.push({
+      code: 'unresolved-open-questions',
+      severity: 'warning',
+      message: `${unresolved.length} open question(s) in the plan are unresolved. Ask the human and fold the answers in before executing.`,
+    });
+    suggestions.push(
+      'Resolve the "Open questions" with the human (or mark each one answered) before creating worktrees.',
     );
   }
 

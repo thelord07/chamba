@@ -5,14 +5,14 @@ argument-hint: "[-p <plan-path>] <ticket> [repo ...]"
 
 You are orchestrating ticket **$ARGUMENTS** end-to-end. chamba provides context,
 plan validation, worktrees and vault memory; you delegate the thinking and the
-code to the configured subagents. **Run to the end and stop only for my final
-review** — do not pause for approval mid-way.
+code to the configured subagents.
 
-**One exception to running autonomously:** the plan itself may mark an item as
-needing my approval (scope expansion beyond the ticket, a destructive or
-irreversible change, a product decision you can't make). You do NOT act on those.
-You complete everything else and surface them at the final gate. Autonomy is
-bounded by the plan's gates — it must never silently drop an acceptance criterion.
+**Clarify once, up front; then run to the end.** There is exactly one point where
+you may pause: once the plan is ready, if it has unresolved open questions or
+decisions only I can make, ask me, fold my answers into the plan, and continue.
+After that, run to the end and stop only for my final review — do not pause again
+mid-way. You never resolve a flagged decision on your own and never silently drop
+an acceptance criterion.
 
 Parse the arguments first. If they start with `-p` or `--plan`, the next token is
 the path to a plan I already wrote (relative to the workspace root, or absolute) —
@@ -30,7 +30,7 @@ the workspace.
      subagent to rewrite it (I already approved this plan). If the plan doesn't
      cover a ticket acceptance criterion, or fails to mark a risky item
      **needs-approval**, note it as a gap and carry it to the final report — don't
-     invent scope to fill it. Then skip to step 4.
+     invent scope to fill it. Then continue to the clarification gate (step 4).
    - **If `-p` was given but the file does not exist:** tell me you couldn't find
      it, then fall back to generating the plan (next bullet).
    - **Otherwise (no `-p`):** delegate to the **planner** subagent to produce the
@@ -40,17 +40,25 @@ the workspace.
    to a subtask. Items needing a decision you can't make autonomously are marked
    **needs-approval** — a hard gate, not something to resolve on your own. If I
    named repos in the arguments, use exactly those; otherwise infer the set from
-   the plan + the workspace map. List ambiguities as assumptions — do not invent
-   scope.
+   the plan + the workspace map. State confident assumptions as assumptions and put
+   genuine forks under **Open questions** — do not invent scope.
 3. (Skip when the plan came from `-p` — already checked in step 2.) Run the plan
    through `chamba_review_plan` and have the **reviewer** subagent audit it. Fix
    and re-review until approved (max 3 rounds). Do NOT stop to ask me.
-4. Create isolated worktrees ONLY for the repos the plan identified: call
+4. **Clarification gate.** Before creating any worktree, check the plan for
+   unresolved **Open questions** and any item marked **needs-approval**;
+   `chamba_review_plan` flags these as `unresolved-open-questions`. If there are
+   any: ask me all of them in one concise batch, wait for my answers, fold them
+   into the plan (adjust scope, subtasks and acceptance criteria as needed), and
+   only then continue. If the plan has none, proceed without pausing. This is the
+   only place you stop before the final review — it applies whether the plan came
+   from the planner or from `-p`.
+5. Create isolated worktrees ONLY for the repos the plan identified: call
    `chamba_create_worktrees` with the ticket and that repo list. ALL work happens
    inside these worktrees — never edit the main checkouts.
-5. For each subtask/repo, delegate implementation to the **implementer** subagent
+6. For each subtask/repo, delegate implementation to the **implementer** subagent
    (in that repo's worktree) and the tests to the **tester** subagent; run them.
-6. **Verify against the real diff** (not the plan). For each touched repo: have the
+7. **Verify against the real diff** (not the plan). For each touched repo: have the
    **reviewer** subagent audit the actual diff for correctness, missing tests, and
    **referential closure** — anything the change deleted must leave no orphaned
    callers and no now-unused exports. Then run that repo's build / typecheck / lint,
@@ -58,8 +66,8 @@ the workspace.
    misses orphans whose name doesn't contain the deleted symbol — rely on the
    build/typechecker/dead-code tool, not just grep. Fix what comes back, then
    re-verify (max 3 rounds).
-7. Call `chamba_summarize_to_vault` with a summary of what changed.
-8. STOP and report for my review. The report MUST include:
+8. Call `chamba_summarize_to_vault` with a summary of what changed.
+9. STOP and report for my review. The report MUST include:
    - the repos touched and why;
    - per repo, what changed and the test + verify results;
    - an **acceptance-criteria checklist**: every AC of the ticket marked
