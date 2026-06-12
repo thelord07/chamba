@@ -39,6 +39,8 @@ export {
 } from './models/catalog.js';
 export type { NoteFields } from './obsidian/note-template.js';
 export { renderNote, slugify } from './obsidian/note-template.js';
+export type { SeedVaultInput, SeedVaultResult } from './obsidian/vault-init.js';
+export { VAULT_OVERVIEW_FILE, VaultInitializer } from './obsidian/vault-init.js';
 export type { WriteNoteInput, WriteNoteResult } from './obsidian/vault-writer.js';
 export { VAULT_NOTES_DIR, VaultWriter } from './obsidian/vault-writer.js';
 export type { PlanReview, ReviewInput } from './plan/reviewer.js';

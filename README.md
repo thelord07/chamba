@@ -64,12 +64,14 @@ Note: VS Code uses **`"servers"`**, not `"mcpServers"`:
 **OpenCode** — `opencode.json` ([guide](./examples/opencode-setup)).
 
 To wire up an Obsidian vault, add `"env": { "CHAMBA_OBSIDIAN_VAULT_PATH": "/path/to/vault" }`.
+Don't have one? `chamba_workspace_init` bootstraps a vault at the workspace root (and seeds
+a "Workspace overview" note) when it can't find an existing one — so memory works from day one.
 
 ## Tools
 
 | Tool | Input | Output |
 |---|---|---|
-| `chamba_workspace_init` | `{ root? }` | Scans and writes `.chamba/workspace.md` (won't overwrite) |
+| `chamba_workspace_init` | `{ root?, createVault? }` | Scans and writes `.chamba/workspace.md` (won't overwrite); bootstraps + seeds a vault if none is found |
 | `chamba_workspace_show` | `{}` | Contents of `.chamba/workspace.md` |
 | `chamba_workspace_reload` | `{}` | A diff vs a fresh re-scan (no writes) |
 | `chamba_load_context` | `{ task, includeObsidian? }` | Workspace summary + relevant vault notes |

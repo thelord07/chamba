@@ -99,6 +99,57 @@ describe('chamba MCP server', () => {
     await server.close();
   });
 
+  it('workspace_init bootstraps a vault at the root when none exists', async () => {
+    const services = buildServices(
+      { '/proj/package.json': JSON.stringify({ name: 'proj' }) },
+      '/proj',
+    );
+    const { client, server } = await connect(services);
+
+    const result = await client.callTool({ name: 'chamba_workspace_init', arguments: {} });
+    expect(textOf(result)).toContain('created one at the workspace root');
+    expect(await services.fs.exists('/proj/.obsidian/app.json')).toBe(true);
+    expect(await services.fs.exists('/proj/Workspace overview.md')).toBe(true);
+
+    await server.close();
+  });
+
+  it('workspace_init leaves an existing vault untouched', async () => {
+    const services: Services = {
+      ...buildServices(
+        {
+          '/proj/package.json': JSON.stringify({ name: 'proj' }),
+          '/vault/.obsidian/app.json': '{}',
+        },
+        '/proj',
+      ),
+      obsidianVaultPath: '/vault',
+    };
+    const { client, server } = await connect(services);
+
+    const result = await client.callTool({ name: 'chamba_workspace_init', arguments: {} });
+    expect(textOf(result)).toContain('using the existing one at /vault');
+    expect(await services.fs.exists('/proj/.obsidian/app.json')).toBe(false);
+
+    await server.close();
+  });
+
+  it('workspace_init skips vault creation with createVault: false', async () => {
+    const services = buildServices(
+      { '/proj/package.json': JSON.stringify({ name: 'proj' }) },
+      '/proj',
+    );
+    const { client, server } = await connect(services);
+
+    await client.callTool({
+      name: 'chamba_workspace_init',
+      arguments: { createVault: false },
+    });
+    expect(await services.fs.exists('/proj/.obsidian/app.json')).toBe(false);
+
+    await server.close();
+  });
+
   it('workspace_reload returns a diff without overwriting hand edits', async () => {
     const services = buildServices(
       {
