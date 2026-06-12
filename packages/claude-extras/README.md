@@ -13,7 +13,10 @@ slash commands, subagents and hooks on top of the chamba MCP server.
 npx @chamba/claude-extras install      # add commands, agents, hooks + register MCP
 npx @chamba/claude-extras install --force   # overwrite existing files
 npx @chamba/claude-extras uninstall    # remove them
+npx @chamba/claude-extras --version    # print the installed version
 ```
+
+Check the MCP server's version the same way: `npx @chamba/mcp --version`.
 
 It installs into `~/.claude/`:
 

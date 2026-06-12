@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { NodeFilesystem } from '@chamba/adapters';
@@ -45,8 +46,25 @@ function labelFor(dir: string): string {
   return CATEGORIES.find((c) => c.dir === dir)?.label ?? dir;
 }
 
+/** Read this package's version from its package.json, next to the built file. */
+function readPackageVersion(): string {
+  try {
+    const pkgPath = fileURLToPath(new URL('../package.json', import.meta.url));
+    const pkg = JSON.parse(readFileSync(pkgPath, 'utf8')) as { version?: string };
+    return pkg.version ?? 'unknown';
+  } catch {
+    return 'unknown';
+  }
+}
+
 async function main(): Promise<void> {
   const [command, ...rest] = process.argv.slice(2);
+
+  if (command === '--version' || command === '-v' || command === 'version') {
+    process.stdout.write(`${readPackageVersion()}\n`);
+    return;
+  }
+
   const installer = buildInstaller();
 
   if (command === 'uninstall') {
@@ -79,7 +97,7 @@ async function main(): Promise<void> {
   }
 
   process.stderr.write(
-    `Unknown command "${command}". Usage: chamba-install [install|uninstall|apply|config <sub>] [--force]\n`,
+    `Unknown command "${command}". Usage: chamba-install [install|uninstall|apply|config <sub>] [--force] [--version]\n`,
   );
   process.exitCode = 1;
 }

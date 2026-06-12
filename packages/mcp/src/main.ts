@@ -1,6 +1,19 @@
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { createLogger } from './logging.js';
 import { createServer } from './server.js';
+
+/** Read this package's version from its package.json, next to the built file. */
+function readPackageVersion(): string {
+  try {
+    const pkgPath = fileURLToPath(new URL('../package.json', import.meta.url));
+    const pkg = JSON.parse(readFileSync(pkgPath, 'utf8')) as { version?: string };
+    return pkg.version ?? 'unknown';
+  } catch {
+    return 'unknown';
+  }
+}
 
 /**
  * Entry point for the chamba MCP server.
@@ -10,6 +23,13 @@ import { createServer } from './server.js';
  * — including any logging — must stay off stdout (see logging.ts).
  */
 async function main(): Promise<void> {
+  // `--version`/`-v` prints the version and exits before any protocol starts.
+  const flag = process.argv[2];
+  if (flag === '--version' || flag === '-v') {
+    process.stdout.write(`${readPackageVersion()}\n`);
+    return;
+  }
+
   const logger = createLogger();
   const server = createServer(logger);
   const transport = new StdioServerTransport();
