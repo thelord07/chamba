@@ -20,8 +20,8 @@ Check the MCP server's version the same way: `npx @chamba/mcp --version`.
 
 It installs into `~/.claude/`:
 
-- **Slash commands**: `/orq`, `/workspace`, `/worktrees`, `/recall`
-- **Subagents**: `implementer`, `reviewer`, `tester`
+- **Slash commands**: `/ticket`, `/workspace`, `/map`, `/worktrees`, `/orq`, `/recall`, `/vault`
+- **Subagents**: `planner`, `implementer`, `reviewer`, `tester`
 - **Hooks**: warn on destructive commands, validate worktree edits
 
 …and registers the `chamba` MCP server in `~/.claude.json`. It never overwrites your
@@ -183,6 +183,24 @@ model + effort you configured above.
 > **Security:** `copyEnvFiles` copies secrets into the worktree directories. Add your
 > `worktrees.root` (e.g. `WORKTREES/`) to `.gitignore` so they're never committed. It's
 > off by default.
+
+## Bootstrap the architecture map with `/map`
+
+What makes `/ticket` precise is a vault that already describes how your repos fit
+together. On a small or new project, seed that in one shot:
+
+```
+/map          # asks EN/ES, then maps every repo
+/map es web   # Spanish notes, scoped to the `web` repo
+```
+
+`/map` resolves the vault (`chamba_vault_status` — run `/workspace init` first if you
+don't have one), asks which language to write in, reads the repos for their cross-repo
+wiring (REST, async/events, shared data, build deps), and writes **living notes** with
+stable names: `Topology.md`, `Data flows.md`, `Domain entities.md`, and `repos/<repo>.md`.
+Re-run it as the project grows — it updates its own notes in place and **never touches a
+note you edited by hand** (it only rewrites notes marked `source: chamba`). It's opt-in;
+on a big monorepo, mapping everything is expensive.
 
 ## License
 
