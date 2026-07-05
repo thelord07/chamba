@@ -61,7 +61,8 @@ the workspace.
    into the plan (adjust scope, subtasks and acceptance criteria as needed), and
    only then continue. If the plan has none, proceed without pausing. This is the
    only place you stop before the final review — it applies whether the plan came
-   from the planner or from `-p`.
+   from the planner or from `-p`. Once the plan is final, call `chamba_save_plan`
+   (title: the ticket id) to persist it under the vault's `plans/` folder.
 5. Create isolated worktrees ONLY for the repos the plan identified: call
    `chamba_create_worktrees` with the ticket and that repo list. ALL work happens
    inside these worktrees — never edit the main checkouts.
@@ -92,7 +93,10 @@ the workspace.
       phase ran). Anything the plan marked **needs-approval**, or any AC you could
       not deliver or verify without a deferred decision, goes under **"Needs your
       decision"** with what's pending and why — never omit it;
-    - the `.code-workspace` to open, and the suggested commit +
-      `git merge --no-ff` commands.
+    - **how to open the work**, as two copy-paste commands below the message, using
+      the paths `chamba_create_worktrees` returned — VS Code: `code <the
+      .code-workspace>` and Cursor: `cursor <the .code-workspace>` (fall back to the
+      worktree directory if no workspace file was generated);
+    - the suggested commit + `git merge --no-ff` commands.
     Do NOT commit, merge or push — I review, commit and send to my company's code
     review by hand.

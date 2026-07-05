@@ -22,7 +22,8 @@ primitive — adapt to what you have.
    audit it. If not approved, fix the issues and review again until a full pass
    raises zero **new** blocking issues (dry) or 6 rounds, whichever comes first —
    don't re-raise an issue you already addressed.
-4. Show me the approved plan and wait for my go-ahead.
+4. Save the approved plan with `chamba_save_plan` (it lands under the vault's
+   `plans/` folder), then show it to me and wait for my go-ahead.
 5. If this is a git repo, call `chamba_create_worktree` per worker for isolation.
 6. Delegate implementation to the **implementer** subagent (in its worktree) and
    the tests to the **tester** subagent; run them.

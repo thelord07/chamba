@@ -43,7 +43,7 @@ export { renderNote, slugify } from './obsidian/note-template.js';
 export type { SeedVaultInput, SeedVaultResult } from './obsidian/vault-init.js';
 export { VAULT_OVERVIEW_FILE, VaultInitializer } from './obsidian/vault-init.js';
 export type { WriteNoteInput, WriteNoteResult } from './obsidian/vault-writer.js';
-export { VAULT_NOTES_DIR, VaultWriter } from './obsidian/vault-writer.js';
+export { VAULT_NOTES_DIR, VAULT_PLANS_DIR, VaultWriter } from './obsidian/vault-writer.js';
 export type { PlanReview, ReviewInput } from './plan/reviewer.js';
 export { Reviewer } from './plan/reviewer.js';
 export type { GeneratePlanInput, SubtaskSpec, WorkerKind } from './plan/template.js';

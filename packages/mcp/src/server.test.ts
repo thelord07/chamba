@@ -49,6 +49,7 @@ describe('chamba MCP server', () => {
       'chamba_recall',
       'chamba_remember',
       'chamba_review_plan',
+      'chamba_save_plan',
       'chamba_summarize_to_vault',
       'chamba_vault_status',
       'chamba_workspace_init',

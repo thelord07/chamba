@@ -7,17 +7,22 @@ export interface WriteNoteInput {
   vaultPath: string;
   title: string;
   content: string;
-  /** Subfolder slug under `proyectos/`; defaults to the title slug. */
+  /** Filename slug; defaults to the title slug. */
   projectSlug?: string;
   tags?: string[];
+  /** Vault subfolder to write into; defaults to `proyectos/`. */
+  subdir?: string;
 }
 
 export interface WriteNoteResult {
   notePath: string;
 }
 
-/** Subfolder inside the vault where chamba writes its summaries. */
+/** Subfolder inside the vault where chamba writes its run summaries. */
 export const VAULT_NOTES_DIR = 'proyectos';
+
+/** Subfolder inside the vault where chamba saves plans. */
+export const VAULT_PLANS_DIR = 'plans';
 
 /**
  * Write a structured summary note into an Obsidian vault at
@@ -32,7 +37,7 @@ export class VaultWriter {
   async write(input: WriteNoteInput): Promise<WriteNoteResult> {
     const date = this.clock.today();
     const slug = slugify(input.projectSlug ?? input.title);
-    const dir = joinPath(input.vaultPath, VAULT_NOTES_DIR);
+    const dir = joinPath(input.vaultPath, input.subdir ?? VAULT_NOTES_DIR);
     const notePath = joinPath(dir, `${date}-${slug}.md`);
 
     const note = renderNote({

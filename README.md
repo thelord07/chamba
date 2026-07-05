@@ -75,7 +75,8 @@ a "Workspace overview" note) when it can't find an existing one — so memory wo
 | `chamba_workspace_show` | `{}` | Contents of `.chamba/workspace.md` |
 | `chamba_workspace_reload` | `{}` | A diff vs a fresh re-scan (no writes) |
 | `chamba_load_context` | `{ task, includeObsidian? }` | Workspace summary + relevant vault notes |
-| `chamba_summarize_to_vault` | `{ title, content, projectSlug? }` | Writes a note to the vault |
+| `chamba_summarize_to_vault` | `{ title, content, projectSlug? }` | Writes a run summary to the vault's `proyectos/` folder |
+| `chamba_save_plan` | `{ title, content, projectSlug? }` | Saves a plan to the vault's `plans/` folder |
 | `chamba_vault_status` | `{}` | Resolved vault path + the notes chamba can see (diagnostic) |
 | `chamba_generate_plan` | `{ task, context? }` | A structured plan template to fill |
 | `chamba_review_plan` | `{ plan, task, context? }` | `{ approved, issues, suggestions, riskFlags }` — no LLM |

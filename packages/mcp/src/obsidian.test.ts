@@ -73,6 +73,22 @@ describe('obsidian tools', () => {
     await server.close();
   });
 
+  it('save_plan writes the plan under the vault plans/ folder', async () => {
+    const svc = services({ ...projectFiles, ...vaultFiles }, '/vault');
+    const { client, server } = await connect(svc);
+
+    const result = await client.callTool({
+      name: 'chamba_save_plan',
+      arguments: { title: 'TICKET-123', content: '## Goal\nDo X.' },
+    });
+    expect(textOf(result)).toContain('Saved plan to /vault/plans/2026-06-09-ticket-123.md');
+    const note = await svc.fs.readFile('/vault/plans/2026-06-09-ticket-123.md');
+    expect(note).toContain('tags: [chamba, plan]');
+    expect(note).toContain('Do X.');
+
+    await server.close();
+  });
+
   it('summarize_to_vault errors clearly when no vault is configured', async () => {
     const { client, server } = await connect(services(projectFiles));
 

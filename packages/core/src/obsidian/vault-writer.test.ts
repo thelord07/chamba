@@ -49,4 +49,15 @@ describe('VaultWriter', () => {
     });
     expect(notePath).toBe('/v/proyectos/2026-06-09-magic-links.md');
   });
+
+  it('writes into a custom subdir when given (e.g. plans/)', async () => {
+    const fs = new MemoryFilesystem({});
+    const { notePath } = await new VaultWriter(fs, fixedClock).write({
+      vaultPath: '/v',
+      title: 'TICKET-9',
+      content: 'the plan',
+      subdir: 'plans',
+    });
+    expect(notePath).toBe('/v/plans/2026-06-09-ticket-9.md');
+  });
 });
