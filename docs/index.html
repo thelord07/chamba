@@ -105,6 +105,7 @@ const CONTENT = {
       { label: 'Herramientas', href: '#tools' },
       { label: 'Cómo funciona', href: '#how' },
       { label: 'Instalación', href: '#setup' },
+      { label: 'Editor', href: '#powerups' },
       { label: 'Comparación', href: '#compare' },
       { label: 'Roadmap', href: '#roadmap' }
     ],
@@ -117,15 +118,26 @@ const CONTENT = {
     heroEditorsLabel: 'Funciona en',
     editorPills: ['Cursor', 'Claude Code', 'VS Code', 'Windsurf', 'Cline', 'OpenCode'],
     glossary: '«Chamba» es la palabra latina para trabajo — la chamba. Le pasas al modelo su chamba; chamba (la herramienta) se encarga de supervisar, validar y hacer la plomería alrededor.',
+    powerups: {
+      kicker: 'Con tu editor',
+      title: 'Power‑ups del editor',
+      sub: 'chamba usa lo mejor que tu editor ofrece y degrada limpio cuando no está.',
+      cards: [
+        { tag: 'ultracode', title: 'ultracode en Claude Code', body: 'Enciende ultracode y los pasos de verify, review y QA de chamba se abren en chequeos multi‑agente adversariales. Gasta más tokens. chamba lo aprovecha si está disponible y, si no, corre en un solo pase sin romperse.' },
+        { tag: 'Fable 5', title: 'Fable 5 opt‑in', body: 'Modelo premium que asignás a mano a un rol (planner, reviewer, qa) cuando el ticket lo amerita. No es el default: lo activás vos. chamba te muestra el costo y el requisito de retención de datos en el wizard, el hint de config y el frontmatter del subagente.' },
+        { tag: 'QA', title: 'QA en el navegador', body: 'El agente qa valida los criterios contra la app corriendo: maneja un navegador real vía Playwright MCP en Claude Code o el navegador integrado de Cursor. Sin tooling de browser, levanta la app desde el worktree y te copilotea criterio por criterio. Reporta PASS/FAIL y nunca commitea.' }
+      ],
+      note: 'Fable 5 es premium y NO forma parte de los planes de suscripción de Claude: usarlo es una decisión de costo y acceso de quien lo corre.'
+    },
     whyKicker: 'Por qué chamba',
     whyTitle: 'Coordinación real, sin un LLM extra',
     benefits: [
       { no: '01', title: 'Cero API keys', body: 'Sin ANTHROPIC_API_KEY ni OPENAI_API_KEY. Tu editor ya paga su propio modelo; chamba nunca llama a un LLM.' },
       { no: '02', title: 'Todo editor MCP, desde el día uno', body: 'Un solo servidor stdio funciona en Cursor, Claude Code, VS Code, Windsurf, Cline y OpenCode.' },
       { no: '03', title: '/ticket de punta a punta', body: 'Orquestador‑trabajador: plan → worktrees por repo → implementación → verificación del diff → QA, con un único gate de clarificación. Nunca hace auto‑merge ni push.' },
-      { no: '04', title: 'QA de aceptación', body: 'El agente qa valida cada criterio contra la app corriendo: usa Playwright si el proyecto lo tiene, si no levanta la app del worktree y te co‑pilotea la prueba.' },
+      { no: '04', title: 'Tests con tu propio runner', body: 'El subagente tester escribe y corre tests para cada cambio con el runner y las convenciones de tu repo, y reporta pass/fail honestamente. Unitarios e integración — aparte del QA de aceptación sobre la app corriendo.' },
       { no: '05', title: 'Modelo + effort por agente', body: 'Configurás qué modelo y esfuerzo usa cada rol (planner, reviewer, qa, implementer…). Multi‑proveedor, con Claude Fable 5 opt‑in.' },
-      { no: '06', title: 'Obsidian + memoria + reglas', body: 'Vault con bootstrap en el init, planes en plans/ y resúmenes en proyectos/, más las reglas de código de cada repo cargadas en contexto.' }
+      { no: '06', title: 'El vault como memoria del equipo', body: 'chamba lee tu vault de Obsidian al contexto, guarda resúmenes en proyectos/, planes en plans/ y memoria entre sesiones (remember/recall). Todo markdown plano: el equipo lo comparte y commitea — memoria colectiva que sobrevive a un solo chat.' }
     ],
     toolsKicker: 'Herramientas',
     toolsTitle: 'Las herramientas MCP que expone',
@@ -214,6 +226,7 @@ const CONTENT = {
       { label: 'Tools', href: '#tools' },
       { label: 'How it works', href: '#how' },
       { label: 'Setup', href: '#setup' },
+      { label: 'Editor', href: '#powerups' },
       { label: 'Compare', href: '#compare' },
       { label: 'Roadmap', href: '#roadmap' }
     ],
@@ -226,15 +239,26 @@ const CONTENT = {
     heroEditorsLabel: 'Works in',
     editorPills: ['Cursor', 'Claude Code', 'VS Code', 'Windsurf', 'Cline', 'OpenCode'],
     glossary: '“Chamba” is the LATAM word for work — la chamba. You hand the model its chamba; chamba (the tool) handles the supervising, validating and plumbing around it.',
+    powerups: {
+      kicker: 'With your editor',
+      title: 'Editor power‑ups',
+      sub: 'chamba uses the best your editor offers and degrades cleanly when it isn’t there.',
+      cards: [
+        { tag: 'ultracode', title: 'ultracode in Claude Code', body: 'Turn on ultracode and chamba’s verify, review and QA passes fan out into adversarial multi‑agent checks. It costs more tokens. chamba uses it when it’s available and falls back to a single pass elsewhere, no breakage.' },
+        { tag: 'Fable 5', title: 'Fable 5 opt‑in', body: 'Premium model you assign by hand to a role (planner, reviewer, qa) when a hard ticket warrants it. It’s not the default: you switch it on. chamba surfaces its cost and data‑retention requirement in the wizard, the config hint and the subagent frontmatter.' },
+        { tag: 'QA', title: 'Browser QA', body: 'The qa agent validates acceptance criteria against the running app: it drives a real browser via a Playwright MCP in Claude Code or Cursor’s built‑in browser. With no browser tooling, it runs the app from the worktree and co‑pilots each criterion with you. Reports PASS/FAIL and never commits.' }
+      ],
+      note: 'Fable 5 is premium and NOT part of consumer Claude subscription plans: using it is a cost and access decision for whoever runs it.'
+    },
     whyKicker: 'Why chamba',
     whyTitle: 'Real coordination, no extra LLM',
     benefits: [
       { no: '01', title: 'Zero API keys', body: 'No ANTHROPIC_API_KEY, no OPENAI_API_KEY. Your editor already pays for its own model; chamba never calls an LLM.' },
       { no: '02', title: 'Every MCP editor, day one', body: 'One stdio server works in Cursor, Claude Code, VS Code, Windsurf, Cline and OpenCode.' },
       { no: '03', title: 'End‑to‑end /ticket', body: 'Orchestrator‑worker: plan → per‑repo worktrees → implement → diff verify → QA, with one clarification gate. It never auto‑merges or pushes.' },
-      { no: '04', title: 'Acceptance QA', body: 'The qa agent validates each criterion against the running app: it uses Playwright if the project has it, otherwise runs the app from the worktree and co‑pilots the test with you.' },
+      { no: '04', title: 'Tests with your own runner', body: 'The tester subagent writes and runs tests for each change with your repo’s runner and conventions, and reports pass/fail honestly. Unit and integration — separate from acceptance QA on the running app.' },
       { no: '05', title: 'Per‑agent model + effort', body: 'Set which model and effort each role uses (planner, reviewer, qa, implementer…). Multi‑provider, with Claude Fable 5 opt‑in.' },
-      { no: '06', title: 'Obsidian + memory + rules', body: 'A vault bootstrapped on init, plans in plans/ and summaries in proyectos/, plus each repo’s coding rules loaded into context.' }
+      { no: '06', title: 'The vault as team memory', body: 'chamba reads your Obsidian vault into context, saves summaries to proyectos/, plans to plans/ and cross‑session memory (remember/recall). All plain markdown: your team shares and commits it — collective memory that outlives a single chat.' }
     ],
     toolsKicker: 'Tools',
     toolsTitle: 'The MCP tools it exposes',
@@ -324,6 +348,7 @@ const esc = (s) => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(
 
 function render() {
   const t = CONTENT[lang];
+  const pu = t.powerups;
   const ed = { ...EDITORS[editorIdx], desc: EDITOR_DESCS[lang][EDITORS[editorIdx].id] };
 
   const nav = t.nav.map(l => `<a href="${l.href}" class="navlink" style="font-size:14px;color:var(--muted);text-decoration:none;padding:7px 12px;border-radius:8px;font-weight:500;">${esc(l.label)}</a>`).join('');
@@ -333,6 +358,12 @@ function render() {
       <span style="font-family:'JetBrains Mono';font-size:13px;color:var(--accent);font-weight:600;">${esc(b.no)}</span>
       <h3 style="font-family:'Space Grotesk';font-weight:600;font-size:20px;letter-spacing:-0.02em;margin:0;line-height:1.2;">${esc(b.title)}</h3>
       <p style="font-size:14.5px;line-height:1.55;color:var(--muted);margin:0;">${esc(b.body)}</p>
+    </div>`).join('');
+  const powerCards = pu.cards.map(c => `
+    <div class="card-benefit" style="background:var(--card);border:1px solid var(--border);border-radius:16px;padding:26px;display:flex;flex-direction:column;gap:12px;">
+      <span style="align-self:flex-start;font-family:'JetBrains Mono';font-size:12px;color:var(--accent);font-weight:600;background:color-mix(in oklab, var(--accent) 14%, var(--card));border:1px solid color-mix(in oklab, var(--accent) 40%, var(--border));padding:3px 10px;border-radius:100px;">${esc(c.tag)}</span>
+      <h3 style="font-family:'Space Grotesk';font-weight:600;font-size:19px;letter-spacing:-0.02em;margin:0;line-height:1.2;">${esc(c.title)}</h3>
+      <p style="font-size:14.5px;line-height:1.55;color:var(--muted);margin:0;">${esc(c.body)}</p>
     </div>`).join('');
   const tools = t.tools.map(tool => `
     <div class="row-hover" style="display:grid;grid-template-columns:1.1fr 1fr 1.4fr;padding:15px 22px;border-bottom:1px solid var(--border);align-items:center;">
@@ -474,9 +505,19 @@ function render() {
       </div>
     </section>
 
+    <section id="powerups" style="max-width:1180px;margin:0 auto;padding:64px 32px;">
+      <div style="display:flex;align-items:baseline;gap:16px;margin-bottom:12px;flex-wrap:wrap;">
+        <span style="font-family:'JetBrains Mono';font-size:12px;color:var(--accent);text-transform:uppercase;letter-spacing:0.14em;font-weight:600;">05 · ${esc(pu.kicker)}</span>
+        <h2 style="font-family:'Space Grotesk';font-weight:700;font-size:clamp(28px,3.6vw,42px);letter-spacing:-0.03em;margin:0;line-height:1.05;">${esc(pu.title)}</h2>
+      </div>
+      <p style="font-size:16px;color:var(--muted);margin:0 0 32px;max-width:62ch;">${esc(pu.sub)}</p>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;">${powerCards}</div>
+      <p style="font-family:'JetBrains Mono';font-size:13px;color:var(--muted);margin:18px 0 0;padding:13px 16px;border:1px solid color-mix(in oklab, var(--amber) 32%, var(--border));background:color-mix(in oklab, var(--amber) 8%, var(--card));border-radius:12px;line-height:1.6;">⚠ ${esc(pu.note)}</p>
+    </section>
+
     <section id="compare" style="max-width:1180px;margin:0 auto;padding:64px 32px;">
       <div style="display:flex;align-items:baseline;gap:16px;margin-bottom:32px;flex-wrap:wrap;">
-        <span style="font-family:'JetBrains Mono';font-size:12px;color:var(--accent);text-transform:uppercase;letter-spacing:0.14em;font-weight:600;">05 · ${esc(t.cmpKicker)}</span>
+        <span style="font-family:'JetBrains Mono';font-size:12px;color:var(--accent);text-transform:uppercase;letter-spacing:0.14em;font-weight:600;">06 · ${esc(t.cmpKicker)}</span>
         <h2 style="font-family:'Space Grotesk';font-weight:700;font-size:clamp(28px,3.6vw,42px);letter-spacing:-0.03em;margin:0;line-height:1.05;">${esc(t.cmpTitle)}</h2>
       </div>
       <div style="border:1px solid var(--border);border-radius:16px;overflow:hidden;background:var(--card);">
@@ -491,7 +532,7 @@ function render() {
 
     <section id="roadmap" style="max-width:1180px;margin:0 auto;padding:64px 32px 40px;">
       <div style="display:flex;align-items:baseline;gap:16px;margin-bottom:12px;flex-wrap:wrap;">
-        <span style="font-family:'JetBrains Mono';font-size:12px;color:var(--accent);text-transform:uppercase;letter-spacing:0.14em;font-weight:600;">06 · ${esc(t.rmKicker)}</span>
+        <span style="font-family:'JetBrains Mono';font-size:12px;color:var(--accent);text-transform:uppercase;letter-spacing:0.14em;font-weight:600;">07 · ${esc(t.rmKicker)}</span>
         <h2 style="font-family:'Space Grotesk';font-weight:700;font-size:clamp(28px,3.6vw,42px);letter-spacing:-0.03em;margin:0;line-height:1.05;">${esc(t.rmTitle)}</h2>
       </div>
       <p style="font-size:16px;color:var(--muted);margin:0 0 40px;max-width:62ch;">${esc(t.rmSub)}</p>
