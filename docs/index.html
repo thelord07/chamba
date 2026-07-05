@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>chamba — MCP server para orquestar tu editor con IA</title>
+<meta name="description" content="Un servidor MCP que añade orquestación, contexto de workspace, git worktrees y memoria en Obsidian a cualquier editor con IA. Sin API keys.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23d97a4f'/%3E%3Ctext x='16' y='23' font-family='monospace' font-size='20' font-weight='700' text-anchor='middle' fill='%231a140f'%3Ec%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: oklch(0.165 0.012 66);
+    --bg2: oklch(0.205 0.014 66);
+    --card: oklch(0.225 0.015 66);
+    --border: oklch(0.315 0.016 66);
+    --text: oklch(0.95 0.008 82);
+    --muted: oklch(0.705 0.014 78);
+    --accent: #d97a4f;
+    --accent2: oklch(0.77 0.11 165);
+    --amber: oklch(0.83 0.11 88);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Instrument Sans', sans-serif;
+    min-height: 100vh;
+    position: relative;
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+  ::selection { background: #d97a4f; color: #1a140f; }
+  html { scroll-behavior: smooth; }
+  @keyframes chPulse { 0%,100% { opacity: .5; } 50% { opacity: 1; } }
+  a { color: inherit; }
+
+  .navlink { transition: color .15s, background .15s; }
+  .navlink:hover { color: var(--text) !important; background: var(--bg2) !important; }
+  .btn-outline { transition: border-color .15s, color .15s; }
+  .btn-outline:hover { border-color: var(--accent) !important; color: var(--text) !important; }
+  .btn-gh:hover { opacity: .9; }
+  .btn-cta:hover { filter: brightness(1.06); }
+  .card-benefit { transition: border-color .18s, transform .18s; }
+  .card-benefit:hover { border-color: var(--accent); transform: translateY(-3px); }
+  .row-hover { transition: background .15s; }
+  .row-hover:hover { background: var(--bg2); }
+  .link-hover { transition: color .15s, border-color .15s; }
+  .link-hover:hover { color: var(--text); }
+  .link-rm:hover { border-color: var(--accent); }
+
+  @media (max-width: 820px) {
+    .top-nav { display: none !important; }
+    .hero-grid { grid-template-columns: 1fr !important; }
+    section { padding-left: 20px !important; padding-right: 20px !important; }
+    header > div { padding-left: 20px !important; padding-right: 20px !important; }
+  }
+</style>
+</head>
+<body>
+  <div style="position: fixed; inset: 0; pointer-events: none; z-index: 0; background-image: radial-gradient(oklch(0.32 0.016 66) 1px, transparent 1px); background-size: 26px 26px; opacity: 0.35; mask-image: radial-gradient(ellipse 100% 60% at 50% 0%, black, transparent 75%);"></div>
+  <div id="app" style="position: relative; z-index: 1;"></div>
+
+<script>
+const AC = 'var(--accent)', OK = 'var(--accent2)', AM = 'var(--amber)', MU = 'var(--muted)';
+
+const EDITORS = [
+  { id: 'cursor', name: 'Cursor', file: '.cursor/mcp.json',
+    config: '{\n  "mcpServers": {\n    "chamba": {\n      "command": "npx",\n      "args": ["-y", "@chamba/mcp"]\n    }\n  }\n}' },
+  { id: 'claude', name: 'Claude Code', file: 'terminal',
+    config: 'claude mcp add chamba -- npx -y @chamba/mcp' },
+  { id: 'vscode', name: 'VS Code', file: '.vscode/mcp.json',
+    config: '{\n  "servers": {\n    "chamba": {\n      "type": "stdio",\n      "command": "npx",\n      "args": ["-y", "@chamba/mcp"]\n    }\n  }\n}' },
+  { id: 'windsurf', name: 'Windsurf', file: '~/.codeium/windsurf/mcp_config.json',
+    config: '{\n  "mcpServers": {\n    "chamba": {\n      "command": "npx",\n      "args": ["-y", "@chamba/mcp"]\n    }\n  }\n}' },
+  { id: 'opencode', name: 'OpenCode', file: 'opencode.json',
+    config: '{\n  "mcpServers": {\n    "chamba": {\n      "command": "npx",\n      "args": ["-y", "@chamba/mcp"]\n    }\n  }\n}' }
+];
+
+const EDITOR_DESCS = {
+  es: {
+    cursor: 'Guía completa en examples/cursor-setup. Añade una entrada "chamba" a tu bloque mcpServers.',
+    claude: 'Un solo comando en la terminal. Guía en examples/claude-code-setup.',
+    vscode: 'Ojo: VS Code usa "servers", no "mcpServers". Guía en examples/vscode-setup.',
+    windsurf: 'Vive en ~/.codeium/windsurf/mcp_config.json. Guía en examples/windsurf-setup.',
+    opencode: 'Añádelo a opencode.json. Guía en examples/opencode-setup. Para Obsidian: env CHAMBA_OBSIDIAN_VAULT_PATH.'
+  },
+  en: {
+    cursor: 'Full guide in examples/cursor-setup. Add a "chamba" entry to your mcpServers block.',
+    claude: 'A single terminal command. Guide in examples/claude-code-setup.',
+    vscode: 'Note: VS Code uses "servers", not "mcpServers". Guide in examples/vscode-setup.',
+    windsurf: 'Lives in ~/.codeium/windsurf/mcp_config.json. Guide in examples/windsurf-setup.',
+    opencode: 'Add it to opencode.json. Guide in examples/opencode-setup. For Obsidian: env CHAMBA_OBSIDIAN_VAULT_PATH.'
+  }
+};
+
+const CONTENT = {
+  es: {
+    langBtn: 'EN', copy: 'Copiar', copied: '¡Copiado!',
+    nav: [
+      { label: 'Beneficios', href: '#benefits' },
+      { label: 'Herramientas', href: '#tools' },
+      { label: 'Cómo funciona', href: '#how' },
+      { label: 'Instalación', href: '#setup' },
+      { label: 'Comparación', href: '#compare' },
+      { label: 'Roadmap', href: '#roadmap' }
+    ],
+    heroTag: 'Servidor MCP · Open source · Licencia MIT',
+    heroTitleA: 'Dale su chamba al modelo.',
+    heroTitleB: 'El resto lo coordina chamba.',
+    heroSub: 'Un servidor MCP que añade patrones orquestador‑trabajador, contexto de workspace, git worktrees y memoria en Obsidian a cualquier editor con IA. Sin API keys: el modelo de tu editor razona, chamba coordina.',
+    heroTermLabel: 'instálalo en segundos',
+    heroCta: 'Ver instalación',
+    heroEditorsLabel: 'Funciona en',
+    editorPills: ['Cursor', 'Claude Code', 'VS Code', 'Windsurf', 'Cline', 'OpenCode'],
+    glossary: '«Chamba» es la palabra latina para trabajo — la chamba. Le pasas al modelo su chamba; chamba (la herramienta) se encarga de supervisar, validar y hacer la plomería alrededor.',
+    whyKicker: 'Por qué chamba',
+    whyTitle: 'Coordinación real, sin un LLM extra',
+    benefits: [
+      { no: '01', title: 'Cero API keys', body: 'Sin ANTHROPIC_API_KEY ni OPENAI_API_KEY. Tu editor ya paga su propio modelo; chamba nunca llama a un LLM.' },
+      { no: '02', title: 'Todo editor MCP, desde el día uno', body: 'Un solo servidor stdio funciona en Cursor, Claude Code, VS Code, Windsurf, Cline y OpenCode.' },
+      { no: '03', title: 'Consciente del workspace', body: 'Escanea tu proyecto a un .chamba/workspace.md editable y alimenta ese contexto a cada plan.' },
+      { no: '04', title: 'Plan + revisión heurística', body: 'Un revisor programático (sin LLM) marca tests faltantes, trabajo sin asignar y áreas sensibles sin evaluación de riesgo.' },
+      { no: '05', title: 'Paralelismo seguro', body: 'Los git worktrees aíslan el trabajo en paralelo; la limpieza conserva las ramas para que fusiones a mano — nunca --force, nunca auto‑merge.' },
+      { no: '06', title: 'Obsidian + memoria entre sesiones', body: 'Trae contexto de tu vault, escribe resúmenes de vuelta y persiste conocimiento como markdown plano.' }
+    ],
+    toolsKicker: 'Herramientas',
+    toolsTitle: 'Las herramientas MCP que expone',
+    toolsSub: 'Cada herramienta es determinista y sin LLM. El modelo de tu editor decide cuándo llamarlas.',
+    toolCol1: 'Herramienta', toolCol2: 'Entrada', toolCol3: 'Salida',
+    tools: [
+      { name: 'workspace_init', in: '{ root? }', out: 'Escanea y escribe .chamba/workspace.md' },
+      { name: 'workspace_show', in: '{ }', out: 'Contenido de .chamba/workspace.md' },
+      { name: 'workspace_reload', in: '{ }', out: 'Un diff contra un re‑escaneo (sin escribir)' },
+      { name: 'load_context', in: '{ task, includeObsidian? }', out: 'Resumen del workspace + notas del vault' },
+      { name: 'summarize_to_vault', in: '{ title, content, projectSlug? }', out: 'Escribe una nota al vault' },
+      { name: 'generate_plan', in: '{ task, context? }', out: 'Plantilla de plan estructurado' },
+      { name: 'review_plan', in: '{ plan, task, context? }', out: '{ approved, issues, riskFlags } — sin LLM' },
+      { name: 'create_worktree', in: '{ taskSlug, workerId, baseBranch? }', out: 'Un git worktree aislado' },
+      { name: 'list_worktrees', in: '{ }', out: 'Los worktrees del repo' },
+      { name: 'cleanup_worktree', in: '{ branch }', out: 'Borra el dir, conserva la rama' },
+      { name: 'remember', in: '{ key, content, tags? }', out: 'Persiste una memoria en markdown' },
+      { name: 'recall', in: '{ query }', out: 'Busca en las memorias guardadas' }
+    ],
+    howKicker: 'Cómo funciona',
+    howTitle: 'De una orden a ramas listas para fusionar',
+    howSub: 'chamba aporta las herramientas y los patrones; el modelo de tu editor aporta el razonamiento.',
+    flow: [
+      { mono: 'tú →', text: '«@chamba orquesta: añade un endpoint de health check»', dot: MU },
+      { mono: 'modelo', text: 'El modelo de tu editor razona y llama a las herramientas de chamba:', dot: AC },
+      { mono: 'load_context', text: 'mapa del workspace + notas relevantes de Obsidian', dot: OK },
+      { mono: 'generate_plan', text: 'esqueleto de plan que el modelo rellena', dot: OK },
+      { mono: 'review_plan', text: 'veredicto heurístico (sin LLM); el modelo corrige los problemas', dot: OK },
+      { mono: 'create_worktree', text: 'rama aislada por worker (si hay git)', dot: OK },
+      { mono: 'summarize_to_vault', text: 'nota estructurada de vuelta a Obsidian', dot: OK },
+      { mono: 'resultado', text: 'Todo en el chat de tu editor. Las ramas quedan abiertas para que revises y fusiones.', dot: AC }
+    ],
+    contribA_t: 'chamba aporta',
+    contribA_b: 'Contexto de workspace, validación de planes, aislamiento con worktrees y memoria en el vault.',
+    contribB_t: 'El modelo aporta',
+    contribB_b: 'Razonamiento, decisiones y código — usando el modelo por el que tu editor ya paga.',
+    setupKicker: 'Instalación',
+    setupTitle: 'Un archivo de config por editor',
+    setupSub: 'Elige tu editor. Guías completas paso a paso en la carpeta examples/ del repo.',
+    setupFileLabel: 'archivo:',
+    cmpKicker: 'Comparación',
+    cmpTitle: 'Cómo se compara chamba',
+    cmpCol2: 'Subagentes de Claude Code', cmpCol3: 'MCP de filesystem',
+    cmpRows: [
+      { label: 'Funciona en cualquier editor MCP', a: '✅', b: '❌', c: '✅' },
+      { label: 'Necesita su propia API key', a: '❌', b: '❌', c: '❌' },
+      { label: 'Plan + revisión heurística', a: '✅', b: '⚠️', c: '❌' },
+      { label: 'Aislamiento con git worktree', a: '✅', b: '❌', c: '❌' },
+      { label: 'Contexto Obsidian + escritura', a: '✅', b: '❌', c: '❌' },
+      { label: 'Memoria entre sesiones', a: '✅', b: '⚠️', c: '⚠️' }
+    ],
+    rmKicker: 'Roadmap + Changelog',
+    rmTitle: 'Construido en público, fase por fase',
+    rmSub: 'Siempre al día: cada fase se cierra en abierto. El set completo de herramientas V1 ya está implementado; faltan release y pulido.',
+    rmLink: 'Ver el plan completo (PLAN.md)',
+    timeline: [
+      { badge: 'Listo', dot: OK, title: 'Servidor MCP + escáner de workspace', desc: 'La base: servidor stdio y escaneo del proyecto a workspace.md.' },
+      { badge: 'Listo', dot: OK, title: 'Contexto Obsidian + escritor de vault', desc: 'Lee notas del vault y escribe resúmenes de vuelta como markdown.' },
+      { badge: 'Listo', dot: OK, title: 'Generador de planes + revisor heurístico', desc: 'Plantilla de plan + revisor programático sin LLM.' },
+      { badge: 'Listo', dot: OK, title: 'Gestor de git worktree', desc: 'Aislamiento de trabajo en paralelo; limpieza que conserva ramas.' },
+      { badge: 'Listo', dot: OK, title: 'Memoria entre sesiones', desc: 'remember / recall persistiendo conocimiento en markdown.' },
+      { badge: 'Listo', dot: OK, title: 'Extras de Claude Code', desc: 'Instalador de /orq, /workspace, subagentes y hooks.' },
+      { badge: 'En curso', dot: AM, title: 'Docs multi‑editor', desc: 'Guías runnable para cada editor con cliente MCP (estás leyéndolas).' },
+      { badge: 'Siguiente', dot: AC, title: 'Release 1.0.0 en npm', desc: 'Publicación estable de @chamba/mcp.' },
+      { badge: 'Explorando', dot: MU, title: 'V2: búsqueda semántica, MCP sampling', desc: 'Búsqueda semántica del vault y más bases de conocimiento.' }
+    ],
+    ctaTitle: 'Pon a tu editor a trabajar la chamba',
+    ctaSub: 'Un comando y tu editor gana orquestación, contexto y memoria. Sin API keys.',
+    ctaBtn1: 'Ver en GitHub', ctaBtn2: 'npm · @chamba/mcp',
+    footer: 'Hecho con cariño en LATAM · MIT'
+  },
+  en: {
+    langBtn: 'ES', copy: 'Copy', copied: 'Copied!',
+    nav: [
+      { label: 'Benefits', href: '#benefits' },
+      { label: 'Tools', href: '#tools' },
+      { label: 'How it works', href: '#how' },
+      { label: 'Setup', href: '#setup' },
+      { label: 'Compare', href: '#compare' },
+      { label: 'Roadmap', href: '#roadmap' }
+    ],
+    heroTag: 'MCP server · Open source · MIT license',
+    heroTitleA: 'Hand the model its chamba.',
+    heroTitleB: 'chamba coordinates the rest.',
+    heroSub: 'An MCP server that adds orchestrator‑worker patterns, workspace context, git worktrees and Obsidian memory to any AI editor. No API key: your editor’s model does the reasoning, chamba does the coordination.',
+    heroTermLabel: 'install in seconds',
+    heroCta: 'See setup',
+    heroEditorsLabel: 'Works in',
+    editorPills: ['Cursor', 'Claude Code', 'VS Code', 'Windsurf', 'Cline', 'OpenCode'],
+    glossary: '“Chamba” is the LATAM word for work — la chamba. You hand the model its chamba; chamba (the tool) handles the supervising, validating and plumbing around it.',
+    whyKicker: 'Why chamba',
+    whyTitle: 'Real coordination, no extra LLM',
+    benefits: [
+      { no: '01', title: 'Zero API keys', body: 'No ANTHROPIC_API_KEY, no OPENAI_API_KEY. Your editor already pays for its own model; chamba never calls an LLM.' },
+      { no: '02', title: 'Every MCP editor, day one', body: 'One stdio server works in Cursor, Claude Code, VS Code, Windsurf, Cline and OpenCode.' },
+      { no: '03', title: 'Workspace‑aware', body: 'It scans your project into an editable .chamba/workspace.md and feeds that context to every plan.' },
+      { no: '04', title: 'Plan + heuristic review', body: 'A programmatic reviewer (no LLM) flags missing tests, unassigned work and sensitive areas without a risk assessment.' },
+      { no: '05', title: 'Safe parallelism', body: 'Git worktrees isolate parallel work; cleanup keeps branches for you to merge by hand — never --force, never auto‑merge.' },
+      { no: '06', title: 'Obsidian + cross‑session memory', body: 'Pull context from your vault, write summaries back, and persist knowledge as plain markdown.' }
+    ],
+    toolsKicker: 'Tools',
+    toolsTitle: 'The MCP tools it exposes',
+    toolsSub: 'Every tool is deterministic and LLM‑free. Your editor’s model decides when to call them.',
+    toolCol1: 'Tool', toolCol2: 'Input', toolCol3: 'Output',
+    tools: [
+      { name: 'workspace_init', in: '{ root? }', out: 'Scans and writes .chamba/workspace.md' },
+      { name: 'workspace_show', in: '{ }', out: 'Contents of .chamba/workspace.md' },
+      { name: 'workspace_reload', in: '{ }', out: 'A diff vs a fresh re‑scan (no writes)' },
+      { name: 'load_context', in: '{ task, includeObsidian? }', out: 'Workspace summary + relevant vault notes' },
+      { name: 'summarize_to_vault', in: '{ title, content, projectSlug? }', out: 'Writes a note to the vault' },
+      { name: 'generate_plan', in: '{ task, context? }', out: 'A structured plan template' },
+      { name: 'review_plan', in: '{ plan, task, context? }', out: '{ approved, issues, riskFlags } — no LLM' },
+      { name: 'create_worktree', in: '{ taskSlug, workerId, baseBranch? }', out: 'An isolated git worktree' },
+      { name: 'list_worktrees', in: '{ }', out: 'The repo’s worktrees' },
+      { name: 'cleanup_worktree', in: '{ branch }', out: 'Removes the dir, keeps the branch' },
+      { name: 'remember', in: '{ key, content, tags? }', out: 'Persists a markdown memory' },
+      { name: 'recall', in: '{ query }', out: 'Searches saved memories' }
+    ],
+    howKicker: 'How it works',
+    howTitle: 'From one command to merge‑ready branches',
+    howSub: 'chamba provides the tools and patterns; your editor’s model provides the reasoning.',
+    flow: [
+      { mono: 'you →', text: '“@chamba orchestrate: add a health check endpoint”', dot: MU },
+      { mono: 'model', text: 'Your editor’s model reasons, then calls chamba tools:', dot: AC },
+      { mono: 'load_context', text: 'workspace map + relevant Obsidian notes', dot: OK },
+      { mono: 'generate_plan', text: 'plan skeleton the model fills in', dot: OK },
+      { mono: 'review_plan', text: 'heuristic verdict (no LLM); model fixes issues', dot: OK },
+      { mono: 'create_worktree', text: 'isolated branch per worker (if git)', dot: OK },
+      { mono: 'summarize_to_vault', text: 'structured note back to Obsidian', dot: OK },
+      { mono: 'result', text: 'All in your editor’s chat. Branches stay open for you to review & merge.', dot: AC }
+    ],
+    contribA_t: 'chamba contributes',
+    contribA_b: 'Workspace context, plan validation, worktree isolation and vault memory.',
+    contribB_t: 'The model contributes',
+    contribB_b: 'Reasoning, decisions and code — using the model your editor already pays for.',
+    setupKicker: 'Setup',
+    setupTitle: 'One config file per editor',
+    setupSub: 'Pick your editor. Full step‑by‑step walkthroughs live in the repo’s examples/ folder.',
+    setupFileLabel: 'file:',
+    cmpKicker: 'Compare',
+    cmpTitle: 'How chamba compares',
+    cmpCol2: 'Claude Code subagents', cmpCol3: 'Plain filesystem MCP',
+    cmpRows: [
+      { label: 'Works in any MCP editor', a: '✅', b: '❌', c: '✅' },
+      { label: 'Needs its own API key', a: '❌', b: '❌', c: '❌' },
+      { label: 'Plan + heuristic review', a: '✅', b: '⚠️', c: '❌' },
+      { label: 'Git worktree isolation', a: '✅', b: '❌', c: '❌' },
+      { label: 'Obsidian context + write‑back', a: '✅', b: '❌', c: '❌' },
+      { label: 'Cross‑session memory', a: '✅', b: '⚠️', c: '⚠️' }
+    ],
+    rmKicker: 'Roadmap + Changelog',
+    rmTitle: 'Built in public, phase by phase',
+    rmSub: 'Always current: each phase ships in the open. The full V1 tool set is already implemented; release and polish are the last phases.',
+    rmLink: 'See the full plan (PLAN.md)',
+    timeline: [
+      { badge: 'Shipped', dot: OK, title: 'MCP server + workspace scanner', desc: 'The base: stdio server and project scan into workspace.md.' },
+      { badge: 'Shipped', dot: OK, title: 'Obsidian context + vault writer', desc: 'Reads vault notes and writes summaries back as markdown.' },
+      { badge: 'Shipped', dot: OK, title: 'Plan generator + heuristic reviewer', desc: 'Plan template + programmatic, LLM‑free reviewer.' },
+      { badge: 'Shipped', dot: OK, title: 'Git worktree manager', desc: 'Parallel work isolation; cleanup that keeps branches.' },
+      { badge: 'Shipped', dot: OK, title: 'Cross‑session memory', desc: 'remember / recall persisting knowledge as markdown.' },
+      { badge: 'Shipped', dot: OK, title: 'Claude Code extras', desc: 'Installer for /orq, /workspace, subagents and hooks.' },
+      { badge: 'In progress', dot: AM, title: 'Multi‑editor docs', desc: 'Runnable guides for every MCP‑client editor (you’re reading them).' },
+      { badge: 'Next', dot: AC, title: '1.0.0 release on npm', desc: 'Stable publish of @chamba/mcp.' },
+      { badge: 'Exploring', dot: MU, title: 'V2: semantic search, MCP sampling', desc: 'Semantic vault search and more knowledge bases.' }
+    ],
+    ctaTitle: 'Put your editor to work — la chamba',
+    ctaSub: 'One command and your editor gains orchestration, context and memory. No API keys.',
+    ctaBtn1: 'View on GitHub', ctaBtn2: 'npm · @chamba/mcp',
+    footer: 'Built with cariño in LATAM · MIT'
+  }
+};
+
+let lang = 'es';
+let editorIdx = 0;
+const esc = (s) => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+function render() {
+  const t = CONTENT[lang];
+  const ed = { ...EDITORS[editorIdx], desc: EDITOR_DESCS[lang][EDITORS[editorIdx].id] };
+
+  const nav = t.nav.map(l => `<a href="${l.href}" class="navlink" style="font-size:14px;color:var(--muted);text-decoration:none;padding:7px 12px;border-radius:8px;font-weight:500;">${esc(l.label)}</a>`).join('');
+  const pills = t.editorPills.map(e => `<span style="font-size:13px;font-weight:500;color:var(--text);background:var(--bg2);border:1px solid var(--border);padding:5px 12px;border-radius:8px;">${esc(e)}</span>`).join('');
+  const benefits = t.benefits.map(b => `
+    <div class="card-benefit" style="background:var(--card);border:1px solid var(--border);border-radius:16px;padding:26px;display:flex;flex-direction:column;gap:12px;">
+      <span style="font-family:'JetBrains Mono';font-size:13px;color:var(--accent);font-weight:600;">${esc(b.no)}</span>
+      <h3 style="font-family:'Space Grotesk';font-weight:600;font-size:20px;letter-spacing:-0.02em;margin:0;line-height:1.2;">${esc(b.title)}</h3>
+      <p style="font-size:14.5px;line-height:1.55;color:var(--muted);margin:0;">${esc(b.body)}</p>
+    </div>`).join('');
+  const tools = t.tools.map(tool => `
+    <div class="row-hover" style="display:grid;grid-template-columns:1.1fr 1fr 1.4fr;padding:15px 22px;border-bottom:1px solid var(--border);align-items:center;">
+      <span style="font-family:'JetBrains Mono';font-size:13.5px;color:var(--accent);font-weight:500;">${esc(tool.name)}</span>
+      <span style="font-family:'JetBrains Mono';font-size:12.5px;color:var(--muted);">${esc(tool.in)}</span>
+      <span style="font-size:14px;color:var(--text);">${esc(tool.out)}</span>
+    </div>`).join('');
+  const flow = t.flow.map(s => `
+    <div style="position:relative;padding:0 0 26px 30px;">
+      <span style="position:absolute;left:-8px;top:3px;width:14px;height:14px;border-radius:50%;background:${s.dot};border:3px solid var(--bg);box-shadow:0 0 0 1px var(--border);"></span>
+      <div style="display:flex;flex-wrap:wrap;align-items:center;gap:12px;">
+        <span style="font-family:'JetBrains Mono';font-size:13px;font-weight:600;color:${s.dot};background:color-mix(in oklab, ${s.dot} 14%, var(--card));border:1px solid color-mix(in oklab, ${s.dot} 40%, var(--border));padding:4px 10px;border-radius:7px;">${esc(s.mono)}</span>
+        <span style="font-size:15px;color:var(--text);line-height:1.5;">${esc(s.text)}</span>
+      </div>
+    </div>`).join('');
+  const tabs = EDITORS.map((e, i) => `
+    <button data-tab="${i}" style="font-family:'Space Grotesk';font-weight:600;font-size:14px;padding:9px 17px;border-radius:10px;cursor:pointer;transition:all .15s;background:${i===editorIdx?'var(--accent)':'transparent'};color:${i===editorIdx?'#1a140f':'var(--muted)'};border:1px solid ${i===editorIdx?'var(--accent)':'var(--border)'};">${esc(e.name)}</button>`).join('');
+  const cmpRows = t.cmpRows.map(r => `
+    <div class="row-hover" style="display:grid;grid-template-columns:1.6fr 1fr 1fr 1fr;padding:15px 22px;border-bottom:1px solid var(--border);align-items:center;">
+      <span style="font-size:14.5px;color:var(--text);">${esc(r.label)}</span>
+      <span style="text-align:center;font-size:17px;">${r.a}</span>
+      <span style="text-align:center;font-size:17px;">${r.b}</span>
+      <span style="text-align:center;font-size:17px;">${r.c}</span>
+    </div>`).join('');
+  const timeline = t.timeline.map(i => `
+    <div style="position:relative;padding:0 0 30px 34px;">
+      <span style="position:absolute;left:-9px;top:2px;width:16px;height:16px;border-radius:50%;background:${i.dot};border:3px solid var(--bg);box-shadow:0 0 0 1px var(--border);"></span>
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:6px;">
+        <span style="font-family:'JetBrains Mono';font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;padding:3px 9px;border-radius:100px;color:${i.dot};background:color-mix(in oklab, ${i.dot} 16%, var(--card));border:1px solid color-mix(in oklab, ${i.dot} 40%, var(--border));">${esc(i.badge)}</span>
+        <h3 style="font-family:'Space Grotesk';font-weight:600;font-size:18px;letter-spacing:-0.02em;margin:0;">${esc(i.title)}</h3>
+      </div>
+      <p style="margin:0;font-size:14px;color:var(--muted);line-height:1.5;">${esc(i.desc)}</p>
+    </div>`).join('');
+
+  document.getElementById('app').innerHTML = `
+  <header style="position:sticky;top:0;z-index:50;backdrop-filter:blur(14px);background:color-mix(in oklab, var(--bg) 78%, transparent);border-bottom:1px solid var(--border);">
+    <div style="max-width:1180px;margin:0 auto;padding:14px 32px;display:flex;align-items:center;gap:24px;">
+      <a href="#top" style="display:flex;align-items:center;gap:11px;text-decoration:none;color:var(--text);">
+        <span style="width:30px;height:30px;border-radius:9px;background:linear-gradient(135deg,var(--accent),oklch(0.6 0.13 30));display:grid;place-items:center;font-family:'Space Grotesk';font-weight:700;color:#1a140f;font-size:15px;box-shadow:0 0 0 1px oklch(0.4 0.06 45 / 0.4),0 6px 18px -6px var(--accent);">c</span>
+        <span style="font-family:'Space Grotesk';font-weight:600;font-size:19px;letter-spacing:-0.02em;">chamba</span>
+        <span style="font-family:'JetBrains Mono';font-size:10px;color:var(--muted);border:1px solid var(--border);padding:2px 6px;border-radius:5px;letter-spacing:0.04em;">MCP</span>
+      </a>
+      <nav class="top-nav" style="display:flex;gap:4px;margin-left:12px;flex:1;">${nav}</nav>
+      <button id="langBtn" class="btn-outline" style="display:flex;align-items:center;gap:7px;background:var(--bg2);border:1px solid var(--border);color:var(--text);font-family:'JetBrains Mono';font-size:12px;font-weight:600;padding:7px 11px;border-radius:9px;cursor:pointer;">
+        <span style="width:6px;height:6px;border-radius:50%;background:var(--accent);"></span>${esc(t.langBtn)}
+      </button>
+      <a href="https://github.com/thelord07/chamba" target="_blank" rel="noopener" class="btn-gh" style="display:flex;align-items:center;gap:8px;background:var(--text);color:var(--bg);text-decoration:none;font-weight:600;font-size:14px;padding:8px 15px;border-radius:9px;">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38v-1.34c-2.23.48-2.7-1.07-2.7-1.07-.36-.93-.89-1.18-.89-1.18-.73-.5.05-.49.05-.49.81.06 1.23.83 1.23.83.72 1.23 1.88.87 2.34.67.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.01.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.03 2.2-.82 2.2-.82.44 1.11.16 1.92.08 2.12.51.56.82 1.28.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48v2.2c0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+        GitHub
+      </a>
+    </div>
+  </header>
+
+  <main id="top">
+    <section style="max-width:1180px;margin:0 auto;padding:92px 32px 64px;">
+      <div style="display:inline-flex;align-items:center;gap:9px;font-family:'JetBrains Mono';font-size:12px;color:var(--muted);border:1px solid var(--border);background:var(--bg2);padding:6px 13px;border-radius:100px;margin-bottom:30px;">
+        <span style="width:7px;height:7px;border-radius:50%;background:var(--accent2);animation:chPulse 2.4s ease-in-out infinite;"></span>${esc(t.heroTag)}
+      </div>
+      <h1 style="font-family:'Space Grotesk';font-weight:700;font-size:clamp(40px,6.2vw,76px);line-height:1.02;letter-spacing:-0.035em;margin:0 0 24px;max-width:15ch;text-wrap:balance;">${esc(t.heroTitleA)} <span style="color:var(--accent);">${esc(t.heroTitleB)}</span></h1>
+      <p style="font-size:clamp(17px,2vw,21px);line-height:1.55;color:var(--muted);max-width:62ch;margin:0 0 40px;">${esc(t.heroSub)}</p>
+      <div class="hero-grid" style="display:flex;flex-wrap:wrap;gap:16px;align-items:stretch;margin-bottom:34px;">
+        <div style="background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden;min-width:340px;box-shadow:0 20px 50px -24px oklch(0 0 0 / 0.6);">
+          <div style="display:flex;align-items:center;gap:7px;padding:11px 15px;border-bottom:1px solid var(--border);background:var(--bg2);">
+            <span style="width:11px;height:11px;border-radius:50%;background:oklch(0.65 0.16 25);"></span>
+            <span style="width:11px;height:11px;border-radius:50%;background:var(--amber);"></span>
+            <span style="width:11px;height:11px;border-radius:50%;background:var(--accent2);"></span>
+            <span style="font-family:'JetBrains Mono';font-size:11px;color:var(--muted);margin-left:auto;">${esc(t.heroTermLabel)}</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:14px;padding:18px;font-family:'JetBrains Mono';font-size:15px;">
+            <span style="color:var(--accent2);">$</span>
+            <span style="color:var(--text);flex:1;">npx -y @chamba/mcp</span>
+            <button id="copyInstall" class="btn-outline" style="background:var(--bg2);border:1px solid var(--border);color:var(--muted);font-family:'JetBrains Mono';font-size:11px;font-weight:600;padding:6px 11px;border-radius:7px;cursor:pointer;white-space:nowrap;">${esc(t.copy)}</button>
+          </div>
+        </div>
+        <a href="#setup" class="btn-cta" style="display:flex;align-items:center;justify-content:center;gap:9px;background:var(--accent);color:#1a140f;text-decoration:none;font-weight:600;font-size:16px;padding:0 26px;border-radius:14px;min-width:210px;">${esc(t.heroCta)} →</a>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px;">
+        <span style="font-family:'JetBrains Mono';font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.08em;margin-right:4px;">${esc(t.heroEditorsLabel)}</span>${pills}
+      </div>
+      <p style="font-family:'JetBrains Mono';font-size:13px;color:var(--muted);margin:40px 0 0;padding-left:15px;border-left:2px solid var(--accent);line-height:1.6;max-width:60ch;">${esc(t.glossary)}</p>
+    </section>
+
+    <section id="benefits" style="max-width:1180px;margin:0 auto;padding:64px 32px;">
+      <div style="display:flex;align-items:baseline;gap:16px;margin-bottom:40px;flex-wrap:wrap;">
+        <span style="font-family:'JetBrains Mono';font-size:12px;color:var(--accent);text-transform:uppercase;letter-spacing:0.14em;font-weight:600;">01 · ${esc(t.whyKicker)}</span>
+        <h2 style="font-family:'Space Grotesk';font-weight:700;font-size:clamp(28px,3.6vw,42px);letter-spacing:-0.03em;margin:0;line-height:1.05;">${esc(t.whyTitle)}</h2>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;">${benefits}</div>
+    </section>
+
+    <section id="tools" style="max-width:1180px;margin:0 auto;padding:64px 32px;">
+      <div style="display:flex;align-items:baseline;gap:16px;margin-bottom:12px;flex-wrap:wrap;">
+        <span style="font-family:'JetBrains Mono';font-size:12px;color:var(--accent);text-transform:uppercase;letter-spacing:0.14em;font-weight:600;">02 · ${esc(t.toolsKicker)}</span>
+        <h2 style="font-family:'Space Grotesk';font-weight:700;font-size:clamp(28px,3.6vw,42px);letter-spacing:-0.03em;margin:0;line-height:1.05;">${esc(t.toolsTitle)}</h2>
+      </div>
+      <p style="font-size:16px;color:var(--muted);margin:0 0 32px;max-width:60ch;">${esc(t.toolsSub)}</p>
+      <div style="border:1px solid var(--border);border-radius:16px;overflow:hidden;background:var(--card);">
+        <div style="display:grid;grid-template-columns:1.1fr 1fr 1.4fr;padding:13px 22px;background:var(--bg2);border-bottom:1px solid var(--border);font-family:'JetBrains Mono';font-size:11px;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);font-weight:600;">
+          <span>${esc(t.toolCol1)}</span><span>${esc(t.toolCol2)}</span><span>${esc(t.toolCol3)}</span>
+        </div>${tools}
+      </div>
+    </section>
+
+    <section id="how" style="max-width:1180px;margin:0 auto;padding:64px 32px;">
+      <div style="display:flex;align-items:baseline;gap:16px;margin-bottom:12px;flex-wrap:wrap;">
+        <span style="font-family:'JetBrains Mono';font-size:12px;color:var(--accent);text-transform:uppercase;letter-spacing:0.14em;font-weight:600;">03 · ${esc(t.howKicker)}</span>
+        <h2 style="font-family:'Space Grotesk';font-weight:700;font-size:clamp(28px,3.6vw,42px);letter-spacing:-0.03em;margin:0;line-height:1.05;">${esc(t.howTitle)}</h2>
+      </div>
+      <p style="font-size:16px;color:var(--muted);margin:0 0 36px;max-width:62ch;">${esc(t.howSub)}</p>
+      <div style="display:grid;grid-template-columns:1fr;border-left:2px solid var(--border);margin-left:6px;">${flow}</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;margin-top:30px;">
+        <div style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:22px;">
+          <h4 style="font-family:'Space Grotesk';font-size:15px;margin:0 0 8px;color:var(--accent);">${esc(t.contribA_t)}</h4>
+          <p style="margin:0;font-size:14px;color:var(--muted);line-height:1.5;">${esc(t.contribA_b)}</p>
+        </div>
+        <div style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:22px;">
+          <h4 style="font-family:'Space Grotesk';font-size:15px;margin:0 0 8px;color:var(--accent2);">${esc(t.contribB_t)}</h4>
+          <p style="margin:0;font-size:14px;color:var(--muted);line-height:1.5;">${esc(t.contribB_b)}</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="setup" style="max-width:1180px;margin:0 auto;padding:64px 32px;">
+      <div style="display:flex;align-items:baseline;gap:16px;margin-bottom:12px;flex-wrap:wrap;">
+        <span style="font-family:'JetBrains Mono';font-size:12px;color:var(--accent);text-transform:uppercase;letter-spacing:0.14em;font-weight:600;">04 · ${esc(t.setupKicker)}</span>
+        <h2 style="font-family:'Space Grotesk';font-weight:700;font-size:clamp(28px,3.6vw,42px);letter-spacing:-0.03em;margin:0;line-height:1.05;">${esc(t.setupTitle)}</h2>
+      </div>
+      <p style="font-size:16px;color:var(--muted);margin:0 0 28px;max-width:60ch;">${esc(t.setupSub)}</p>
+      <div style="display:flex;flex-wrap:wrap;gap:9px;margin-bottom:20px;">${tabs}</div>
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:16px;overflow:hidden;">
+        <div style="display:flex;align-items:center;gap:12px;padding:13px 20px;border-bottom:1px solid var(--border);background:var(--bg2);">
+          <span style="font-family:'JetBrains Mono';font-size:12px;color:var(--muted);">${esc(t.setupFileLabel)}</span>
+          <span style="font-family:'JetBrains Mono';font-size:13px;color:var(--accent);font-weight:500;">${esc(ed.file)}</span>
+          <button id="copyCfg" class="btn-outline" style="margin-left:auto;background:transparent;border:1px solid var(--border);color:var(--muted);font-family:'JetBrains Mono';font-size:11px;font-weight:600;padding:5px 10px;border-radius:7px;cursor:pointer;">${esc(t.copy)}</button>
+        </div>
+        <pre style="margin:0;padding:22px;font-family:'JetBrains Mono';font-size:13.5px;line-height:1.7;color:var(--text);overflow-x:auto;white-space:pre-wrap;word-break:break-word;">${esc(ed.config)}</pre>
+        <div style="padding:14px 22px;border-top:1px solid var(--border);font-size:13.5px;color:var(--muted);line-height:1.55;">${esc(ed.desc)}</div>
+      </div>
+    </section>
+
+    <section id="compare" style="max-width:1180px;margin:0 auto;padding:64px 32px;">
+      <div style="display:flex;align-items:baseline;gap:16px;margin-bottom:32px;flex-wrap:wrap;">
+        <span style="font-family:'JetBrains Mono';font-size:12px;color:var(--accent);text-transform:uppercase;letter-spacing:0.14em;font-weight:600;">05 · ${esc(t.cmpKicker)}</span>
+        <h2 style="font-family:'Space Grotesk';font-weight:700;font-size:clamp(28px,3.6vw,42px);letter-spacing:-0.03em;margin:0;line-height:1.05;">${esc(t.cmpTitle)}</h2>
+      </div>
+      <div style="border:1px solid var(--border);border-radius:16px;overflow:hidden;background:var(--card);">
+        <div style="display:grid;grid-template-columns:1.6fr 1fr 1fr 1fr;padding:15px 22px;background:var(--bg2);border-bottom:1px solid var(--border);align-items:center;">
+          <span></span>
+          <span style="font-family:'Space Grotesk';font-weight:700;font-size:15px;text-align:center;color:var(--accent);">chamba</span>
+          <span style="font-family:'JetBrains Mono';font-size:12px;text-align:center;color:var(--muted);line-height:1.3;">${esc(t.cmpCol2)}</span>
+          <span style="font-family:'JetBrains Mono';font-size:12px;text-align:center;color:var(--muted);line-height:1.3;">${esc(t.cmpCol3)}</span>
+        </div>${cmpRows}
+      </div>
+    </section>
+
+    <section id="roadmap" style="max-width:1180px;margin:0 auto;padding:64px 32px 40px;">
+      <div style="display:flex;align-items:baseline;gap:16px;margin-bottom:12px;flex-wrap:wrap;">
+        <span style="font-family:'JetBrains Mono';font-size:12px;color:var(--accent);text-transform:uppercase;letter-spacing:0.14em;font-weight:600;">06 · ${esc(t.rmKicker)}</span>
+        <h2 style="font-family:'Space Grotesk';font-weight:700;font-size:clamp(28px,3.6vw,42px);letter-spacing:-0.03em;margin:0;line-height:1.05;">${esc(t.rmTitle)}</h2>
+      </div>
+      <p style="font-size:16px;color:var(--muted);margin:0 0 40px;max-width:62ch;">${esc(t.rmSub)}</p>
+      <div style="border-left:2px solid var(--border);margin-left:8px;">${timeline}</div>
+      <a href="https://github.com/thelord07/chamba/blob/main/PLAN.md" target="_blank" rel="noopener" class="link-rm" style="display:inline-flex;align-items:center;gap:8px;margin-top:8px;font-family:'JetBrains Mono';font-size:13px;color:var(--accent);text-decoration:none;border:1px solid var(--border);padding:9px 15px;border-radius:10px;transition:border-color .15s;">${esc(t.rmLink)} →</a>
+    </section>
+
+    <section style="max-width:1180px;margin:0 auto;padding:40px 32px 88px;">
+      <div style="background:linear-gradient(135deg,color-mix(in oklab, var(--accent) 22%, var(--card)),var(--card));border:1px solid color-mix(in oklab, var(--accent) 40%, var(--border));border-radius:22px;padding:52px 44px;text-align:center;">
+        <h2 style="font-family:'Space Grotesk';font-weight:700;font-size:clamp(26px,4vw,40px);letter-spacing:-0.03em;margin:0 0 14px;line-height:1.1;">${esc(t.ctaTitle)}</h2>
+        <p style="font-size:17px;color:var(--muted);margin:0 auto 30px;max-width:52ch;">${esc(t.ctaSub)}</p>
+        <div style="display:flex;gap:14px;justify-content:center;flex-wrap:wrap;">
+          <a href="https://github.com/thelord07/chamba" target="_blank" rel="noopener" class="btn-cta" style="background:var(--accent);color:#1a140f;text-decoration:none;font-weight:600;font-size:16px;padding:14px 28px;border-radius:13px;">${esc(t.ctaBtn1)}</a>
+          <a href="https://www.npmjs.com/package/@chamba/mcp" target="_blank" rel="noopener" class="btn-outline" style="background:var(--bg2);color:var(--text);border:1px solid var(--border);text-decoration:none;font-weight:600;font-size:16px;padding:14px 28px;border-radius:13px;">${esc(t.ctaBtn2)}</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer style="border-top:1px solid var(--border);background:var(--bg2);">
+    <div style="max-width:1180px;margin:0 auto;padding:34px 32px;display:flex;flex-wrap:wrap;gap:20px;align-items:center;justify-content:space-between;">
+      <div style="display:flex;align-items:center;gap:11px;">
+        <span style="width:26px;height:26px;border-radius:8px;background:linear-gradient(135deg,var(--accent),oklch(0.6 0.13 30));display:grid;place-items:center;font-family:'Space Grotesk';font-weight:700;color:#1a140f;font-size:13px;">c</span>
+        <span style="font-family:'JetBrains Mono';font-size:13px;color:var(--muted);">${esc(t.footer)}</span>
+      </div>
+      <div style="display:flex;gap:20px;font-size:13px;">
+        <a href="https://github.com/thelord07/chamba" target="_blank" rel="noopener" class="link-hover" style="color:var(--muted);text-decoration:none;">GitHub</a>
+        <a href="https://github.com/thelord07/chamba/blob/main/LICENSE" target="_blank" rel="noopener" class="link-hover" style="color:var(--muted);text-decoration:none;">MIT</a>
+        <a href="https://modelcontextprotocol.io" target="_blank" rel="noopener" class="link-hover" style="color:var(--muted);text-decoration:none;">MCP</a>
+      </div>
+    </div>
+  </footer>`;
+
+  wire();
+}
+
+function flash(btn) {
+  const original = btn.textContent;
+  btn.textContent = CONTENT[lang].copied;
+  clearTimeout(btn._t);
+  btn._t = setTimeout(() => { btn.textContent = original; }, 1600);
+}
+
+function wire() {
+  document.getElementById('langBtn').onclick = () => { lang = lang === 'es' ? 'en' : 'es'; document.documentElement.lang = lang; render(); };
+  document.getElementById('copyInstall').onclick = (e) => { try { navigator.clipboard.writeText('npx -y @chamba/mcp'); } catch (_) {} flash(e.currentTarget); };
+  document.getElementById('copyCfg').onclick = (e) => { try { navigator.clipboard.writeText(EDITORS[editorIdx].config); } catch (_) {} flash(e.currentTarget); };
+  document.querySelectorAll('[data-tab]').forEach(b => { b.onclick = () => { editorIdx = Number(b.getAttribute('data-tab')); render(); }; });
+}
+
+render();
+</script>
+</body>
+</html>
