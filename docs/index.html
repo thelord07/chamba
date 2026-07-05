@@ -65,6 +65,7 @@
 
 <script>
 const AC = 'var(--accent)', OK = 'var(--accent2)', AM = 'var(--amber)', MU = 'var(--muted)';
+const VERSION = '0.9.0';
 
 const EDITORS = [
   { id: 'cursor', name: 'Cursor', file: '.cursor/mcp.json',
@@ -107,7 +108,7 @@ const CONTENT = {
       { label: 'Comparación', href: '#compare' },
       { label: 'Roadmap', href: '#roadmap' }
     ],
-    heroTag: 'Servidor MCP · Open source · Licencia MIT',
+    heroTag: `Servidor MCP · Open source · v${VERSION}`,
     heroTitleA: 'Dale su chamba al modelo.',
     heroTitleB: 'El resto lo coordina chamba.',
     heroSub: 'Un servidor MCP que añade patrones orquestador‑trabajador, contexto de workspace, git worktrees y memoria en Obsidian a cualquier editor con IA. Sin API keys: el modelo de tu editor razona, chamba coordina.',
@@ -121,26 +122,31 @@ const CONTENT = {
     benefits: [
       { no: '01', title: 'Cero API keys', body: 'Sin ANTHROPIC_API_KEY ni OPENAI_API_KEY. Tu editor ya paga su propio modelo; chamba nunca llama a un LLM.' },
       { no: '02', title: 'Todo editor MCP, desde el día uno', body: 'Un solo servidor stdio funciona en Cursor, Claude Code, VS Code, Windsurf, Cline y OpenCode.' },
-      { no: '03', title: 'Consciente del workspace', body: 'Escanea tu proyecto a un .chamba/workspace.md editable y alimenta ese contexto a cada plan.' },
-      { no: '04', title: 'Plan + revisión heurística', body: 'Un revisor programático (sin LLM) marca tests faltantes, trabajo sin asignar y áreas sensibles sin evaluación de riesgo.' },
-      { no: '05', title: 'Paralelismo seguro', body: 'Los git worktrees aíslan el trabajo en paralelo; la limpieza conserva las ramas para que fusiones a mano — nunca --force, nunca auto‑merge.' },
-      { no: '06', title: 'Obsidian + memoria entre sesiones', body: 'Trae contexto de tu vault, escribe resúmenes de vuelta y persiste conocimiento como markdown plano.' }
+      { no: '03', title: '/ticket de punta a punta', body: 'Orquestador‑trabajador: plan → worktrees por repo → implementación → verificación del diff → QA, con un único gate de clarificación. Nunca hace auto‑merge ni push.' },
+      { no: '04', title: 'QA de aceptación', body: 'El agente qa valida cada criterio contra la app corriendo: usa Playwright si el proyecto lo tiene, si no levanta la app del worktree y te co‑pilotea la prueba.' },
+      { no: '05', title: 'Modelo + effort por agente', body: 'Configurás qué modelo y esfuerzo usa cada rol (planner, reviewer, qa, implementer…). Multi‑proveedor, con Claude Fable 5 opt‑in.' },
+      { no: '06', title: 'Obsidian + memoria + reglas', body: 'Vault con bootstrap en el init, planes en plans/ y resúmenes en proyectos/, más las reglas de código de cada repo cargadas en contexto.' }
     ],
     toolsKicker: 'Herramientas',
     toolsTitle: 'Las herramientas MCP que expone',
     toolsSub: 'Cada herramienta es determinista y sin LLM. El modelo de tu editor decide cuándo llamarlas.',
     toolCol1: 'Herramienta', toolCol2: 'Entrada', toolCol3: 'Salida',
     tools: [
-      { name: 'workspace_init', in: '{ root? }', out: 'Escanea y escribe .chamba/workspace.md' },
+      { name: 'workspace_init', in: '{ root?, createVault? }', out: 'Escanea y escribe .chamba/workspace.md; bootstrapea un vault si no hay' },
       { name: 'workspace_show', in: '{ }', out: 'Contenido de .chamba/workspace.md' },
       { name: 'workspace_reload', in: '{ }', out: 'Un diff contra un re‑escaneo (sin escribir)' },
-      { name: 'load_context', in: '{ task, includeObsidian? }', out: 'Resumen del workspace + notas del vault' },
-      { name: 'summarize_to_vault', in: '{ title, content, projectSlug? }', out: 'Escribe una nota al vault' },
+      { name: 'load_context', in: '{ task, includeObsidian? }', out: 'Resumen del workspace + notas del vault + reglas de código' },
+      { name: 'summarize_to_vault', in: '{ title, content, projectSlug? }', out: 'Escribe un resumen a la carpeta proyectos/' },
+      { name: 'save_plan', in: '{ title, content, projectSlug? }', out: 'Guarda un plan en la carpeta plans/' },
+      { name: 'vault_status', in: '{ }', out: 'Ruta del vault + las notas que chamba ve (diagnóstico)' },
       { name: 'generate_plan', in: '{ task, context? }', out: 'Plantilla de plan estructurado' },
       { name: 'review_plan', in: '{ plan, task, context? }', out: '{ approved, issues, riskFlags } — sin LLM' },
+      { name: 'get_agent_config', in: '{ role }', out: '{ model, effort, hint } para un rol — sin LLM' },
       { name: 'create_worktree', in: '{ taskSlug, workerId, baseBranch? }', out: 'Un git worktree aislado' },
+      { name: 'create_worktrees', in: '{ ticket, repos? }', out: 'Worktrees multi‑repo para un ticket' },
       { name: 'list_worktrees', in: '{ }', out: 'Los worktrees del repo' },
       { name: 'cleanup_worktree', in: '{ branch }', out: 'Borra el dir, conserva la rama' },
+      { name: 'cleanup_worktrees', in: '{ ticket, repos? }', out: 'Borra los worktrees de un ticket, conserva las ramas' },
       { name: 'remember', in: '{ key, content, tags? }', out: 'Persiste una memoria en markdown' },
       { name: 'recall', in: '{ query }', out: 'Busca en las memorias guardadas' }
     ],
@@ -148,14 +154,16 @@ const CONTENT = {
     howTitle: 'De una orden a ramas listas para fusionar',
     howSub: 'chamba aporta las herramientas y los patrones; el modelo de tu editor aporta el razonamiento.',
     flow: [
-      { mono: 'tú →', text: '«@chamba orquesta: añade un endpoint de health check»', dot: MU },
-      { mono: 'modelo', text: 'El modelo de tu editor razona y llama a las herramientas de chamba:', dot: AC },
-      { mono: 'load_context', text: 'mapa del workspace + notas relevantes de Obsidian', dot: OK },
-      { mono: 'generate_plan', text: 'esqueleto de plan que el modelo rellena', dot: OK },
-      { mono: 'review_plan', text: 'veredicto heurístico (sin LLM); el modelo corrige los problemas', dot: OK },
-      { mono: 'create_worktree', text: 'rama aislada por worker (si hay git)', dot: OK },
-      { mono: 'summarize_to_vault', text: 'nota estructurada de vuelta a Obsidian', dot: OK },
-      { mono: 'resultado', text: 'Todo en el chat de tu editor. Las ramas quedan abiertas para que revises y fusiones.', dot: AC }
+      { mono: 'tú →', text: '«/ticket FX‑123: no enviar la comunicación de invoice»', dot: MU },
+      { mono: 'modelo', text: 'El modelo de tu editor orquesta y llama a las herramientas de chamba:', dot: AC },
+      { mono: 'load_context', text: 'mapa de repos + notas del vault + reglas de código', dot: OK },
+      { mono: 'planner', text: 'plan por repo con criterios de aceptación', dot: OK },
+      { mono: 'review_plan', text: 'veredicto heurístico (sin LLM) + audit del reviewer', dot: OK },
+      { mono: 'gate', text: 'te pregunta lo ambiguo una sola vez, antes de ejecutar', dot: AM },
+      { mono: 'create_worktrees', text: 'un worktree aislado por repo tocado', dot: OK },
+      { mono: 'implement + test', text: 'implementer y tester en cada worktree', dot: OK },
+      { mono: 'verify + qa', text: 'reviewer sobre el diff real + el agente qa contra la app corriendo', dot: OK },
+      { mono: 'resultado', text: 'plan y resumen al vault; ramas abiertas + comandos para abrir en Code/Cursor. Vos revisás y mergeás.', dot: AC }
     ],
     contribA_t: 'chamba aporta',
     contribA_b: 'Contexto de workspace, validación de planes, aislamiento con worktrees y memoria en el vault.',
@@ -172,24 +180,27 @@ const CONTENT = {
       { label: 'Funciona en cualquier editor MCP', a: '✅', b: '❌', c: '✅' },
       { label: 'Necesita su propia API key', a: '❌', b: '❌', c: '❌' },
       { label: 'Plan + revisión heurística', a: '✅', b: '⚠️', c: '❌' },
-      { label: 'Aislamiento con git worktree', a: '✅', b: '❌', c: '❌' },
+      { label: 'Worktrees git multi‑repo', a: '✅', b: '❌', c: '❌' },
+      { label: 'Fase de QA de aceptación', a: '✅', b: '⚠️', c: '❌' },
+      { label: 'Modelo + effort por agente', a: '✅', b: '⚠️', c: '❌' },
       { label: 'Contexto Obsidian + escritura', a: '✅', b: '❌', c: '❌' },
       { label: 'Memoria entre sesiones', a: '✅', b: '⚠️', c: '⚠️' }
     ],
     rmKicker: 'Roadmap + Changelog',
     rmTitle: 'Construido en público, fase por fase',
-    rmSub: 'Siempre al día: cada fase se cierra en abierto. El set completo de herramientas V1 ya está implementado; faltan release y pulido.',
+    rmSub: `Siempre al día: cada fase se cierra en abierto. Hoy en v${VERSION} — el flujo /ticket con QA, worktrees multi‑repo, config por agente y memoria en Obsidian ya están. Falta el 1.0.0 estable.`,
     rmLink: 'Ver el plan completo (PLAN.md)',
     timeline: [
-      { badge: 'Listo', dot: OK, title: 'Servidor MCP + escáner de workspace', desc: 'La base: servidor stdio y escaneo del proyecto a workspace.md.' },
-      { badge: 'Listo', dot: OK, title: 'Contexto Obsidian + escritor de vault', desc: 'Lee notas del vault y escribe resúmenes de vuelta como markdown.' },
+      { badge: 'Listo', dot: OK, title: 'Servidor MCP + escáner de workspace', desc: 'Servidor stdio y escaneo del proyecto a workspace.md.' },
+      { badge: 'Listo', dot: OK, title: 'Obsidian: vault, memoria y reglas', desc: 'Bootstrap del vault en el init, resúmenes y planes, y reglas de código multi‑editor.' },
       { badge: 'Listo', dot: OK, title: 'Generador de planes + revisor heurístico', desc: 'Plantilla de plan + revisor programático sin LLM.' },
-      { badge: 'Listo', dot: OK, title: 'Gestor de git worktree', desc: 'Aislamiento de trabajo en paralelo; limpieza que conserva ramas.' },
-      { badge: 'Listo', dot: OK, title: 'Memoria entre sesiones', desc: 'remember / recall persistiendo conocimiento en markdown.' },
-      { badge: 'Listo', dot: OK, title: 'Extras de Claude Code', desc: 'Instalador de /orq, /workspace, subagentes y hooks.' },
-      { badge: 'En curso', dot: AM, title: 'Docs multi‑editor', desc: 'Guías runnable para cada editor con cliente MCP (estás leyéndolas).' },
-      { badge: 'Siguiente', dot: AC, title: 'Release 1.0.0 en npm', desc: 'Publicación estable de @chamba/mcp.' },
-      { badge: 'Explorando', dot: MU, title: 'V2: búsqueda semántica, MCP sampling', desc: 'Búsqueda semántica del vault y más bases de conocimiento.' }
+      { badge: 'Listo', dot: OK, title: 'Worktrees multi‑repo + flujo /ticket', desc: 'Aislamiento por repo, copia de env, .code‑workspace, gate de clarificación y verify.' },
+      { badge: 'Listo', dot: OK, title: 'Modelo + effort por agente', desc: 'Reparto por rol, wizard y Claude Fable 5 opt‑in.' },
+      { badge: 'Listo', dot: OK, title: 'QA de aceptación (/qa + agente qa)', desc: 'Valida los criterios contra la app corriendo; Playwright o co‑piloto.' },
+      { badge: 'Listo', dot: OK, title: '/map de arquitectura + carpeta plans/', desc: 'Mapa cross‑repo al vault y planes persistidos.' },
+      { badge: 'Ahora', dot: AM, title: 'v0.9.0 en npm', desc: '@chamba/mcp, core, adapters y claude‑extras publicados.' },
+      { badge: 'Siguiente', dot: AC, title: 'Release 1.0.0 estable', desc: 'Pulido final y publicación 1.0.' },
+      { badge: 'Explorando', dot: MU, title: 'V2: registro de servicios, búsqueda semántica', desc: 'Registro con detección de drift y búsqueda del vault.' }
     ],
     ctaTitle: 'Pon a tu editor a trabajar la chamba',
     ctaSub: 'Un comando y tu editor gana orquestación, contexto y memoria. Sin API keys.',
@@ -206,7 +217,7 @@ const CONTENT = {
       { label: 'Compare', href: '#compare' },
       { label: 'Roadmap', href: '#roadmap' }
     ],
-    heroTag: 'MCP server · Open source · MIT license',
+    heroTag: `MCP server · Open source · v${VERSION}`,
     heroTitleA: 'Hand the model its chamba.',
     heroTitleB: 'chamba coordinates the rest.',
     heroSub: 'An MCP server that adds orchestrator‑worker patterns, workspace context, git worktrees and Obsidian memory to any AI editor. No API key: your editor’s model does the reasoning, chamba does the coordination.',
@@ -220,26 +231,31 @@ const CONTENT = {
     benefits: [
       { no: '01', title: 'Zero API keys', body: 'No ANTHROPIC_API_KEY, no OPENAI_API_KEY. Your editor already pays for its own model; chamba never calls an LLM.' },
       { no: '02', title: 'Every MCP editor, day one', body: 'One stdio server works in Cursor, Claude Code, VS Code, Windsurf, Cline and OpenCode.' },
-      { no: '03', title: 'Workspace‑aware', body: 'It scans your project into an editable .chamba/workspace.md and feeds that context to every plan.' },
-      { no: '04', title: 'Plan + heuristic review', body: 'A programmatic reviewer (no LLM) flags missing tests, unassigned work and sensitive areas without a risk assessment.' },
-      { no: '05', title: 'Safe parallelism', body: 'Git worktrees isolate parallel work; cleanup keeps branches for you to merge by hand — never --force, never auto‑merge.' },
-      { no: '06', title: 'Obsidian + cross‑session memory', body: 'Pull context from your vault, write summaries back, and persist knowledge as plain markdown.' }
+      { no: '03', title: 'End‑to‑end /ticket', body: 'Orchestrator‑worker: plan → per‑repo worktrees → implement → diff verify → QA, with one clarification gate. It never auto‑merges or pushes.' },
+      { no: '04', title: 'Acceptance QA', body: 'The qa agent validates each criterion against the running app: it uses Playwright if the project has it, otherwise runs the app from the worktree and co‑pilots the test with you.' },
+      { no: '05', title: 'Per‑agent model + effort', body: 'Set which model and effort each role uses (planner, reviewer, qa, implementer…). Multi‑provider, with Claude Fable 5 opt‑in.' },
+      { no: '06', title: 'Obsidian + memory + rules', body: 'A vault bootstrapped on init, plans in plans/ and summaries in proyectos/, plus each repo’s coding rules loaded into context.' }
     ],
     toolsKicker: 'Tools',
     toolsTitle: 'The MCP tools it exposes',
     toolsSub: 'Every tool is deterministic and LLM‑free. Your editor’s model decides when to call them.',
     toolCol1: 'Tool', toolCol2: 'Input', toolCol3: 'Output',
     tools: [
-      { name: 'workspace_init', in: '{ root? }', out: 'Scans and writes .chamba/workspace.md' },
+      { name: 'workspace_init', in: '{ root?, createVault? }', out: 'Scans and writes .chamba/workspace.md; bootstraps a vault if none' },
       { name: 'workspace_show', in: '{ }', out: 'Contents of .chamba/workspace.md' },
       { name: 'workspace_reload', in: '{ }', out: 'A diff vs a fresh re‑scan (no writes)' },
-      { name: 'load_context', in: '{ task, includeObsidian? }', out: 'Workspace summary + relevant vault notes' },
-      { name: 'summarize_to_vault', in: '{ title, content, projectSlug? }', out: 'Writes a note to the vault' },
+      { name: 'load_context', in: '{ task, includeObsidian? }', out: 'Workspace summary + vault notes + coding rules' },
+      { name: 'summarize_to_vault', in: '{ title, content, projectSlug? }', out: 'Writes a run summary to proyectos/' },
+      { name: 'save_plan', in: '{ title, content, projectSlug? }', out: 'Saves a plan to plans/' },
+      { name: 'vault_status', in: '{ }', out: 'Resolved vault path + the notes chamba can see' },
       { name: 'generate_plan', in: '{ task, context? }', out: 'A structured plan template' },
       { name: 'review_plan', in: '{ plan, task, context? }', out: '{ approved, issues, riskFlags } — no LLM' },
+      { name: 'get_agent_config', in: '{ role }', out: '{ model, effort, hint } for a role — no LLM' },
       { name: 'create_worktree', in: '{ taskSlug, workerId, baseBranch? }', out: 'An isolated git worktree' },
+      { name: 'create_worktrees', in: '{ ticket, repos? }', out: 'Multi‑repo worktrees for a ticket' },
       { name: 'list_worktrees', in: '{ }', out: 'The repo’s worktrees' },
       { name: 'cleanup_worktree', in: '{ branch }', out: 'Removes the dir, keeps the branch' },
+      { name: 'cleanup_worktrees', in: '{ ticket, repos? }', out: 'Removes a ticket’s worktrees, keeps branches' },
       { name: 'remember', in: '{ key, content, tags? }', out: 'Persists a markdown memory' },
       { name: 'recall', in: '{ query }', out: 'Searches saved memories' }
     ],
@@ -247,14 +263,16 @@ const CONTENT = {
     howTitle: 'From one command to merge‑ready branches',
     howSub: 'chamba provides the tools and patterns; your editor’s model provides the reasoning.',
     flow: [
-      { mono: 'you →', text: '“@chamba orchestrate: add a health check endpoint”', dot: MU },
-      { mono: 'model', text: 'Your editor’s model reasons, then calls chamba tools:', dot: AC },
-      { mono: 'load_context', text: 'workspace map + relevant Obsidian notes', dot: OK },
-      { mono: 'generate_plan', text: 'plan skeleton the model fills in', dot: OK },
-      { mono: 'review_plan', text: 'heuristic verdict (no LLM); model fixes issues', dot: OK },
-      { mono: 'create_worktree', text: 'isolated branch per worker (if git)', dot: OK },
-      { mono: 'summarize_to_vault', text: 'structured note back to Obsidian', dot: OK },
-      { mono: 'result', text: 'All in your editor’s chat. Branches stay open for you to review & merge.', dot: AC }
+      { mono: 'you →', text: '“/ticket FX‑123: don’t send the invoice communication”', dot: MU },
+      { mono: 'model', text: 'Your editor’s model orchestrates, then calls chamba tools:', dot: AC },
+      { mono: 'load_context', text: 'repo map + vault notes + coding rules', dot: OK },
+      { mono: 'planner', text: 'per‑repo plan with acceptance criteria', dot: OK },
+      { mono: 'review_plan', text: 'heuristic verdict (no LLM) + reviewer audit', dot: OK },
+      { mono: 'gate', text: 'asks you anything ambiguous once, before executing', dot: AM },
+      { mono: 'create_worktrees', text: 'an isolated worktree per touched repo', dot: OK },
+      { mono: 'implement + test', text: 'implementer and tester in each worktree', dot: OK },
+      { mono: 'verify + qa', text: 'reviewer over the real diff + the qa agent against the running app', dot: OK },
+      { mono: 'result', text: 'plan and summary to the vault; branches open + open‑in‑Code/Cursor commands. You review & merge.', dot: AC }
     ],
     contribA_t: 'chamba contributes',
     contribA_b: 'Workspace context, plan validation, worktree isolation and vault memory.',
@@ -271,24 +289,27 @@ const CONTENT = {
       { label: 'Works in any MCP editor', a: '✅', b: '❌', c: '✅' },
       { label: 'Needs its own API key', a: '❌', b: '❌', c: '❌' },
       { label: 'Plan + heuristic review', a: '✅', b: '⚠️', c: '❌' },
-      { label: 'Git worktree isolation', a: '✅', b: '❌', c: '❌' },
+      { label: 'Multi‑repo git worktrees', a: '✅', b: '❌', c: '❌' },
+      { label: 'Acceptance‑QA phase', a: '✅', b: '⚠️', c: '❌' },
+      { label: 'Per‑agent model + effort', a: '✅', b: '⚠️', c: '❌' },
       { label: 'Obsidian context + write‑back', a: '✅', b: '❌', c: '❌' },
       { label: 'Cross‑session memory', a: '✅', b: '⚠️', c: '⚠️' }
     ],
     rmKicker: 'Roadmap + Changelog',
     rmTitle: 'Built in public, phase by phase',
-    rmSub: 'Always current: each phase ships in the open. The full V1 tool set is already implemented; release and polish are the last phases.',
+    rmSub: `Always current: each phase ships in the open. Now at v${VERSION} — the /ticket flow with QA, multi‑repo worktrees, per‑agent config and Obsidian memory are all in. The stable 1.0.0 is next.`,
     rmLink: 'See the full plan (PLAN.md)',
     timeline: [
-      { badge: 'Shipped', dot: OK, title: 'MCP server + workspace scanner', desc: 'The base: stdio server and project scan into workspace.md.' },
-      { badge: 'Shipped', dot: OK, title: 'Obsidian context + vault writer', desc: 'Reads vault notes and writes summaries back as markdown.' },
+      { badge: 'Shipped', dot: OK, title: 'MCP server + workspace scanner', desc: 'Stdio server and project scan into workspace.md.' },
+      { badge: 'Shipped', dot: OK, title: 'Obsidian: vault, memory & rules', desc: 'Vault bootstrap on init, summaries and plans, and multi‑editor coding rules.' },
       { badge: 'Shipped', dot: OK, title: 'Plan generator + heuristic reviewer', desc: 'Plan template + programmatic, LLM‑free reviewer.' },
-      { badge: 'Shipped', dot: OK, title: 'Git worktree manager', desc: 'Parallel work isolation; cleanup that keeps branches.' },
-      { badge: 'Shipped', dot: OK, title: 'Cross‑session memory', desc: 'remember / recall persisting knowledge as markdown.' },
-      { badge: 'Shipped', dot: OK, title: 'Claude Code extras', desc: 'Installer for /orq, /workspace, subagents and hooks.' },
-      { badge: 'In progress', dot: AM, title: 'Multi‑editor docs', desc: 'Runnable guides for every MCP‑client editor (you’re reading them).' },
-      { badge: 'Next', dot: AC, title: '1.0.0 release on npm', desc: 'Stable publish of @chamba/mcp.' },
-      { badge: 'Exploring', dot: MU, title: 'V2: semantic search, MCP sampling', desc: 'Semantic vault search and more knowledge bases.' }
+      { badge: 'Shipped', dot: OK, title: 'Multi‑repo worktrees + /ticket flow', desc: 'Per‑repo isolation, env copy, .code‑workspace, clarification gate and verify.' },
+      { badge: 'Shipped', dot: OK, title: 'Per‑agent model + effort config', desc: 'Per‑role split, wizard and Claude Fable 5 opt‑in.' },
+      { badge: 'Shipped', dot: OK, title: 'Acceptance QA (/qa + qa agent)', desc: 'Validates criteria against the running app; Playwright or co‑pilot.' },
+      { badge: 'Shipped', dot: OK, title: '/map architecture + plans/ folder', desc: 'Cross‑repo map to the vault and persisted plans.' },
+      { badge: 'Now', dot: AM, title: 'v0.9.0 on npm', desc: '@chamba/mcp, core, adapters and claude‑extras published.' },
+      { badge: 'Next', dot: AC, title: 'Stable 1.0.0 release', desc: 'Final polish and the 1.0 publish.' },
+      { badge: 'Exploring', dot: MU, title: 'V2: service registry, semantic search', desc: 'Registry with drift detection and vault search.' }
     ],
     ctaTitle: 'Put your editor to work — la chamba',
     ctaSub: 'One command and your editor gains orchestration, context and memory. No API keys.',
@@ -353,6 +374,7 @@ function render() {
         <span style="width:30px;height:30px;border-radius:9px;background:linear-gradient(135deg,var(--accent),oklch(0.6 0.13 30));display:grid;place-items:center;font-family:'Space Grotesk';font-weight:700;color:#1a140f;font-size:15px;box-shadow:0 0 0 1px oklch(0.4 0.06 45 / 0.4),0 6px 18px -6px var(--accent);">c</span>
         <span style="font-family:'Space Grotesk';font-weight:600;font-size:19px;letter-spacing:-0.02em;">chamba</span>
         <span style="font-family:'JetBrains Mono';font-size:10px;color:var(--muted);border:1px solid var(--border);padding:2px 6px;border-radius:5px;letter-spacing:0.04em;">MCP</span>
+        <span style="font-family:'JetBrains Mono';font-size:10px;color:var(--accent2);border:1px solid color-mix(in oklab, var(--accent2) 40%, var(--border));padding:2px 6px;border-radius:5px;letter-spacing:0.04em;">v${VERSION}</span>
       </a>
       <nav class="top-nav" style="display:flex;gap:4px;margin-left:12px;flex:1;">${nav}</nav>
       <button id="langBtn" class="btn-outline" style="display:flex;align-items:center;gap:7px;background:var(--bg2);border:1px solid var(--border);color:var(--text);font-family:'JetBrains Mono';font-size:12px;font-weight:600;padding:7px 11px;border-radius:9px;cursor:pointer;">
