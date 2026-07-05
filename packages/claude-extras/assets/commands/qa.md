@@ -10,6 +10,12 @@ Parse the arguments: if they start with `-p`/`--plan`, the next token is a plan
 file to read the `## QA plan` and acceptance criteria from. The first non-flag token
 is the ticket id; any remaining tokens are repos to scope to.
 
+**Orchestration capability.** The steps below delegate to subagents. Use the richest
+orchestration your editor supports, and degrade cleanly: with **parallel subagents**,
+fan out independent checks and reconcile them; with **one subagent at a time**, run
+them sequentially; with **no subagents**, do the work inline yourself. Never assume a
+specific editor primitive — adapt to what you have.
+
 1. Locate the code under test: call `chamba_list_worktrees` and use the worktree for
    this ticket if one exists; otherwise use the current checkout. All QA runs there.
 2. Get the acceptance criteria and QA setup:

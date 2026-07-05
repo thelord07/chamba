@@ -25,9 +25,17 @@ export interface ModelInfo {
    * when the provider has no effort knob (effort is then advisory only).
    */
   effortMap: Record<Effort, string | null>;
+  /** Cost note surfaced when the model has adoption caveats (premium tiers). */
+  pricing_note?: string;
+  /** True if the org must have a data-retention policy the model requires. */
+  requires_data_retention?: boolean;
+  /** True if safety classifiers may decline some requests (refusal). */
+  can_refuse?: boolean;
 }
 
 // Claude Code subagent `effort:` accepts low|medium|high|xhigh|max — `extreme` → `max`.
+// Note: this path cannot emit `xhigh`. Fable 5's recommended coding/agentic setting is
+// `xhigh`, so a Fable 5 role on Claude Code runs at `high` or `max`, never `xhigh`.
 const ANTHROPIC_EFFORT: Record<Effort, string> = {
   low: 'low',
   medium: 'medium',
@@ -75,6 +83,20 @@ export const MODEL_CATALOG: readonly ModelInfo[] = [
     description: 'Flagship reasoning. Best for critical decomposition and planning.',
     supports_thinking: true,
     effortMap: ANTHROPIC_EFFORT,
+  },
+  {
+    // Opt-in, premium — NOT a default. Its recommended `xhigh` setting is not reachable
+    // on the Claude Code path (extreme → max skips xhigh), so it runs at high or max.
+    id: 'claude-fable-5',
+    provider: 'anthropic',
+    label: 'Claude Fable 5',
+    description:
+      "Anthropic's most capable model for demanding long-horizon reasoning. Opt-in, premium.",
+    supports_thinking: true,
+    effortMap: ANTHROPIC_EFFORT,
+    pricing_note: '~$10/$50 per 1M tokens — roughly 2× Opus 4.8 (verify per release).',
+    requires_data_retention: true,
+    can_refuse: true,
   },
   {
     id: 'claude-opus-4-7',
@@ -162,6 +184,21 @@ export const MODEL_CATALOG: readonly ModelInfo[] = [
 /** Look up a model by exact id. */
 export function getModel(id: string): ModelInfo | undefined {
   return MODEL_CATALOG.find((m) => m.id === id);
+}
+
+/**
+ * A one-line adoption caveat for a model (cost, data-retention, refusal), or
+ * `undefined` when it has none. Surfaced by the wizard, the config hint and the
+ * generated subagent frontmatter so a premium/gated model never fails silently.
+ */
+export function modelCaveat(model: ModelInfo): string | undefined {
+  const parts: string[] = [];
+  if (model.pricing_note) parts.push(model.pricing_note);
+  if (model.requires_data_retention) {
+    parts.push('requires 30-day data retention (zero-retention orgs get a 400 on every request).');
+  }
+  if (model.can_refuse) parts.push('safety classifiers may decline some requests.');
+  return parts.length > 0 ? parts.join(' ') : undefined;
 }
 
 /** All models for a given provider. */

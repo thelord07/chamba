@@ -7,7 +7,9 @@ import {
   DEFAULT_WORKTREE_CONFIG,
   EFFORT_LEVELS,
   type Effort,
+  getModel,
   MODEL_CATALOG,
+  modelCaveat,
   type PartialWorktreeConfig,
   ROLE_DESCRIPTIONS,
 } from '@chamba/core';
@@ -129,6 +131,9 @@ export async function runWizard(
         choices: modelChoices(),
         default: DEFAULT_CONFIG.defaults[role].model,
       });
+      const picked = getModel(model);
+      const caveat = picked ? modelCaveat(picked) : undefined;
+      if (caveat) process.stdout.write(`  ⚠️  ${model}: ${caveat}\n`);
       const effort = await select({
         message: `  effort for ${role}`,
         choices: effortChoices(),

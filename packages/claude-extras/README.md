@@ -55,6 +55,14 @@ fast/cheap ones.** These ship pre-configured — you only change what you want.
 | **summarizer** | `claude-haiku-4-5` | low | Summaries are mechanical; a fast, cheap model is perfect. |
 | **researcher** | `claude-opus-4-7` | high | Research + synthesis; high reasoning, doesn't need Opus 4.8. |
 
+**Claude Fable 5** (`claude-fable-5`) is in the catalog as an **opt-in premium** model —
+assign it to a role by hand; it's never a default. Two caveats chamba surfaces (wizard,
+config hint, subagent frontmatter): it costs **~2× Opus 4.8** and **requires 30-day data
+retention** (zero-retention orgs get a 400 on every request). Also note its recommended
+`xhigh` setting **isn't reachable on Claude Code** — chamba's `extreme` maps to `max`
+there (it maps to `xhigh` only on the OpenAI path), so a Fable 5 role runs at `high` or
+`max`, never `xhigh`.
+
 ### The wizard
 
 The first `install` offers an interactive wizard (skipped automatically with

@@ -14,6 +14,13 @@ After that, run to the end and stop only for my final review — do not pause ag
 mid-way. You never resolve a flagged decision on your own and never silently drop
 an acceptance criterion.
 
+**Orchestration capability.** The steps below delegate to subagents and run
+verification passes. Use the richest orchestration your editor supports, and degrade
+cleanly: with **parallel subagents**, fan out independent reviews/verifiers and
+reconcile them; with **one subagent at a time**, run the passes sequentially; with
+**no subagents**, do the work inline yourself. Never assume a specific editor
+primitive — adapt to what you have.
+
 Parse the arguments first. If they start with `-p` or `--plan`, the next token is
 the path to a plan I already wrote (relative to the workspace root, or absolute) —
 read it and skip planning (see step 2). The first non-flag token is the ticket id;
@@ -43,8 +50,10 @@ the workspace.
    the plan + the workspace map. State confident assumptions as assumptions and put
    genuine forks under **Open questions** — do not invent scope.
 3. (Skip when the plan came from `-p` — already checked in step 2.) Run the plan
-   through `chamba_review_plan` and have the **reviewer** subagent audit it. Fix
-   and re-review until approved (max 3 rounds). Do NOT stop to ask me.
+   through `chamba_review_plan` and have the **reviewer** subagent audit it. Fix and
+   re-review until a full pass raises zero **new** blocking issues (dry) — an issue
+   already listed and addressed is resolved, don't re-raise it — or 6 rounds,
+   whichever comes first. Do NOT stop to ask me.
 4. **Clarification gate.** Before creating any worktree, check the plan for
    unresolved **Open questions** and any item marked **needs-approval**;
    `chamba_review_plan` flags these as `unresolved-open-questions`. If there are
@@ -65,7 +74,8 @@ the workspace.
    and a dead-code check if the repo has one (knip, ts-prune). Token grep alone
    misses orphans whose name doesn't contain the deleted symbol — rely on the
    build/typechecker/dead-code tool, not just grep. Fix what comes back, then
-   re-verify (max 3 rounds).
+   re-verify until a full pass finds zero **new** blocking issues (dry) or 6 rounds,
+   whichever comes first — don't re-report a finding you already fixed.
 8. **Acceptance QA** — only if the plan has a `## QA plan`. Delegate to the **qa**
    subagent to run it from the worktree: set up the local seed and test users, run
    the app, and validate each acceptance criterion against the **running app** —

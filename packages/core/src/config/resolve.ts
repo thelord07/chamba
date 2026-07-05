@@ -1,4 +1,4 @@
-import { getModel } from '../models/catalog.js';
+import { getModel, modelCaveat } from '../models/catalog.js';
 import type { AgentRole } from './roles.js';
 import type { AgentConfig, ResolvedConfig } from './types.js';
 
@@ -25,5 +25,7 @@ export function buildHint(role: AgentRole, cfg: AgentConfig): string {
     model && !model.supports_thinking
       ? ' (this model has no adjustable thinking, so effort is advisory)'
       : '';
-  return `For the ${role} role, use a model ${PRIORITY_PHRASE[cfg.reasoning_priority]}; suggested: ${cfg.model} with ${effortPhrase} effort${advisory}.`;
+  const caveat = model ? modelCaveat(model) : undefined;
+  const caveatText = caveat ? ` Caveat: ${caveat}` : '';
+  return `For the ${role} role, use a model ${PRIORITY_PHRASE[cfg.reasoning_priority]}; suggested: ${cfg.model} with ${effortPhrase} effort${advisory}.${caveatText}`;
 }

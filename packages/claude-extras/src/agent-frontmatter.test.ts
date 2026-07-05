@@ -42,6 +42,16 @@ describe('renderAgentMarkdown', () => {
     expect(out).toContain('effort: max');
   });
 
+  it('adds a caveat comment for a gated Anthropic model (Fable 5)', () => {
+    const out = renderAgentMarkdown(parseAgentMarkdown(ASSET), {
+      ...anthropic,
+      model: 'claude-fable-5',
+    });
+    expect(out).toContain('model: claude-fable-5');
+    expect(out).toContain('# claude-fable-5:');
+    expect(out).toContain('data retention');
+  });
+
   it('omits the model line for a non-Anthropic model but keeps effort', () => {
     const out = renderAgentMarkdown(parseAgentMarkdown(ASSET), {
       ...anthropic,

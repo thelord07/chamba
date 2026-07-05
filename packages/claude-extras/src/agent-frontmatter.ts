@@ -1,4 +1,4 @@
-import { type AgentConfig, type AgentRole, type Effort, getModel } from '@chamba/core';
+import { type AgentConfig, type AgentRole, type Effort, getModel, modelCaveat } from '@chamba/core';
 
 /**
  * Which shipped subagent asset file maps to which config role. These subagents
@@ -61,9 +61,11 @@ export function renderAgentMarkdown(parsed: ParsedAgent, cfg: AgentConfig): stri
   const isAnthropic = model?.provider === 'anthropic';
   const effort = CLAUDE_CODE_EFFORT[cfg.effort];
 
+  const caveat = model ? modelCaveat(model) : undefined;
   const lines = ['---', `name: ${parsed.name}`, `description: ${parsed.description}`];
   if (isAnthropic) {
     lines.push(`model: ${cfg.model}`);
+    if (caveat) lines.push(`# ${cfg.model}: ${caveat}`);
   } else {
     lines.push(
       `# requested model '${cfg.model}' is not an Anthropic model; Claude Code uses the session model (inherit)`,

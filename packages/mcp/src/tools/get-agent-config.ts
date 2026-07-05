@@ -5,6 +5,7 @@ import {
   getModel,
   joinPath,
   loadConfig,
+  modelCaveat,
   resolveRole,
   WORKSPACE_DIR,
 } from '@chamba/core';
@@ -48,6 +49,7 @@ export function registerGetAgentConfig(
       const agent = resolveRole(config, role);
       const model = getModel(agent.model);
       const hint = buildHint(role, agent);
+      const caveat = model ? modelCaveat(model) : undefined;
       const invalid = sources.find((s) => s.status === 'invalid');
       const warning = invalid
         ? `Ignored invalid config at ${invalid.path}: ${invalid.error}. Using defaults.`
@@ -65,6 +67,7 @@ export function registerGetAgentConfig(
         reasoning_priority: agent.reasoning_priority,
         provider: model?.provider ?? 'unknown',
         hint,
+        ...(caveat ? { caveat } : {}),
         ...(warning ? { warning } : {}),
       };
 

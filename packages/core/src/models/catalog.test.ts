@@ -3,6 +3,7 @@ import { EFFORT_LEVELS } from '../config/roles.js';
 import {
   getModel,
   MODEL_CATALOG,
+  modelCaveat,
   type ModelInfo,
   modelsByProvider,
   resolveEffort,
@@ -35,6 +36,22 @@ describe('model catalog', () => {
 
   it('returns null effort for Ollama models', () => {
     expect(resolveEffort(mustGet('deepseek-r1:7b'), 'high')).toBeNull();
+  });
+
+  it('exposes Fable 5 as an opt-in premium model, not the default', () => {
+    // Opus 4.8 stays first so it remains the visual/default entry.
+    expect(MODEL_CATALOG[0]?.id).toBe('claude-opus-4-8');
+    const fable = mustGet('claude-fable-5');
+    expect(fable.provider).toBe('anthropic');
+    expect(fable.requires_data_retention).toBe(true);
+    // Reuses ANTHROPIC_EFFORT, so extreme still maps to max (never xhigh here).
+    expect(resolveEffort(fable, 'extreme')).toBe('max');
+  });
+
+  it('reports adoption caveats only for gated models', () => {
+    const caveat = modelCaveat(mustGet('claude-fable-5'));
+    expect(caveat).toContain('data retention');
+    expect(modelCaveat(mustGet('claude-opus-4-8'))).toBeUndefined();
   });
 
   it('looks up by id and by provider', () => {

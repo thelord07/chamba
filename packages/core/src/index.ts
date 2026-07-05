@@ -34,6 +34,7 @@ export type { ModelInfo, ModelProvider } from './models/catalog.js';
 export {
   getModel,
   MODEL_CATALOG,
+  modelCaveat,
   modelsByProvider,
   resolveEffort,
 } from './models/catalog.js';

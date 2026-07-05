@@ -13,6 +13,12 @@ unknown rather than guessing.
 Parse the arguments: a leading `en` or `es` sets the notes' language; any other
 tokens are repos to scope the map to (default: every repo in the workspace).
 
+**Orchestration capability.** Use the richest orchestration your editor supports, and
+degrade cleanly: with **parallel subagents**, fan out the per-repo reconnaissance and
+reconcile it; with **one subagent at a time**, do the repos sequentially; with **no
+subagents**, do the work inline yourself. Never assume a specific editor primitive —
+adapt to what you have.
+
 1. Resolve the vault with `chamba_vault_status`. If no vault is found, tell me to
    run `/workspace init` first (it bootstraps one) and stop here.
 2. **Language.** If I didn't pass `en`/`es`, ask me whether to write the notes in
