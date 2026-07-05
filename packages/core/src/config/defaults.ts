@@ -20,6 +20,8 @@ export const DEFAULT_CONFIG: ChambaConfig = {
     implementer: { model: 'claude-sonnet-4-6', effort: 'medium', reasoning_priority: 'balanced' },
     // Tests over already-implemented code; same profile as the implementer.
     tester: { model: 'claude-sonnet-4-6', effort: 'medium', reasoning_priority: 'balanced' },
+    // Acceptance QA: reasons about criteria and drives the running app. Capable model.
+    qa: { model: 'claude-opus-4-7', effort: 'high', reasoning_priority: 'thoroughness' },
     // Summaries are mechanical; a fast, cheap model is perfect.
     summarizer: { model: 'claude-haiku-4-5', effort: 'low', reasoning_priority: 'speed' },
     // Research and synthesis; high reasoning, but doesn't need Opus 4.8.

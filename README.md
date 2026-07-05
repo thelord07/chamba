@@ -118,8 +118,8 @@ Cursor/VS Code/etc. get everything via MCP. On **Claude Code** you can also add
 slash commands, subagents and hooks:
 
 ```bash
-npx @chamba/claude-extras install     # /orq, /workspace, /worktrees, /recall +
-                                      # implementer/reviewer/tester agents + 2 hooks
+npx @chamba/claude-extras install     # /ticket, /workspace, /map, /qa, /worktrees … +
+                                      # planner/implementer/reviewer/tester/qa agents + 2 hooks
 npx @chamba/claude-extras uninstall
 ```
 
@@ -127,7 +127,7 @@ Idempotent, never overwrites your files (`--force` to force), preserves other MC
 servers in `~/.claude.json`. Then: `/orq add a health check endpoint`.
 
 **Per-agent config.** First install runs a wizard to pick a model + effort per role
-(orchestrator, planner, reviewer, implementer, tester, summarizer, researcher), with
+(orchestrator, planner, reviewer, implementer, tester, qa, summarizer, researcher), with
 efficient defaults pre-set — powerful models for reasoning, fast/cheap ones for
 mechanical work. Reconfigure with `npx @chamba/claude-extras config <show|set|wizard|…>`.
 chamba still never calls a model: this only tells your editor's model how to delegate.

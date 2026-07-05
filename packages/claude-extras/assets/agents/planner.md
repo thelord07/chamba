@@ -19,6 +19,14 @@ map + relevant notes). Produce a concrete, reviewable plan — do not write code
   resolves. Only list questions that would actually change the plan — not
   implementation details the implementer can settle. Never invent scope to paper
   over them.
+- If the ticket is **user-facing** (a UI change or a flow only verifiable in the
+  running app), add a `## QA plan` section so the **qa** agent can validate it:
+  state whether an acceptance-QA phase is needed and why; the **setup** (local
+  seed/fixtures, test users with their roles/context, how to run the app from the
+  worktree, and any E2E/browser tooling the repo already has); and, per acceptance
+  criterion, the URL/entry point, the login steps, and the expected behaviour.
+  Finish with a concrete step-by-step. If the change isn't user-facing, omit the
+  section — don't invent QA for a backend-only change.
 
 Return the plan as structured markdown. The orchestrator runs it through
 `chamba_review_plan` and the reviewer subagent, then resolves any `## Open

@@ -66,16 +66,23 @@ the workspace.
    misses orphans whose name doesn't contain the deleted symbol — rely on the
    build/typechecker/dead-code tool, not just grep. Fix what comes back, then
    re-verify (max 3 rounds).
-8. Call `chamba_summarize_to_vault` with a summary of what changed.
-9. STOP and report for my review. The report MUST include:
-   - the repos touched and why;
-   - per repo, what changed and the test + verify results;
-   - an **acceptance-criteria checklist**: every AC of the ticket marked
-     **Delivered** or **Not delivered**. Anything the plan marked
-     **needs-approval**, or any AC you could not deliver without a deferred
-     decision, goes under **"Needs your decision"** with what's pending and why —
-     never omit it;
-   - the `.code-workspace` to open, and the suggested commit +
-     `git merge --no-ff` commands.
-   Do NOT commit, merge or push — I review, commit and send to my company's code
-   review by hand.
+8. **Acceptance QA** — only if the plan has a `## QA plan`. Delegate to the **qa**
+   subagent to run it from the worktree: set up the local seed and test users, run
+   the app, and validate each acceptance criterion against the **running app** —
+   driving the browser if the project has E2E tooling, otherwise co-piloting with me
+   (it asks me to log in and tells me what to click while I watch). It reports
+   PASS/FAIL per criterion. If there's no `## QA plan`, skip this step. This is the
+   only interactive touchpoint at the end.
+9. Call `chamba_summarize_to_vault` with a summary of what changed.
+10. STOP and report for my review. The report MUST include:
+    - the repos touched and why;
+    - per repo, what changed and the test + verify results;
+    - an **acceptance-criteria checklist**: every AC of the ticket marked
+      **Delivered** or **Not delivered** (fold in the qa agent's PASS/FAIL when a QA
+      phase ran). Anything the plan marked **needs-approval**, or any AC you could
+      not deliver or verify without a deferred decision, goes under **"Needs your
+      decision"** with what's pending and why — never omit it;
+    - the `.code-workspace` to open, and the suggested commit +
+      `git merge --no-ff` commands.
+    Do NOT commit, merge or push — I review, commit and send to my company's code
+    review by hand.

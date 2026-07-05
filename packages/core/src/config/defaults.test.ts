@@ -5,7 +5,7 @@ import { AGENT_ROLES } from './roles.js';
 import { agentConfigSchema } from './schema.js';
 
 describe('DEFAULT_CONFIG', () => {
-  it('defines all seven roles', () => {
+  it('defines all eight roles', () => {
     for (const role of AGENT_ROLES) {
       expect(DEFAULT_CONFIG.defaults[role]).toBeDefined();
     }

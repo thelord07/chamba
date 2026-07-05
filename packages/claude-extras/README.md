@@ -20,8 +20,8 @@ Check the MCP server's version the same way: `npx @chamba/mcp --version`.
 
 It installs into `~/.claude/`:
 
-- **Slash commands**: `/ticket`, `/workspace`, `/map`, `/worktrees`, `/orq`, `/recall`, `/vault`
-- **Subagents**: `planner`, `implementer`, `reviewer`, `tester`
+- **Slash commands**: `/ticket`, `/workspace`, `/map`, `/qa`, `/worktrees`, `/orq`, `/recall`, `/vault`
+- **Subagents**: `planner`, `implementer`, `reviewer`, `tester`, `qa`
 - **Hooks**: warn on destructive commands, validate worktree edits
 
 …and registers the `chamba` MCP server in `~/.claude.json`. It never overwrites your
@@ -51,6 +51,7 @@ fast/cheap ones.** These ship pre-configured — you only change what you want.
 | **reviewer** | `claude-opus-4-7` | high | Critical audit; deep reasoning, doesn't need the very latest model. |
 | **implementer** | `claude-sonnet-4-6` | medium | Executes clear specs; speed matters, medium reasoning is enough. |
 | **tester** | `claude-sonnet-4-6` | medium | Tests over already-implemented code; same profile. |
+| **qa** | `claude-opus-4-7` | high | Acceptance QA: reasons about criteria and drives the running app. |
 | **summarizer** | `claude-haiku-4-5` | low | Summaries are mechanical; a fast, cheap model is perfect. |
 | **researcher** | `claude-opus-4-7` | high | Research + synthesis; high reasoning, doesn't need Opus 4.8. |
 
@@ -201,6 +202,39 @@ stable names: `Topology.md`, `Data flows.md`, `Domain entities.md`, and `repos/<
 Re-run it as the project grows — it updates its own notes in place and **never touches a
 note you edited by hand** (it only rewrites notes marked `source: chamba`). It's opt-in;
 on a big monorepo, mapping everything is expensive.
+
+## Acceptance QA with the `qa` agent
+
+For user-facing tickets, the **planner** adds a `## QA plan` to the plan (local seed, test
+users, URLs, login steps, and the expected behaviour per acceptance criterion), and
+`/ticket` runs a final **acceptance-QA** phase: the `qa` subagent validates each criterion
+against the **running app**, not the code. It **adapts to the project** — if the repo has
+Playwright/Cypress (or a browser MCP) it drives the browser; otherwise it runs the repos
+from the worktree, applies the local seed, and co-pilots with you, asking you to log in and
+telling you what to click while you watch. It reports PASS/FAIL per criterion and never
+commits.
+
+Run it on its own to test or re-test without redoing the ticket:
+
+```
+/qa TICKET-123                    # locate the worktree, run the QA plan
+/qa -p ./plans/T-123.md TICKET-123
+```
+
+Backend-only tickets get no QA phase.
+
+**Enabling browser-driven QA (Claude Code).** Cursor has a built-in browser; Claude Code
+doesn't, so add a Playwright MCP — at **user scope** so it leaves no trace in your repo.
+In `~/.claude.json`:
+
+```json
+{ "mcpServers": { "playwright": { "command": "npx", "args": ["-y", "@playwright/mcp@latest"] } } }
+```
+
+Run `npx playwright install chromium` once — the browsers land in your **user cache**
+(`~/.cache/ms-playwright`). Both the MCP and the browsers live outside the project;
+nothing is added to your `package.json` or `node_modules`. chamba never bundles or runs a
+browser itself — the `qa` agent uses whatever is available and co-pilots when nothing is.
 
 ## License
 

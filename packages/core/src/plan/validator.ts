@@ -36,6 +36,9 @@ const ORPHAN_CHECK_RE =
 // An "Open questions" item is resolved when it carries an answer marker.
 const RESOLVED_MARKER_RE =
   /\b(answers?|answered|resolved|resuelt\w*|respuesta|respondid\w*|decidid\w*|confirmed|confirmad\w*)\b|→|=>/i;
+// Signals a user-facing change that warrants an acceptance-QA phase.
+const FRONTEND_RE =
+  /\b(react|vue|angular|next\.?js|nextjs|svelte|frontend|front-end|user interface|screen|browser)\b|\bUI\b|\.(tsx|jsx|vue|svelte)\b/i;
 
 const DEFAULT_MODULES = new Set([
   'packages',
@@ -172,6 +175,25 @@ export function validatePlan(input: ValidatePlanInput): ValidationResult {
     );
   }
 
+  // 9. User-facing plan without a QA (acceptance) section.
+  const hasQaSection =
+    hasSection(sec, 'qa plan') ||
+    hasSection(sec, 'qa') ||
+    hasSection(sec, 'acceptance test') ||
+    hasSection(sec, 'manual test');
+  if (FRONTEND_RE.test(plan) && !hasQaSection) {
+    issues.push({
+      code: 'missing-qa-plan',
+      severity: 'warning',
+      message:
+        'The plan looks user-facing but has no "## QA plan": how to seed data, which ' +
+        'users/URL to test with, and the acceptance criteria to walk through the running app.',
+    });
+    suggestions.push(
+      'Add a "## QA plan" (seed, test users, URL, login steps, expected behaviour per acceptance criterion) so the qa agent can validate it.',
+    );
+  }
+
   return { issues, suggestions, riskFlags };
 }
 
@@ -198,6 +220,14 @@ function getSection(map: Map<string, string[]>, name: string): string[] {
     if (heading.includes(name)) return lines;
   }
   return [];
+}
+
+/** Whether any heading includes `name` (regardless of whether it has body lines). */
+function hasSection(map: Map<string, string[]>, name: string): boolean {
+  for (const heading of map.keys()) {
+    if (heading.includes(name)) return true;
+  }
+  return false;
 }
 
 function listItems(lines: string[]): string[] {

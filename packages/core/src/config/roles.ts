@@ -8,6 +8,7 @@ export type AgentRole =
   | 'reviewer'
   | 'implementer'
   | 'tester'
+  | 'qa'
   | 'summarizer'
   | 'researcher';
 
@@ -18,6 +19,7 @@ export const AGENT_ROLES: readonly AgentRole[] = [
   'reviewer',
   'implementer',
   'tester',
+  'qa',
   'summarizer',
   'researcher',
 ];
@@ -49,6 +51,7 @@ export const ROLE_DESCRIPTIONS: Record<AgentRole, string> = {
   reviewer: 'Audits the plan and code with critical judgement.',
   implementer: 'Writes code against a clear, reviewed spec.',
   tester: 'Writes and runs tests over already-implemented code.',
+  qa: 'Acceptance QA: exercises the running app and validates acceptance criteria.',
   summarizer: 'Summarizes what happened — mechanical, cheap.',
   researcher: 'Investigates context, reads docs, synthesizes.',
 };

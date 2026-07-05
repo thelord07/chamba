@@ -157,4 +157,33 @@ describe('validatePlan', () => {
   it('does not warn for a plan without open questions', () => {
     expect(codes(GOOD_PLAN)).not.toContain('unresolved-open-questions');
   });
+
+  it('warns when a user-facing plan has no QA plan', () => {
+    const plan = `## Acceptance criteria
+- [ ] the React dashboard shows the new widget, with tests
+
+## Subtasks
+1. **implementer** — add the widget in src/components/Widget.tsx
+2. **tester** — add vitest tests`;
+    const result = validatePlan({ plan, task: 't' });
+    const issue = result.issues.find((i) => i.code === 'missing-qa-plan');
+    expect(issue?.severity).toBe('warning');
+  });
+
+  it('does not warn when a user-facing plan includes a QA plan', () => {
+    const plan = `## Acceptance criteria
+- [ ] the React dashboard shows the new widget, with tests
+
+## Subtasks
+1. **implementer** — add the widget in src/components/Widget.tsx
+2. **tester** — add vitest tests
+
+## QA plan
+- Seed a demo user, log in at /dashboard, confirm the widget renders.`;
+    expect(codes(plan)).not.toContain('missing-qa-plan');
+  });
+
+  it('does not warn for a backend-only plan', () => {
+    expect(codes(GOOD_PLAN)).not.toContain('missing-qa-plan');
+  });
 });
