@@ -1,6 +1,13 @@
 import { ConfigError, MemoryFilesystem, resolveWorktreeConfig } from '@chamba/core';
 import { describe, expect, it } from 'vitest';
-import { cmdSet, formatModels, formatShow, formatWorktrees } from './config-cli.js';
+import {
+  cmdPreset,
+  cmdSet,
+  formatModels,
+  formatPresets,
+  formatShow,
+  formatWorktrees,
+} from './config-cli.js';
 import { ConfigStore } from './config-store.js';
 
 const GLOBAL = '/home/.chamba/config.json';
@@ -41,6 +48,32 @@ describe('cmdSet', () => {
     await expect(cmdSet(store, { role: 'tester', model: 'gpt-9' })).rejects.toBeInstanceOf(
       ConfigError,
     );
+  });
+});
+
+describe('formatPresets', () => {
+  it('lists every preset', () => {
+    const out = formatPresets();
+    for (const name of ['budget', 'balanced', 'quality', 'fast']) {
+      expect(out).toContain(name);
+    }
+  });
+});
+
+describe('cmdPreset', () => {
+  it('applies a preset to the defaults block', async () => {
+    const fs = new MemoryFilesystem({});
+    const store = new ConfigStore(fs, GLOBAL);
+    const msg = await cmdPreset(store, 'budget');
+    expect(msg).toContain('budget');
+    const file = JSON.parse(await fs.readFile(GLOBAL));
+    expect(file.defaults.implementer.model).toBe('claude-haiku-4-5');
+    expect(file.defaults.planner.model).toBe('claude-sonnet-4-6');
+  });
+
+  it('rejects an unknown preset', async () => {
+    const store = new ConfigStore(new MemoryFilesystem({}), GLOBAL);
+    await expect(cmdPreset(store, 'turbo')).rejects.toBeInstanceOf(ConfigError);
   });
 });
 

@@ -29,6 +29,18 @@ describe('ConfigStore', () => {
     );
   });
 
+  it('setPreset writes the preset as defaults, preserving overrides', async () => {
+    const fs = new MemoryFilesystem({});
+    const store = new ConfigStore(fs, PATH);
+    await store.setRole('reviewer', { effort: 'low' });
+    await store.setPreset('budget');
+
+    const file = JSON.parse(await fs.readFile(PATH));
+    expect(file.defaults.implementer.model).toBe('claude-haiku-4-5');
+    expect(file.defaults.orchestrator.model).toBe('claude-sonnet-4-6');
+    expect(file.overrides.reviewer.effort).toBe('low');
+  });
+
   it('reset writes the compiled defaults', async () => {
     const fs = new MemoryFilesystem({});
     const store = new ConfigStore(fs, PATH);

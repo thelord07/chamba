@@ -8,9 +8,12 @@ import {
   type AgentRole,
   ConfigError,
   type FilesystemPort,
+  isPresetName,
   joinPath,
   loadConfig,
   MODEL_CATALOG,
+  PRESET_DESCRIPTIONS,
+  PRESET_NAMES,
   type WorktreeConfig,
 } from '@chamba/core';
 import { confirm } from '@inquirer/prompts';
@@ -74,6 +77,25 @@ export async function cmdSet(
   return `Set ${args.role} → ${args.model}${effortNote}. Run 'config apply' to regenerate subagents.`;
 }
 
+export function formatPresets(): string {
+  const lines = ['Available presets (set every role at once):'];
+  for (const name of PRESET_NAMES) {
+    lines.push(`  ${name.padEnd(10)} ${PRESET_DESCRIPTIONS[name]}`);
+  }
+  return lines.join('\n');
+}
+
+export async function cmdPreset(store: ConfigStore, name: string): Promise<string> {
+  if (!isPresetName(name)) {
+    throw new ConfigError(`unknown preset '${name}'; valid presets: ${PRESET_NAMES.join(', ')}`);
+  }
+  await store.setPreset(name);
+  return (
+    `Applied preset '${name}'. Per-role overrides (if any) still layer on top — ` +
+    "'config show' to see the result, 'config reset' to clear. Run 'config apply' to regenerate subagents."
+  );
+}
+
 export function formatWorktrees(w: WorktreeConfig): string {
   return [
     'worktrees config:',
@@ -108,9 +130,11 @@ function parseEffortFlag(rest: string[]): string | undefined {
 }
 
 const USAGE =
-  'Usage: chamba-install config <show|models|set|reset|wizard|apply|edit>\n' +
+  'Usage: chamba-install config <show|models|presets|preset|set|reset|wizard|apply|edit>\n' +
   '  show                                   resolved config + where each value comes from\n' +
   '  models                                 list the available models\n' +
+  '  presets                                list the model presets\n' +
+  '  preset <budget|balanced|quality|fast>  set every role at once from a preset\n' +
   '  set <role> <model> [--effort <level>]  change one role\n' +
   '  reset [--yes]                          restore defaults\n' +
   '  wizard [--defaults]                    (re)run the interactive wizard\n' +
@@ -137,6 +161,19 @@ export async function runConfigCommand(args: string[]): Promise<void> {
       case 'models':
         process.stdout.write(`${formatModels()}\n`);
         return;
+      case 'presets':
+        process.stdout.write(`${formatPresets()}\n`);
+        return;
+      case 'preset': {
+        const name = rest[0];
+        if (!name) {
+          process.stdout.write(`${formatPresets()}\nUsage: config preset <name>\n`);
+          process.exitCode = 1;
+          return;
+        }
+        process.stdout.write(`${await cmdPreset(store, name)}\n`);
+        return;
+      }
       case 'set': {
         const [role, model] = rest;
         if (!role || !model) {

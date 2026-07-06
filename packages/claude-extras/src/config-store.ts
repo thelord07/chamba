@@ -4,8 +4,9 @@ import type {
   ConfigFile,
   FilesystemPort,
   PartialWorktreeConfig,
+  PresetName,
 } from '@chamba/core';
-import { ConfigError, DEFAULT_CONFIG, dirname, parseChambaConfig } from '@chamba/core';
+import { ConfigError, DEFAULT_CONFIG, dirname, PRESETS, parseChambaConfig } from '@chamba/core';
 
 /**
  * Reads and writes a single chamba config file (the global `~/.chamba/config.json`).
@@ -57,6 +58,20 @@ export class ConfigStore {
       version: 1,
       worktrees: { ...(current.worktrees ?? {}), ...patch },
     };
+    const parsed = parseChambaConfig(next);
+    if (!parsed.ok) throw new ConfigError(parsed.error);
+    await this.write(parsed.value);
+    return parsed.value;
+  }
+
+  /**
+   * Apply a named preset as the `defaults` block, preserving any per-role
+   * `overrides` and the `worktrees` policy (both orthogonal to the model tier).
+   * Overrides still layer on top — run `reset` first for a clean slate.
+   */
+  async setPreset(name: PresetName): Promise<ConfigFile> {
+    const current = await this.read();
+    const next: ConfigFile = { ...current, version: 1, defaults: PRESETS[name] };
     const parsed = parseChambaConfig(next);
     if (!parsed.ok) throw new ConfigError(parsed.error);
     await this.write(parsed.value);

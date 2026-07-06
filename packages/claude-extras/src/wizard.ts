@@ -11,6 +11,10 @@ import {
   MODEL_CATALOG,
   modelCaveat,
   type PartialWorktreeConfig,
+  PRESET_DESCRIPTIONS,
+  PRESET_NAMES,
+  type PresetName,
+  presetConfigFile,
   ROLE_DESCRIPTIONS,
 } from '@chamba/core';
 import { confirm, input, select } from '@inquirer/prompts';
@@ -118,11 +122,24 @@ export async function runWizard(
         'with `npx @chamba/claude-extras config`.\n\n',
     );
 
-    const useDefaults = await confirm({
-      message: 'Use the recommended defaults? (No lets you customize each role)',
-      default: true,
+    const start = await select({
+      message: 'How do you want to set up the agents?',
+      choices: [
+        { name: 'Recommended defaults', value: 'defaults' },
+        { name: 'A preset (budget · balanced · quality · fast)', value: 'preset' },
+        { name: 'Customize each role', value: 'custom' },
+      ],
+      default: 'defaults',
     });
-    if (useDefaults) return defaultConfigFile();
+    if (start === 'defaults') return defaultConfigFile();
+    if (start === 'preset') {
+      const name = await select<PresetName>({
+        message: 'Pick a preset',
+        choices: PRESET_NAMES.map((p) => ({ name: `${p} — ${PRESET_DESCRIPTIONS[p]}`, value: p })),
+        default: 'quality',
+      });
+      return presetConfigFile(name);
+    }
 
     const answers: RoleAnswer[] = [];
     for (const role of AGENT_ROLES) {

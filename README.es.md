@@ -136,7 +136,8 @@ servers en `~/.claude.json`. Después: `/orq agrega un endpoint de health check`
 **Config por agente.** El primer install corre un wizard para elegir modelo + esfuerzo
 por rol (orchestrator, planner, reviewer, implementer, tester, summarizer, researcher),
 con defaults eficientes pre-configurados — modelos potentes para razonar, rápidos y
-baratos para lo mecánico. Reconfigurás con `npx @chamba/claude-extras config <show|set|wizard|…>`.
+baratos para lo mecánico. Reconfigurás con `npx @chamba/claude-extras config <show|set|wizard|…>`,
+o cambiás todo el dial de costo/calidad de una con `config preset <budget|balanced|quality|fast>`.
 chamba sigue sin llamar a ningún modelo: esto solo le dice al modelo de tu editor cómo
 delegar. Otros editores leen la misma config vía `chamba_get_agent_config`. Ver el
 [README de claude-extras](./packages/claude-extras/README.md#configuration-per-agent-model--effort).

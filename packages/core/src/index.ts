@@ -9,6 +9,14 @@ export type {
   LoadConfigResult,
 } from './config/loader.js';
 export { ConfigError, loadConfig } from './config/loader.js';
+export type { PresetName } from './config/presets.js';
+export {
+  isPresetName,
+  PRESET_DESCRIPTIONS,
+  PRESET_NAMES,
+  PRESETS,
+  presetConfigFile,
+} from './config/presets.js';
 export { buildHint, resolveRole } from './config/resolve.js';
 export type { AgentRole, Effort, ReasoningPriority } from './config/roles.js';
 export {

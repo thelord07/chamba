@@ -141,7 +141,8 @@ servers in `~/.claude.json`. Then: `/orq add a health check endpoint`.
 **Per-agent config.** First install runs a wizard to pick a model + effort per role
 (orchestrator, planner, reviewer, implementer, tester, qa, summarizer, researcher), with
 efficient defaults pre-set — powerful models for reasoning, fast/cheap ones for
-mechanical work. Reconfigure with `npx @chamba/claude-extras config <show|set|wizard|…>`.
+mechanical work. Reconfigure with `npx @chamba/claude-extras config <show|set|wizard|…>`,
+or flip the whole cost/quality dial at once with `config preset <budget|balanced|quality|fast>`.
 chamba still never calls a model: this only tells your editor's model how to delegate.
 Other editors read the same config via `chamba_get_agent_config`. See the
 [claude-extras README](./packages/claude-extras/README.md#configuration-per-agent-model--effort).
