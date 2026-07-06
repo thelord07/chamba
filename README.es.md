@@ -69,6 +69,10 @@ Para conectar un vault de Obsidian, agregá `"env": { "CHAMBA_OBSIDIAN_VAULT_PAT
 ¿No tenés uno? `chamba_workspace_init` crea un vault en la raíz del workspace (y siembra una
 nota "Workspace overview") cuando no encuentra ninguno — así la memoria funciona desde el día uno.
 
+¿Dudás de que todo esté bien conectado? Corré `npx @chamba/mcp doctor` (o la tool `chamba_doctor`
+desde tu editor) para un chequeo pass/warn/fail de Node, git, el workspace, la config, el vault,
+el directorio de logs y los worktrees.
+
 ## Tools
 
 | Tool | Input | Output |
@@ -80,6 +84,7 @@ nota "Workspace overview") cuando no encuentra ninguno — así la memoria funci
 | `chamba_summarize_to_vault` | `{ title, content, projectSlug? }` | Escribe un resumen a la carpeta `proyectos/` del vault |
 | `chamba_save_plan` | `{ title, content, projectSlug? }` | Guarda un plan en la carpeta `plans/` del vault |
 | `chamba_vault_status` | `{}` | Ruta del vault resuelta + las notas que chamba ve (diagnóstico) |
+| `chamba_doctor` | `{}` | Chequeo de salud del entorno (sin LLM): Node, git, workspace, config, vault, logs, worktrees → pass/warn/fail. También `npx @chamba/mcp doctor` |
 | `chamba_generate_plan` | `{ task, context? }` | Un template de plan para completar |
 | `chamba_review_plan` | `{ plan, task, context? }` | `{ approved, issues, suggestions, riskFlags }` — sin LLM |
 | `chamba_create_worktree` | `{ taskSlug, workerId, baseBranch? }` | Un git worktree aislado |

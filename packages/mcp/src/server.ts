@@ -5,6 +5,7 @@ import { registerCleanupWorktree } from './tools/cleanup-worktree.js';
 import { registerCleanupWorktrees } from './tools/cleanup-worktrees.js';
 import { registerCreateWorktree } from './tools/create-worktree.js';
 import { registerCreateWorktrees } from './tools/create-worktrees.js';
+import { registerDoctor } from './tools/doctor.js';
 import { registerGeneratePlan } from './tools/generate-plan.js';
 import { registerGetAgentConfig } from './tools/get-agent-config.js';
 import { registerListWorktrees } from './tools/list-worktrees.js';
@@ -38,6 +39,7 @@ export function createServer(logger: Logger, services: Services = createNodeServ
   registerLoadContext(server, logger, services);
   registerSummarizeToVault(server, logger, services);
   registerVaultStatus(server, logger, services);
+  registerDoctor(server, logger, services);
   registerGeneratePlan(server, logger, services);
   registerReviewPlan(server, logger, services);
   registerSavePlan(server, logger, services);

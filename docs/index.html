@@ -187,6 +187,7 @@ const CONTENT = {
     setupKicker: 'Instalación',
     setupTitle: 'Un archivo de config por editor',
     setupSub: 'Elige tu editor. Guías completas paso a paso en la carpeta examples/ del repo.',
+    setupVerify: '¿Todo conectado? Verificá con:',
     setupFileLabel: 'archivo:',
     cmpKicker: 'Comparación',
     cmpTitle: 'Cómo se compara chamba',
@@ -308,6 +309,7 @@ const CONTENT = {
     setupKicker: 'Setup',
     setupTitle: 'One config file per editor',
     setupSub: 'Pick your editor. Full step‑by‑step walkthroughs live in the repo’s examples/ folder.',
+    setupVerify: 'Wired up right? Verify with:',
     setupFileLabel: 'file:',
     cmpKicker: 'Compare',
     cmpTitle: 'How chamba compares',
@@ -512,6 +514,10 @@ function render() {
         </div>
         <pre style="margin:0;padding:22px;font-family:'JetBrains Mono';font-size:13.5px;line-height:1.7;color:var(--text);overflow-x:auto;white-space:pre-wrap;word-break:break-word;">${esc(ed.config)}</pre>
         <div style="padding:14px 22px;border-top:1px solid var(--border);font-size:13.5px;color:var(--muted);line-height:1.55;">${esc(ed.desc)}</div>
+      </div>
+      <div style="margin-top:16px;display:flex;flex-wrap:wrap;align-items:center;gap:12px;">
+        <span style="font-size:13.5px;color:var(--muted);">${esc(t.setupVerify)}</span>
+        <code style="font-family:'JetBrains Mono';font-size:13px;color:var(--accent2);background:var(--bg2);border:1px solid var(--border);padding:7px 12px;border-radius:9px;">npx @chamba/mcp doctor</code>
       </div>
     </section>
 

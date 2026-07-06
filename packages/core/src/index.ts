@@ -26,6 +26,9 @@ export type {
   WorktreeLayout,
 } from './config/worktrees.js';
 export { DEFAULT_WORKTREE_CONFIG, resolveWorktreeConfig } from './config/worktrees.js';
+// Doctor (environment health check)
+export type { CheckStatus, DoctorCheck, DoctorInput, DoctorReport } from './doctor/doctor.js';
+export { renderDoctorReport, runDoctor } from './doctor/doctor.js';
 export { FilesystemMemoryStore, MEMORY_DIR } from './memory/filesystem-store.js';
 // Memory
 export type { Memory, MemoryStore, RememberInput } from './memory/store.js';

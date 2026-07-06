@@ -1,8 +1,10 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { renderDoctorReport, runDoctor } from '@chamba/core';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { createLogger } from './logging.js';
 import { createServer } from './server.js';
+import { createNodeServices, obsidianSearchRoots } from './services.js';
 
 /** Read this package's version from its package.json, next to the built file. */
 function readPackageVersion(): string {
@@ -27,6 +29,24 @@ async function main(): Promise<void> {
   const flag = process.argv[2];
   if (flag === '--version' || flag === '-v') {
     process.stdout.write(`${readPackageVersion()}\n`);
+    return;
+  }
+
+  // `doctor` runs environment health checks and exits. Safe to write to stdout
+  // here: this path never starts the stdio protocol server.
+  if (flag === 'doctor') {
+    const services = createNodeServices();
+    const report = await runDoctor({
+      fs: services.fs,
+      process: services.process,
+      cwd: services.cwd,
+      homedir: services.homedir,
+      obsidianVaultPath: services.obsidianVaultPath,
+      obsidianSearchRoots: obsidianSearchRoots(services),
+      nodeVersion: process.version,
+    });
+    process.stdout.write(`${renderDoctorReport(report)}\n`);
+    process.exitCode = report.healthy ? 0 : 1;
     return;
   }
 

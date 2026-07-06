@@ -71,6 +71,10 @@ To wire up an Obsidian vault, add `"env": { "CHAMBA_OBSIDIAN_VAULT_PATH": "/path
 Don't have one? `chamba_workspace_init` bootstraps a vault at the workspace root (and seeds
 a "Workspace overview" note) when it can't find an existing one — so memory works from day one.
 
+Not sure everything's wired? Run `npx @chamba/mcp doctor` (or the `chamba_doctor` tool from
+your editor) for a pass/warn/fail health check of Node, git, the workspace, config, the vault,
+the log directory and worktrees.
+
 ## Tools
 
 | Tool | Input | Output |
@@ -82,6 +86,7 @@ a "Workspace overview" note) when it can't find an existing one — so memory wo
 | `chamba_summarize_to_vault` | `{ title, content, projectSlug? }` | Writes a run summary to the vault's `proyectos/` folder |
 | `chamba_save_plan` | `{ title, content, projectSlug? }` | Saves a plan to the vault's `plans/` folder |
 | `chamba_vault_status` | `{}` | Resolved vault path + the notes chamba can see (diagnostic) |
+| `chamba_doctor` | `{}` | Environment health check (no LLM): Node, git, workspace, config, vault, logs, worktrees → pass/warn/fail. Also `npx @chamba/mcp doctor` |
 | `chamba_generate_plan` | `{ task, context? }` | A structured plan template to fill |
 | `chamba_review_plan` | `{ plan, task, context? }` | `{ approved, issues, suggestions, riskFlags }` — no LLM |
 | `chamba_create_worktree` | `{ taskSlug, workerId, baseBranch? }` | An isolated git worktree |
