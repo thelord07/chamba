@@ -1,7 +1,8 @@
 import type { ClockPort } from '../ports/clock.js';
 import type { FilesystemPort } from '../ports/filesystem.js';
-import { joinPath } from '../util/path.js';
-import { renderNote, slugify } from './note-template.js';
+import { basename, joinPath } from '../util/path.js';
+import { renderNote, slugify, slugifyGitRemote } from './note-template.js';
+import { describeFromBody, INDEX_FILE, type IndexEntry, upsertIndexEntry } from './vault-index.js';
 
 export interface WriteNoteInput {
   vaultPath: string;
@@ -12,6 +13,14 @@ export interface WriteNoteInput {
   tags?: string[];
   /** Vault subfolder to write into; defaults to `proyectos/`. */
   subdir?: string;
+  /**
+   * Git remote URL of the project. When set, notes are grouped under a stable
+   * `<subdir>/<owner-repo>/` folder so every note for the same repo lands
+   * together (dedup by project). Omit to keep the flat `<subdir>/` layout.
+   */
+  projectRemoteUrl?: string;
+  /** One-line description for the folder index; defaults to the body's first line. */
+  description?: string;
 }
 
 export interface WriteNoteResult {
@@ -36,9 +45,14 @@ export class VaultWriter {
 
   async write(input: WriteNoteInput): Promise<WriteNoteResult> {
     const date = this.clock.today();
-    const slug = slugify(input.projectSlug ?? input.title);
-    const dir = joinPath(input.vaultPath, input.subdir ?? VAULT_NOTES_DIR);
-    const notePath = joinPath(dir, `${date}-${slug}.md`);
+    const fileSlug = slugify(input.projectSlug ?? input.title);
+    const projectKey = input.projectRemoteUrl
+      ? slugifyGitRemote(input.projectRemoteUrl)
+      : undefined;
+    const baseDir = joinPath(input.vaultPath, input.subdir ?? VAULT_NOTES_DIR);
+    const dir = projectKey ? joinPath(baseDir, projectKey) : baseDir;
+    const fileName = `${date}-${fileSlug}.md`;
+    const notePath = joinPath(dir, fileName);
 
     const note = renderNote({
       title: input.title,
@@ -49,6 +63,25 @@ export class VaultWriter {
 
     await this.fs.mkdir(dir);
     await this.fs.writeFile(notePath, note);
+    await this.updateIndex(dir, fileName, input);
     return { notePath };
+  }
+
+  /** Keep the folder's `INDEX.md` current so recall can scan it instead of every note. */
+  private async updateIndex(dir: string, fileName: string, input: WriteNoteInput): Promise<void> {
+    const indexPath = joinPath(dir, INDEX_FILE);
+    let existing: string | null;
+    try {
+      existing = await this.fs.readFile(indexPath);
+    } catch {
+      existing = null;
+    }
+    const entry: IndexEntry = {
+      title: input.title,
+      path: fileName,
+      description: input.description ?? describeFromBody(input.content),
+    };
+    const md = upsertIndexEntry(existing, basename(dir), entry);
+    await this.fs.writeFile(indexPath, md);
   }
 }

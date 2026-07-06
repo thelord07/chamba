@@ -2,6 +2,7 @@ import { ObsidianDetector, VaultWriter } from '@chamba/core';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { Logger } from 'pino';
 import { z } from 'zod';
+import { readGitRemote } from '../git-remote.js';
 import { obsidianSearchRoots, type Services } from '../services.js';
 
 const TOOL_NAME = 'chamba_summarize_to_vault';
@@ -11,8 +12,9 @@ const NO_VAULT_ERROR =
 
 const DESCRIPTION =
   'Write a structured summary note to the Obsidian vault under ' +
-  '`proyectos/<date>-<slug>.md` with valid YAML frontmatter. Fails clearly if ' +
-  'no vault is configured.';
+  '`proyectos/[<owner-repo>/]<date>-<slug>.md` with valid YAML frontmatter. When the ' +
+  'workspace has a git remote, notes are grouped in a per-project subfolder and indexed ' +
+  'so recall stays cheap. Fails clearly if no vault is configured.';
 
 /** Register `chamba_summarize_to_vault`: write a note to the vault. */
 export function registerSummarizeToVault(
@@ -48,6 +50,7 @@ export function registerSummarizeToVault(
         title,
         content,
         projectSlug,
+        projectRemoteUrl: await readGitRemote(services.process, services.cwd),
       });
       logger.info({ tool: TOOL_NAME, notePath }, 'note written to vault');
 

@@ -42,7 +42,15 @@ export {
   resolveEffort,
 } from './models/catalog.js';
 export type { NoteFields } from './obsidian/note-template.js';
-export { renderNote, slugify } from './obsidian/note-template.js';
+export { renderNote, slugify, slugifyGitRemote } from './obsidian/note-template.js';
+export type { IndexEntry } from './obsidian/vault-index.js';
+export {
+  describeFromBody,
+  INDEX_FILE,
+  parseIndexNote,
+  renderIndexNote,
+  upsertIndexEntry,
+} from './obsidian/vault-index.js';
 export type { SeedVaultInput, SeedVaultResult } from './obsidian/vault-init.js';
 export { VAULT_OVERVIEW_FILE, VaultInitializer } from './obsidian/vault-init.js';
 export type { WriteNoteInput, WriteNoteResult } from './obsidian/vault-writer.js';

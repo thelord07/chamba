@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { ClockPort } from '../ports/clock.js';
 import { MemoryFilesystem } from '../testing/memory-filesystem.js';
-import { slugify } from './note-template.js';
+import { slugify, slugifyGitRemote } from './note-template.js';
 import { VaultWriter } from './vault-writer.js';
 
 const fixedClock: ClockPort = {
@@ -13,6 +13,15 @@ describe('slugify', () => {
   it('normalizes accents and spaces', () => {
     expect(slugify('Hólá Múndo!')).toBe('hola-mundo');
     expect(slugify('  ')).toBe('note');
+  });
+});
+
+describe('slugifyGitRemote', () => {
+  it('normalizes ssh and https remotes to a stable owner-repo key', () => {
+    expect(slugifyGitRemote('git@github.com:acme/app.git')).toBe('acme-app');
+    expect(slugifyGitRemote('https://github.com/acme/app.git')).toBe('acme-app');
+    expect(slugifyGitRemote('https://github.com/acme/app/')).toBe('acme-app');
+    expect(slugifyGitRemote('ssh://git@gitlab.com/acme/app.git')).toBe('acme-app');
   });
 });
 
@@ -59,5 +68,30 @@ describe('VaultWriter', () => {
       subdir: 'plans',
     });
     expect(notePath).toBe('/v/plans/2026-06-09-ticket-9.md');
+  });
+
+  it('maintains a folder INDEX.md after writing', async () => {
+    const fs = new MemoryFilesystem({});
+    await new VaultWriter(fs, fixedClock).write({
+      vaultPath: '/v',
+      title: 'Auth decisions',
+      content: '# Auth\n\nWe use magic links.',
+    });
+    const index = await fs.readFile('/v/proyectos/INDEX.md');
+    expect(index).toContain('# proyectos index');
+    expect(index).toContain('](2026-06-09-auth-decisions.md)');
+    expect(index).toContain('We use magic links.');
+  });
+
+  it('groups notes under a per-project subfolder when a remote is given', async () => {
+    const fs = new MemoryFilesystem({});
+    const { notePath } = await new VaultWriter(fs, fixedClock).write({
+      vaultPath: '/v',
+      title: 'Auth',
+      content: 'body',
+      projectRemoteUrl: 'git@github.com:acme/app.git',
+    });
+    expect(notePath).toBe('/v/proyectos/acme-app/2026-06-09-auth.md');
+    expect(await fs.exists('/v/proyectos/acme-app/INDEX.md')).toBe(true);
   });
 });

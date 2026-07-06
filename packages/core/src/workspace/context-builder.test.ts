@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { renderIndexNote } from '../obsidian/vault-index.js';
 import { MemoryFilesystem } from '../testing/memory-filesystem.js';
 import { ContextBuilder } from './context-builder.js';
 import type { Workspace } from './workspace.js';
@@ -39,6 +40,39 @@ describe('ContextBuilder', () => {
     expect(built.relevantNotes).toEqual(['/v/auth.md']);
     expect(built.context).toContain('## Relevant notes');
     expect(built.context).toContain('auth.md');
+  });
+
+  it('uses the folder index first, then reads only the matched note', async () => {
+    const fs = new MemoryFilesystem({
+      '/v/.obsidian/app.json': '{}',
+      '/v/proyectos/INDEX.md': renderIndexNote('proyectos', [
+        { title: 'Auth', path: '2026-06-09-auth.md', description: 'magic links authentication' },
+      ]),
+      '/v/proyectos/2026-06-09-auth.md': '# Auth\n\nWe use magic links.\n',
+    });
+    const built = await new ContextBuilder(fs).build({
+      workspace,
+      task: 'add authentication',
+      vaultPath: '/v',
+    });
+    expect(built.relevantNotes).toEqual(['/v/proyectos/2026-06-09-auth.md']);
+  });
+
+  it('falls back to a full scan when the index does not match', async () => {
+    const fs = new MemoryFilesystem({
+      '/v/.obsidian/app.json': '{}',
+      '/v/proyectos/INDEX.md': renderIndexNote('proyectos', [
+        { title: 'Cooking', path: 'cooking.md', description: 'pasta recipes' },
+      ]),
+      '/v/proyectos/cooking.md': '# Cooking\n\npasta\n',
+      '/v/notes/deploy.md': '# Deploy\n\nKubernetes rollout strategy.\n',
+    });
+    const built = await new ContextBuilder(fs).build({
+      workspace,
+      task: 'kubernetes rollout',
+      vaultPath: '/v',
+    });
+    expect(built.relevantNotes).toEqual(['/v/notes/deploy.md']);
   });
 
   it('clamps the context to the configured size', async () => {

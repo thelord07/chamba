@@ -89,6 +89,28 @@ describe('obsidian tools', () => {
     await server.close();
   });
 
+  it('groups summaries under a per-project folder when the repo has a remote', async () => {
+    const svc: Services = {
+      ...services({ ...projectFiles, ...vaultFiles }, '/vault'),
+      process: {
+        exec: async (cmd, args) =>
+          cmd === 'git' && args[0] === 'remote'
+            ? { stdout: 'git@github.com:acme/app.git\n', stderr: '', exitCode: 0 }
+            : { stdout: '', stderr: '', exitCode: 0 },
+      },
+    };
+    const { client, server } = await connect(svc);
+
+    const result = await client.callTool({
+      name: 'chamba_summarize_to_vault',
+      arguments: { title: 'Auth decisions', content: 'We use magic links.' },
+    });
+    expect(textOf(result)).toContain('/vault/proyectos/acme-app/2026-06-09-auth-decisions.md');
+    expect(await svc.fs.exists('/vault/proyectos/acme-app/INDEX.md')).toBe(true);
+
+    await server.close();
+  });
+
   it('summarize_to_vault errors clearly when no vault is configured', async () => {
     const { client, server } = await connect(services(projectFiles));
 

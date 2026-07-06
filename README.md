@@ -39,7 +39,9 @@ chamba (the tool) handles the supervising, validating and plumbing around it.
 - **Safe parallelism.** Git worktrees isolate parallel work; cleanup keeps branches
   for you to merge by hand — never `--force`, never auto-merge.
 - **Obsidian + cross-session memory.** Pull context from your vault, write summaries
-  back, and persist knowledge as plain markdown.
+  back, and persist knowledge as plain markdown. Notes are grouped per project (by git
+  remote) and each folder keeps a lightweight `INDEX.md`, so recall scans a cheap index
+  instead of reading every note.
 
 ## Use chamba from your editor
 
@@ -83,8 +85,8 @@ the log directory and worktrees.
 | `chamba_workspace_show` | `{}` | Contents of `.chamba/workspace.md` |
 | `chamba_workspace_reload` | `{}` | A diff vs a fresh re-scan (no writes) |
 | `chamba_load_context` | `{ task, includeObsidian? }` | Workspace summary + relevant vault notes |
-| `chamba_summarize_to_vault` | `{ title, content, projectSlug? }` | Writes a run summary to the vault's `proyectos/` folder |
-| `chamba_save_plan` | `{ title, content, projectSlug? }` | Saves a plan to the vault's `plans/` folder |
+| `chamba_summarize_to_vault` | `{ title, content, projectSlug? }` | Writes a run summary to `proyectos/` — grouped per project (git remote) + a per-folder `INDEX.md` for cheap recall |
+| `chamba_save_plan` | `{ title, content, projectSlug? }` | Saves a plan to `plans/` — same per-project grouping + index |
 | `chamba_vault_status` | `{}` | Resolved vault path + the notes chamba can see (diagnostic) |
 | `chamba_doctor` | `{}` | Environment health check (no LLM): Node, git, workspace, config, vault, logs, worktrees → pass/warn/fail. Also `npx @chamba/mcp doctor` |
 | `chamba_generate_plan` | `{ task, context? }` | A structured plan template to fill |

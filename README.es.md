@@ -36,7 +36,9 @@ El modelo de tu editor hace el razonamiento y llama a las tools de chamba. Eso s
   conserva las ramas para que vos las mergees a mano — nunca `--force`, nunca merge
   automático.
 - **Obsidian + memoria entre sesiones.** Trae contexto de tu vault, escribe resúmenes
-  de vuelta, y persiste conocimiento como markdown plano.
+  de vuelta, y persiste conocimiento como markdown plano. Las notas se agrupan por
+  proyecto (por git remote) y cada carpeta mantiene un `INDEX.md` liviano, así el recall
+  escanea un índice barato en vez de leer todas las notas.
 
 ## Usá chamba desde tu editor
 
@@ -81,8 +83,8 @@ el directorio de logs y los worktrees.
 | `chamba_workspace_show` | `{}` | Contenido de `.chamba/workspace.md` |
 | `chamba_workspace_reload` | `{}` | Un diff vs un re-escaneo (sin escribir) |
 | `chamba_load_context` | `{ task, includeObsidian? }` | Resumen del workspace + notas relevantes del vault |
-| `chamba_summarize_to_vault` | `{ title, content, projectSlug? }` | Escribe un resumen a la carpeta `proyectos/` del vault |
-| `chamba_save_plan` | `{ title, content, projectSlug? }` | Guarda un plan en la carpeta `plans/` del vault |
+| `chamba_summarize_to_vault` | `{ title, content, projectSlug? }` | Escribe un resumen a `proyectos/` — agrupado por proyecto (git remote) + un `INDEX.md` por carpeta para recall barato |
+| `chamba_save_plan` | `{ title, content, projectSlug? }` | Guarda un plan en `plans/` — mismo agrupamiento por proyecto + índice |
 | `chamba_vault_status` | `{}` | Ruta del vault resuelta + las notas que chamba ve (diagnóstico) |
 | `chamba_doctor` | `{}` | Chequeo de salud del entorno (sin LLM): Node, git, workspace, config, vault, logs, worktrees → pass/warn/fail. También `npx @chamba/mcp doctor` |
 | `chamba_generate_plan` | `{ task, context? }` | Un template de plan para completar |

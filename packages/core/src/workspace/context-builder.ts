@@ -1,5 +1,6 @@
+import { INDEX_FILE, parseIndexNote } from '../obsidian/vault-index.js';
 import type { FilesystemPort } from '../ports/filesystem.js';
-import { joinPath } from '../util/path.js';
+import { dirname, joinPath } from '../util/path.js';
 import { readRuleExcerpts } from './rules.js';
 import type { Workspace } from './workspace.js';
 
@@ -121,20 +122,56 @@ export class ContextBuilder {
     return lines.join('\n');
   }
 
+  /**
+   * Index-first: match against the cheap per-folder `INDEX.md` files and only
+   * open the top notes for a snippet. If the indexes yield nothing (or don't
+   * exist yet — a legacy vault), fall back to a full body scan so recall never
+   * regresses. Self-healing: the writer rebuilds indexes as notes are added.
+   */
   private async searchNotes(vaultPath: string, task: string): Promise<RelevantNote[]> {
     const keywords = extractKeywords(task);
     if (keywords.length === 0) return [];
 
-    const files = await this.collectMarkdown(vaultPath);
+    const fromIndex = await this.searchIndex(vaultPath, keywords);
+    if (fromIndex.length > 0) return fromIndex;
+
+    return this.fullScan(vaultPath, keywords);
+  }
+
+  /** Rank index entries by keyword hits on title+description; read only the top notes. */
+  private async searchIndex(vaultPath: string, keywords: string[]): Promise<RelevantNote[]> {
+    const entries = await this.collectIndexEntries(vaultPath);
+    if (entries.length === 0) return [];
+
+    const ranked = entries
+      .map((e) => ({ e, score: scoreText(`${e.title}\n${e.description}`.toLowerCase(), keywords) }))
+      .filter((x) => x.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, MAX_NOTES);
+
+    const out: RelevantNote[] = [];
+    for (const { e, score } of ranked) {
+      const text = await this.tryRead(e.notePath);
+      let snippet = e.description || '(matched)';
+      if (text !== null) {
+        const line = firstMatchingLine(text, keywords);
+        if (line !== '(matched)') snippet = line;
+      }
+      out.push({ path: e.notePath, score, snippet });
+    }
+    return out;
+  }
+
+  /** Legacy/fallback path: read every note body, skipping the index files themselves. */
+  private async fullScan(vaultPath: string, keywords: string[]): Promise<RelevantNote[]> {
+    const files = (await listVaultNotes(this.fs, vaultPath)).filter(
+      (p) => !p.endsWith(`/${INDEX_FILE}`),
+    );
     const scored: RelevantNote[] = [];
     for (const file of files) {
       const text = await this.tryRead(file);
       if (text === null) continue;
-      const lower = text.toLowerCase();
-      let score = 0;
-      for (const kw of keywords) {
-        score += occurrences(lower, kw);
-      }
+      const score = scoreText(text.toLowerCase(), keywords);
       if (score > 0) {
         scored.push({ path: file, score, snippet: firstMatchingLine(text, keywords) });
       }
@@ -143,8 +180,22 @@ export class ContextBuilder {
     return scored.slice(0, MAX_NOTES);
   }
 
-  private async collectMarkdown(root: string): Promise<string[]> {
-    return listVaultNotes(this.fs, root);
+  private async collectIndexEntries(
+    vaultPath: string,
+  ): Promise<Array<{ notePath: string; title: string; description: string }>> {
+    const indexFiles = (await listVaultNotes(this.fs, vaultPath)).filter((p) =>
+      p.endsWith(`/${INDEX_FILE}`),
+    );
+    const out: Array<{ notePath: string; title: string; description: string }> = [];
+    for (const idx of indexFiles) {
+      const text = await this.tryRead(idx);
+      if (text === null) continue;
+      const dir = dirname(idx);
+      for (const e of parseIndexNote(text)) {
+        out.push({ notePath: joinPath(dir, e.path), title: e.title, description: e.description });
+      }
+    }
+    return out;
   }
 
   private async tryRead(path: string): Promise<string | null> {
@@ -204,6 +255,13 @@ function occurrences(haystack: string, needle: string): number {
     idx = haystack.indexOf(needle, idx + needle.length);
   }
   return count;
+}
+
+/** Total keyword hits in a (already lower-cased) haystack. */
+function scoreText(haystack: string, keywords: string[]): number {
+  let score = 0;
+  for (const kw of keywords) score += occurrences(haystack, kw);
+  return score;
 }
 
 function firstMatchingLine(text: string, keywords: string[]): string {
