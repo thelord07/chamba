@@ -1,5 +1,37 @@
 # @chamba/core
 
+## 0.10.0
+
+### Minor Changes
+
+- 64ce3be: feat(doctor): environment health check — `chamba_doctor` tool + `npx @chamba/mcp doctor`
+
+  A no-LLM diagnostic that validates the setup and tells you exactly what to fix:
+  Node version, git, whether the cwd is a git repo, `.chamba/workspace.md`, agent
+  config validity, the Obsidian vault connection, the log directory, and worktrees.
+  Returns a pass/warn/fail report (and a non-zero exit code from the CLI when a check
+  fails, so it works as a CI gate). Shared pure logic in `@chamba/core` (`runDoctor`,
+  `renderDoctorReport`) drives both the MCP tool and the CLI subcommand.
+
+- ddd5298: feat(memory): index-first vault recall + per-project grouping (Engram-style)
+
+  Recall no longer reads every note. Each vault folder keeps a lightweight `INDEX.md`
+  (`{title, path, description}`) that `chamba_load_context` scans first, opening full
+  notes only for the top matches — with a full-scan fallback so recall never regresses
+  on a legacy vault or an index miss. `chamba_summarize_to_vault` and `chamba_save_plan`
+  now group notes under a stable `<folder>/<owner-repo>/` subfolder derived from the git
+  remote (`slugifyGitRemote`), so every note for the same repo lands together and stays
+  deduped. Still no LLM — matching and indexing are mechanical.
+
+- d7208fa: feat(config): model presets — `config preset <budget|balanced|quality|fast>`
+
+  Named model+effort bundles that set every role at once, layered on the existing
+  per-role config. `PRESETS` live in `@chamba/core` (validated: every preset covers
+  all roles with catalog models). `ConfigStore.setPreset` writes the preset as the
+  `defaults` block while preserving per-role overrides and the worktrees policy. New
+  CLI verbs `config preset <name>` and `config presets`, plus a preset option in the
+  install wizard. `chamba_get_agent_config` picks them up automatically. Still no LLM.
+
 ## 0.9.0
 
 ### Minor Changes

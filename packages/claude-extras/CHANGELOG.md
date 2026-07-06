@@ -1,5 +1,26 @@
 # @chamba/claude-extras
 
+## 0.10.0
+
+### Minor Changes
+
+- d7208fa: feat(config): model presets — `config preset <budget|balanced|quality|fast>`
+
+  Named model+effort bundles that set every role at once, layered on the existing
+  per-role config. `PRESETS` live in `@chamba/core` (validated: every preset covers
+  all roles with catalog models). `ConfigStore.setPreset` writes the preset as the
+  `defaults` block while preserving per-role overrides and the worktrees policy. New
+  CLI verbs `config preset <name>` and `config presets`, plus a preset option in the
+  install wizard. `chamba_get_agent_config` picks them up automatically. Still no LLM.
+
+### Patch Changes
+
+- Updated dependencies [64ce3be]
+- Updated dependencies [ddd5298]
+- Updated dependencies [d7208fa]
+  - @chamba/core@0.10.0
+  - @chamba/adapters@0.10.0
+
 ## 0.9.0
 
 ### Patch Changes
