@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="./docs/chambalogo2.png" alt="chamba — tu CLI para generar proyectos" width="340" />
+</p>
+
 # chamba
 
 [![npm](https://img.shields.io/npm/v/@chamba/mcp.svg)](https://www.npmjs.com/package/@chamba/mcp)

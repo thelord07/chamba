@@ -54,6 +54,9 @@
   @media (max-width: 820px) {
     .top-nav { display: none !important; }
     .hero-grid { grid-template-columns: 1fr !important; }
+    .hero-main { grid-template-columns: 1fr !important; gap: 40px !important; }
+    .hero-logo { order: -1; }
+    .hero-logo img { max-width: 240px !important; }
     section { padding-left: 20px !important; padding-right: 20px !important; }
     header > div { padding-left: 20px !important; padding-right: 20px !important; }
   }
@@ -420,6 +423,8 @@ function render() {
 
   <main id="top">
     <section style="max-width:1180px;margin:0 auto;padding:92px 32px 64px;">
+     <div class="hero-main" style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,360px);gap:56px;align-items:center;">
+      <div>
       <div style="display:inline-flex;align-items:center;gap:9px;font-family:'JetBrains Mono';font-size:12px;color:var(--muted);border:1px solid var(--border);background:var(--bg2);padding:6px 13px;border-radius:100px;margin-bottom:30px;">
         <span style="width:7px;height:7px;border-radius:50%;background:var(--accent2);animation:chPulse 2.4s ease-in-out infinite;"></span>${esc(t.heroTag)}
       </div>
@@ -445,6 +450,11 @@ function render() {
         <span style="font-family:'JetBrains Mono';font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.08em;margin-right:4px;">${esc(t.heroEditorsLabel)}</span>${pills}
       </div>
       <p style="font-family:'JetBrains Mono';font-size:13px;color:var(--muted);margin:40px 0 0;padding-left:15px;border-left:2px solid var(--accent);line-height:1.6;max-width:60ch;">${esc(t.glossary)}</p>
+      </div>
+      <div class="hero-logo" style="justify-self:center;">
+        <img src="chambalogo2.png" alt="chamba" width="360" height="360" style="display:block;width:100%;max-width:340px;height:auto;border-radius:26px;border:1px solid var(--border);box-shadow:0 34px 90px -32px oklch(0.72 0.19 47 / 0.4),0 12px 34px -14px oklch(0 0 0 / 0.7);" />
+      </div>
+     </div>
     </section>
 
     <section id="benefits" style="max-width:1180px;margin:0 auto;padding:64px 32px;">
