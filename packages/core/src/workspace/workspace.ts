@@ -5,12 +5,30 @@ export const WORKSPACE_DIR = '.chamba';
 export const WORKSPACE_FILE = 'workspace.md';
 export const WORKSPACE_RELATIVE_PATH = `${WORKSPACE_DIR}/${WORKSPACE_FILE}`;
 
+/** An auth library/provider detected in one project, with the packages that signalled it. */
+export interface ProjectAuth {
+  provider: string;
+  packages: string[];
+}
+
+/** A workspace-level auth finding: a provider, the packages, and where it's used. */
+export interface AuthFinding {
+  /** Provider/library, e.g. "Auth0", "Firebase Auth", "AWS Cognito". */
+  provider: string;
+  /** Dependency names that signalled it. */
+  packages: string[];
+  /** Project names where it was detected. */
+  projects: string[];
+}
+
 export interface ProjectRef {
   name: string;
   /** Path relative to the workspace root; `.` for the root project. */
   path: string;
   language?: string;
   framework?: string;
+  /** Auth libraries detected in this project's manifest. */
+  auth?: ProjectAuth[];
 }
 
 export interface Workspace {
@@ -19,6 +37,8 @@ export interface Workspace {
   languages: string[];
   framework?: string;
   conventions: string[];
+  /** Auth stack detected across projects — the base the QA phase relies on. */
+  auth?: AuthFinding[];
   projects: ProjectRef[];
   /** Coding-rule files found across repos (Cursor, Claude, Trae, …). */
   ruleSources: RuleSource[];
@@ -66,6 +86,29 @@ export function renderWorkspaceMarkdown(ws: Workspace): string {
     for (const c of ws.conventions) lines.push(`- ${c}`);
   } else {
     lines.push('_None detected._');
+  }
+  lines.push('');
+
+  lines.push('## Auth');
+  lines.push('');
+  lines.push('> How this app authenticates and provisions users — the base the QA co-pilot');
+  lines.push('> and planner rely on. Detected from dependencies; enrich by hand: the roles');
+  lines.push('> model, how test users are created, and which provider owns identity.');
+  lines.push('');
+  if (ws.auth && ws.auth.length > 0) {
+    for (const a of ws.auth) {
+      const pkgs = a.packages.map((p) => `\`${p}\``).join(', ');
+      const where = a.projects.length > 0 ? ` (${a.projects.join(', ')})` : '';
+      lines.push(`- **${a.provider}** — ${pkgs}${where}`);
+    }
+  } else {
+    lines.push('_No auth library detected from dependencies._');
+    lines.push('');
+    lines.push(
+      'If this app has auth, document it here by hand: the provider, how users + roles ' +
+        'are provisioned, and how to create test users. The QA phase needs this — the qa ' +
+        'agent never creates identity-provider users, it asks you to.',
+    );
   }
   lines.push('');
 

@@ -14,13 +14,18 @@ Detalle en [tier1-doctor-memory-presets.md](tier1-doctor-memory-presets.md).
 
 ---
 
-## ✳️ Post-0.10.0 — sin publicar todavía (candidatos a 0.10.1)
+## ✳️ Post-0.10.0 — sin publicar todavía (próximo release)
 - **qa como co-piloto (HECHO)** — el agente `qa` ya no crea usuarios de identity
   provider (Auth0/Firebase/Cognito → te los pide/confirma); el **login siempre es
   humano** (abre el browser y pausa, no automatiza credenciales); multi-user →
   re-login por actor; sigue aplicando el data-seed local. Archivos: `qa.md`,
-  `planner.md`, comandos `ticket.md` + `qa.md`. Changeset: `qa-copilot`.
-- **doctor multi-repo fix (pendiente)** — ver 🐛 abajo.
+  `planner.md`, comandos `ticket.md` + `qa.md`. Changeset: `qa-copilot` (patch).
+- **Detección de auth en el workspace (HECHO)** — `workspace_init` escanea deps y
+  escribe una sección `## Auth` (Auth0/Firebase/Cognito/Clerk/Supabase/…) con
+  provider + packages + proyectos; si no detecta nada, te pide documentarlo. Es la
+  **base** para el qa co-piloto y el planner. Archivos: `scanner.ts`, `workspace.ts`,
+  tests. Changeset: `workspace-auth` (minor → el próximo release sería **0.11.0**).
+- **doctor multi-repo fix (pendiente)** — ver 🐛 abajo; entra en el mismo release.
 
 ---
 

@@ -100,7 +100,7 @@ export type { RuleConvention, RuleExcerpt, RuleSource } from './workspace/rules.
 // Coding rules (multi-editor)
 export { detectRuleSources, RULE_SOURCES, readRuleExcerpts } from './workspace/rules.js';
 export { WorkspaceScanner } from './workspace/scanner.js';
-export type { ProjectRef, Workspace } from './workspace/workspace.js';
+export type { AuthFinding, ProjectAuth, ProjectRef, Workspace } from './workspace/workspace.js';
 // Workspace
 export {
   renderWorkspaceMarkdown,

@@ -62,6 +62,45 @@ describe('WorkspaceScanner', () => {
     expect(ws.languages).toEqual(expect.arrayContaining(['TypeScript', 'Python']));
   });
 
+  it('detects the auth stack per project and aggregates it', async () => {
+    const ws = await scan(
+      {
+        '/m/webapp/package.json': JSON.stringify({
+          name: 'webapp',
+          dependencies: { next: '^15', '@auth0/nextjs-auth0': '^3', jsonwebtoken: '^9' },
+        }),
+        '/m/webapp/src/app.tsx': 'export {};\n',
+        '/m/api/package.json': JSON.stringify({
+          name: 'api',
+          dependencies: { express: '^5', '@aws-sdk/client-cognito-identity-provider': '^3' },
+        }),
+        '/m/api/src/server.ts': 'export {};\n',
+        '/m/svc/pyproject.toml':
+          '[project]\nname = "svc"\ndependencies = ["firebase-admin", "pyjwt"]\n',
+        '/m/svc/main.py': 'print(1)\n',
+      },
+      '/m',
+    );
+
+    const byProvider = Object.fromEntries((ws.auth ?? []).map((a) => [a.provider, a]));
+    expect(byProvider.Auth0?.projects).toContain('webapp');
+    expect(byProvider.Auth0?.packages).toContain('@auth0/nextjs-auth0');
+    expect(byProvider['AWS Cognito']?.projects).toContain('api');
+    expect(byProvider['Firebase Auth']?.projects).toContain('svc');
+    expect(byProvider['JWT (jsonwebtoken)']?.projects).toContain('webapp');
+  });
+
+  it('leaves auth empty when no auth library is present', async () => {
+    const ws = await scan(
+      {
+        '/p/package.json': JSON.stringify({ name: 'p', dependencies: { express: '^5' } }),
+        '/p/src/i.ts': 'export {};\n',
+      },
+      '/p',
+    );
+    expect(ws.auth ?? []).toEqual([]);
+  });
+
   it('skips nested linked worktrees but keeps real repos', async () => {
     const ws = await scan(
       {

@@ -20,6 +20,7 @@ describe('renderWorkspaceMarkdown', () => {
       '## Languages',
       '## Framework',
       '## Conventions',
+      '## Auth',
       '## Coding rules',
       '## Active projects',
       '## Folder map',
@@ -35,6 +36,23 @@ describe('renderWorkspaceMarkdown', () => {
     expect(md).toContain('**proj**');
     expect(md).toContain('- src/');
     expect(md).toContain('.cursor/rules/style.mdc');
+  });
+
+  it('renders detected auth findings with packages and projects', () => {
+    const md = renderWorkspaceMarkdown({
+      ...sample,
+      auth: [{ provider: 'Auth0', packages: ['@auth0/nextjs-auth0'], projects: ['webapp'] }],
+    });
+    expect(md).toContain('**Auth0**');
+    expect(md).toContain('`@auth0/nextjs-auth0`');
+    expect(md).toContain('(webapp)');
+  });
+
+  it('prompts to document auth by hand when none is detected', () => {
+    const md = renderWorkspaceMarkdown(sample);
+    expect(md).toContain('## Auth');
+    expect(md).toContain('No auth library detected');
+    expect(md).toContain('the qa agent never creates identity-provider users');
   });
 
   it('is deterministic (no timestamps) so reload diffs are meaningful', () => {

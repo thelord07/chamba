@@ -2,7 +2,7 @@ import type { FilesystemPort } from '../ports/filesystem.js';
 import { basename, dirname, extname, joinPath } from '../util/path.js';
 import { detectGitRepos } from '../worktree/git-repo-detector.js';
 import { detectRuleSources } from './rules.js';
-import type { ProjectRef, Workspace } from './workspace.js';
+import type { AuthFinding, ProjectAuth, ProjectRef, Workspace } from './workspace.js';
 
 const MAX_DEPTH = 6;
 
@@ -65,6 +65,43 @@ const PY_FRAMEWORKS: ReadonlyArray<readonly [string, string]> = [
   ['flask', 'Flask'],
 ];
 
+// Auth signal -> provider label. First match wins (specific → generic). A signal
+// ending in `/` matches a scoped prefix; otherwise it matches the exact name or a
+// `name-*` family (e.g. `passport` also matches `passport-local`).
+const AUTH_LIBS: ReadonlyArray<readonly [string, string]> = [
+  ['@auth0/', 'Auth0'],
+  ['auth0', 'Auth0'],
+  ['express-openid-connect', 'Auth0'],
+  ['@clerk/', 'Clerk'],
+  ['@aws-sdk/client-cognito-identity-provider', 'AWS Cognito'],
+  ['amazon-cognito-identity-js', 'AWS Cognito'],
+  ['aws-amplify', 'AWS Amplify (Cognito)'],
+  ['@supabase/', 'Supabase Auth'],
+  ['@firebase/', 'Firebase Auth'],
+  ['firebase-admin', 'Firebase Auth'],
+  ['firebase', 'Firebase Auth'],
+  ['next-auth', 'Auth.js (NextAuth)'],
+  ['@auth/core', 'Auth.js'],
+  ['@okta/', 'Okta'],
+  ['@workos-inc/node', 'WorkOS'],
+  ['@kinde-oss/', 'Kinde'],
+  ['@stytch/', 'Stytch'],
+  ['lucia', 'Lucia'],
+  ['passport', 'Passport'],
+  ['jsonwebtoken', 'JWT (jsonwebtoken)'],
+  ['jose', 'JWT (jose)'],
+];
+
+// Python auth signals matched as substrings of pyproject.toml (like PY_FRAMEWORKS).
+const PY_AUTH_LIBS: ReadonlyArray<readonly [string, string]> = [
+  ['authlib', 'Authlib'],
+  ['fastapi-users', 'FastAPI Users'],
+  ['django-allauth', 'django-allauth'],
+  ['python-jose', 'JWT (python-jose)'],
+  ['pyjwt', 'JWT (PyJWT)'],
+  ['firebase-admin', 'Firebase Auth'],
+];
+
 interface IgnoreRule {
   re: RegExp;
   anchored: boolean;
@@ -90,6 +127,7 @@ export class WorkspaceScanner {
     const rootProject = projects.find((p) => p.path === '.');
     const framework = rootProject?.framework ?? projects.find((p) => p.framework)?.framework;
     const conventions = await this.detectConventions(root);
+    const auth = aggregateAuth(projects);
     const description = await this.detectDescription(root, rootProject, framework, languages);
 
     // Repos to scan for coding rules: the root, each child git repo, and each
@@ -105,6 +143,7 @@ export class WorkspaceScanner {
       languages,
       framework,
       conventions,
+      auth,
       projects,
       ruleSources,
       folderMap: [...acc.topDirs].sort(),
@@ -200,15 +239,24 @@ export class WorkspaceScanner {
       const pkg = text !== null ? safeJsonParse(text) : null;
       const name = typeof pkg?.name === 'string' && pkg.name.length > 0 ? pkg.name : fallbackName;
       const language = languages.includes('TypeScript') ? 'TypeScript' : 'JavaScript';
-      return { name, path, language, framework: detectNodeFramework(pkg) };
+      const auth = detectNodeAuth(pkg);
+      return {
+        name,
+        path,
+        language,
+        framework: detectNodeFramework(pkg),
+        ...(auth.length > 0 ? { auth } : {}),
+      };
     }
     if (manifestName === 'pyproject.toml') {
       const text = (await this.tryRead(joinPath(root, manifestRel))) ?? '';
+      const auth = detectPyAuth(text);
       return {
         name: tomlName(text) ?? fallbackName,
         path,
         language: 'Python',
         framework: detectPyFramework(text),
+        ...(auth.length > 0 ? { auth } : {}),
       };
     }
     if (manifestName === 'Cargo.toml') {
@@ -364,6 +412,66 @@ function detectPyFramework(pyproject: string): string | undefined {
     if (lower.includes(dep)) return label;
   }
   return undefined;
+}
+
+/** Map one dependency name to an auth provider, or undefined. First match wins. */
+function matchAuthDep(dep: string): string | undefined {
+  for (const [sig, provider] of AUTH_LIBS) {
+    const hit = sig.endsWith('/') ? dep.startsWith(sig) : dep === sig || dep.startsWith(`${sig}-`);
+    if (hit) return provider;
+  }
+  return undefined;
+}
+
+function detectNodeAuth(pkg: Record<string, unknown> | null): ProjectAuth[] {
+  if (!pkg) return [];
+  const deps = {
+    ...(asRecord(pkg.dependencies) ?? {}),
+    ...(asRecord(pkg.devDependencies) ?? {}),
+  };
+  return collectAuth(Object.keys(deps).map((dep) => [matchAuthDep(dep), dep]));
+}
+
+function detectPyAuth(pyproject: string): ProjectAuth[] {
+  const lower = pyproject.toLowerCase();
+  return collectAuth(
+    PY_AUTH_LIBS.map(([dep, provider]) => [lower.includes(dep) ? provider : undefined, dep]),
+  );
+}
+
+/** Group `[provider, package]` hits into per-provider `ProjectAuth`, dropping misses. */
+function collectAuth(hits: ReadonlyArray<readonly [string | undefined, string]>): ProjectAuth[] {
+  const byProvider = new Map<string, Set<string>>();
+  for (const [provider, pkg] of hits) {
+    if (!provider) continue;
+    const set = byProvider.get(provider) ?? new Set<string>();
+    set.add(pkg);
+    byProvider.set(provider, set);
+  }
+  return [...byProvider.entries()].map(([provider, pkgs]) => ({
+    provider,
+    packages: [...pkgs].sort(),
+  }));
+}
+
+/** Aggregate per-project auth into workspace-level findings (provider → packages + projects). */
+function aggregateAuth(projects: ProjectRef[]): AuthFinding[] {
+  const byProvider = new Map<string, { packages: Set<string>; projects: Set<string> }>();
+  for (const p of projects) {
+    for (const a of p.auth ?? []) {
+      const entry = byProvider.get(a.provider) ?? { packages: new Set(), projects: new Set() };
+      for (const pkg of a.packages) entry.packages.add(pkg);
+      entry.projects.add(p.name);
+      byProvider.set(a.provider, entry);
+    }
+  }
+  return [...byProvider.entries()]
+    .map(([provider, e]) => ({
+      provider,
+      packages: [...e.packages].sort(),
+      projects: [...e.projects].sort(),
+    }))
+    .sort((a, b) => a.provider.localeCompare(b.provider));
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {

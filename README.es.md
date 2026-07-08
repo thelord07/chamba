@@ -79,7 +79,7 @@ el directorio de logs y los worktrees.
 
 | Tool | Input | Output |
 |---|---|---|
-| `chamba_workspace_init` | `{ root?, createVault? }` | Escanea y escribe `.chamba/workspace.md` (no sobrescribe); crea y siembra un vault si no hay ninguno |
+| `chamba_workspace_init` | `{ root?, createVault? }` | Escanea y escribe `.chamba/workspace.md` (no sobrescribe); detecta el stack de auth (Auth0/Firebase/Cognito/…) en una sección `## Auth`; crea y siembra un vault si no hay ninguno |
 | `chamba_workspace_show` | `{}` | Contenido de `.chamba/workspace.md` |
 | `chamba_workspace_reload` | `{}` | Un diff vs un re-escaneo (sin escribir) |
 | `chamba_load_context` | `{ task, includeObsidian? }` | Resumen del workspace + notas relevantes del vault |
