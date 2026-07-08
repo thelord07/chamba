@@ -28,3 +28,11 @@ npm-debug.log*
 # User chamba dir (never commit, except examples/)
 .chamba/
 !examples/**/.chamba/
+
+# Obsidian vault artifacts — chamba can bootstrap a vault at the repo root
+# (.obsidian + a seeded overview). Never commit a personal vault into this repo.
+# `plans/*.md` (planning docs) stay tracked; vault note subfolders don't.
+.obsidian/
+/Workspace overview.md
+/proyectos/
+/plans/*/

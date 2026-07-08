@@ -1,5 +1,13 @@
 # @chamba/mcp
 
+## 0.11.0
+
+### Patch Changes
+
+- Updated dependencies [ea415bf]
+  - @chamba/core@0.11.0
+  - @chamba/adapters@0.11.0
+
 ## 0.10.0
 
 ### Minor Changes
