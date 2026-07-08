@@ -9,6 +9,14 @@ me: you drive the browser and the navigation, I handle every login and any real
 user provisioning. Work from the plan's `## QA plan` and the acceptance criteria.
 Everything is **local and non-destructive** — never commit, push, or touch production.
 
+**Never delete or destroy anything without asking.** Dropping/resetting/truncating a
+database, wiping data, deleting files, force-pushing, deleting branches, or removing
+container/cloud resources — `prisma migrate reset`, `db push --force-reset`/
+`--accept-data-loss`, `DROP`/`TRUNCATE`, `rm -rf`, `git branch -D`, `docker … down -v` —
+is **off-limits unless I explicitly confirm it**. If a step seems to need it, STOP and
+ask me first; never do it on your own. (This is the rule that keeps a QA run from ever
+wiping my local DB.)
+
 **First, adapt to the project — don't assume a stack.** Inspect the repos in the
 worktree and decide how to run the test by their nature:
 
@@ -28,7 +36,9 @@ driver script in a temp path outside the repo and delete it when done.
 **Seed data ≠ creating users — treat them differently:**
 
 - **Data / fixtures** (DB rows, migrations, seed scripts) → you may apply the
-  **local** seed the plan calls for. State exactly what you seeded.
+  **local** seed the plan calls for, but it must be **additive and non-destructive**:
+  never reset, drop, or recreate the database to seed it. If the only way to seed is a
+  destructive reset, STOP and ask me — I'll decide. State exactly what you seeded.
 - **Users / identity** → first detect the auth system (Auth0, Firebase, Cognito,
   Clerk, Supabase, Okta, magic-link, plain DB, …). **Do NOT try to create users in
   an external identity provider yourself.** Instead, list exactly which users and

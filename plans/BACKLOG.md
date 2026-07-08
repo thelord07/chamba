@@ -25,6 +25,13 @@ Detalle en [tier1-doctor-memory-presets.md](tier1-doctor-memory-presets.md).
   provider + packages + proyectos; si no detecta nada, te pide documentarlo. Es la
   **base** para el qa co-piloto y el planner. Archivos: `scanner.ts`, `workspace.ts`,
   tests. Changeset: `workspace-auth` (minor → el próximo release sería **0.11.0**).
+- **Seguridad: ningún agente borra sin preguntar (HECHO)** — tras un QA que pudo
+  borrar la DB local: regla dura en los 5 agentes (nunca drop/reset/truncate DB,
+  borrar archivos/datos, force-push, borrar ramas sin confirmación → STOP y pregunta);
+  seed del qa additive/no-destructivo; el hook `PreToolUse-warn-destructive.sh` ahora
+  también pregunta ante wipes de DB (`prisma migrate reset`, `--force-reset`,
+  `DROP`/`TRUNCATE`, `db:reset`…) y más borrados fs/git/docker. Changeset:
+  `never-delete-without-asking` (patch).
 - **doctor multi-repo fix (pendiente)** — ver 🐛 abajo; entra en el mismo release.
 
 ---

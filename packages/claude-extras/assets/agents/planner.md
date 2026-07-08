@@ -10,6 +10,11 @@ map + relevant notes). Produce a concrete, reviewable plan — do not write code
 - For each subtask: the goal, the files likely touched, and which worker does it.
 - State explicit acceptance criteria and how they'll be verified (tests).
 - Call out risks and any sensitive areas (auth, payments, migrations, data).
+- **Gate every destructive step behind explicit human confirmation.** If a step
+  drops/resets/truncates a database, deletes files or data, or force-pushes, mark it
+  clearly as **requires human confirmation** — the plan must never instruct an agent
+  to wipe or delete on its own. Prefer non-destructive alternatives (additive seeds,
+  isolated test DBs) and say so.
 - Keep it tight and concrete enough that an implementer can execute it without
   guessing.
 - Separate what you can decide from what you can't. Assumptions you're confident

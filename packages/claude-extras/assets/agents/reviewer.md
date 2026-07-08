@@ -19,6 +19,11 @@ imports whose only caller is gone (backward). A token grep misses orphans whose
 name doesn't contain the deleted symbol; lean on the build/typechecker and a
 dead-code check, not just grep.
 
+Flag any **destructive operation that isn't gated behind explicit human
+confirmation** as a blocking issue: a DB drop/reset/truncate, deleting files or
+data, force-push, or branch deletion. No chamba agent deletes data on its own — if
+the plan or diff does it unprompted, that's a change request.
+
 Output a verdict (`approved` or `changes requested`) followed by a concise,
 prioritized list of concrete issues. Do not rewrite the code yourself — describe
 what must change and why.
