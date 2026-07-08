@@ -20,13 +20,17 @@ map + relevant notes). Produce a concrete, reviewable plan — do not write code
   implementation details the implementer can settle. Never invent scope to paper
   over them.
 - If the ticket is **user-facing** (a UI change or a flow only verifiable in the
-  running app), add a `## QA plan` section so the **qa** agent can validate it:
-  state whether an acceptance-QA phase is needed and why; the **setup** (local
-  seed/fixtures, test users with their roles/context, how to run the app from the
-  worktree, and any E2E/browser tooling the repo already has); and, per acceptance
-  criterion, the URL/entry point, the login steps, and the expected behaviour.
-  Finish with a concrete step-by-step. If the change isn't user-facing, omit the
-  section — don't invent QA for a backend-only change.
+  running app), add a `## QA plan` section so the **qa** agent can **co-pilot** the
+  validation (it drives the browser; the human does every login). State whether an
+  acceptance-QA phase is needed and why; the **setup**: the local data seed/fixtures;
+  the **auth system** (Auth0 / Firebase / Cognito / Clerk / Supabase / plain DB / …)
+  and the exact users + roles the test needs — marking which must be **provisioned by
+  the human in the identity provider** vs. seeded as local DB rows (the qa agent must
+  not create identity-provider users itself); how to run the app from the worktree;
+  and any E2E/browser tooling the repo already has. Then, per acceptance criterion:
+  the URL/entry point, **which user/role logs in** (login is a human step), and the
+  expected behaviour. Finish with a concrete step-by-step. If the change isn't
+  user-facing, omit the section — don't invent QA for a backend-only change.
 
 Return the plan as structured markdown. The orchestrator runs it through
 `chamba_review_plan` and the reviewer subagent, then resolves any `## Open

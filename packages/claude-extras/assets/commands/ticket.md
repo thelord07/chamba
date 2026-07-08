@@ -78,12 +78,14 @@ the workspace.
    re-verify until a full pass finds zero **new** blocking issues (dry) or 6 rounds,
    whichever comes first — don't re-report a finding you already fixed.
 8. **Acceptance QA** — only if the plan has a `## QA plan`. Delegate to the **qa**
-   subagent to run it from the worktree: set up the local seed and test users, run
-   the app, and validate each acceptance criterion against the **running app** —
-   driving the browser if the project has E2E tooling, otherwise co-piloting with me
-   (it asks me to log in and tells me what to click while I watch). It reports
-   PASS/FAIL per criterion. If there's no `## QA plan`, skip this step. This is the
-   only interactive touchpoint at the end.
+   subagent to **co-pilot** it from the worktree: apply the local data seed, ask me
+   to provision any identity-provider users (Auth0/Firebase/…) rather than creating
+   them itself, run the app, and validate each acceptance criterion against the
+   **running app** — driving the browser if the project has E2E tooling, otherwise
+   co-piloting with me. **The login is always my step**: it opens the browser and
+   asks me to log in (and to re-log in per user on multi-user flows) while it drives
+   and watches. It reports PASS/FAIL per criterion. If there's no `## QA plan`, skip
+   this step. This is the only interactive touchpoint at the end.
 9. Call `chamba_summarize_to_vault` with a summary of what changed.
 10. STOP and report for my review. The report MUST include:
     - the repos touched and why;
