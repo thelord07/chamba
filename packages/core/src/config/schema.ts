@@ -54,6 +54,8 @@ export const worktreeConfigSchema = z
     editorWorkspace: z.enum(['code-workspace']).nullable().optional(),
     repos: z.array(z.string()).nullable().optional(),
     command: z.string().nullable().optional(),
+    maxParallel: z.number().int().positive().nullable().optional(),
+    perWorkerMemMB: z.number().int().positive().nullable().optional(),
   })
   .strict();
 

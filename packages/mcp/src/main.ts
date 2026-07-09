@@ -44,6 +44,7 @@ async function main(): Promise<void> {
       obsidianVaultPath: services.obsidianVaultPath,
       obsidianSearchRoots: obsidianSearchRoots(services),
       nodeVersion: process.version,
+      resources: services.system.resources(),
     });
     process.stdout.write(`${renderDoctorReport(report)}\n`);
     process.exitCode = report.healthy ? 0 : 1;

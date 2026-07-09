@@ -25,6 +25,14 @@ function services(handler: ProcessHandler): { svc: Services; process: FakeProces
       fs: new MemoryFilesystem({}),
       process,
       clock: { now: () => new Date('2026-06-09T00:00:00Z'), today: () => '2026-06-09' },
+      system: {
+        resources: () => ({
+          totalMemBytes: 16 * 1024 ** 3,
+          freeMemBytes: 8 * 1024 ** 3,
+          cpus: 8,
+          loadAvg1: 0,
+        }),
+      },
       cwd: '/repo',
       homedir: '/home/test',
     },

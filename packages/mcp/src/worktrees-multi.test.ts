@@ -20,6 +20,14 @@ function makeServices(files: Record<string, string>, git: GitReply): Services {
       },
     },
     clock: { now: () => new Date('2026-06-09T10:00:00Z'), today: () => '2026-06-09' },
+    system: {
+      resources: () => ({
+        totalMemBytes: 16 * 1024 ** 3,
+        freeMemBytes: 8 * 1024 ** 3,
+        cpus: 8,
+        loadAvg1: 0,
+      }),
+    },
     cwd: '/ws',
     homedir: '/home/test',
   };

@@ -29,6 +29,7 @@ export function registerDoctor(server: McpServer, logger: Logger, services: Serv
         obsidianVaultPath: services.obsidianVaultPath,
         obsidianSearchRoots: obsidianSearchRoots(services),
         nodeVersion: process.version,
+        resources: services.system.resources(),
       });
 
       logger.info(

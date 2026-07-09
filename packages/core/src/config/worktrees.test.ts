@@ -17,6 +17,18 @@ describe('resolveWorktreeConfig', () => {
     expect(resolved.branchPrefix).toBe('chamba/');
     expect(resolved.layout).toBe('sibling');
   });
+
+  it('defaults the parallelism knobs to auto (null)', () => {
+    const d = resolveWorktreeConfig();
+    expect(d.maxParallel).toBeNull();
+    expect(d.perWorkerMemMB).toBeNull();
+  });
+
+  it('carries an explicit parallelism cap and per-worker estimate', () => {
+    const resolved = resolveWorktreeConfig({ maxParallel: 2, perWorkerMemMB: 1024 });
+    expect(resolved.maxParallel).toBe(2);
+    expect(resolved.perWorkerMemMB).toBe(1024);
+  });
 });
 
 describe('worktrees schema (via parseChambaConfig)', () => {
@@ -55,6 +67,19 @@ describe('worktrees schema (via parseChambaConfig)', () => {
 
   it('rejects unknown keys in worktrees', () => {
     const result = parseChambaConfig({ version: 1, worktrees: { nope: true } });
+    expect(result.ok).toBe(false);
+  });
+
+  it('accepts maxParallel and perWorkerMemMB', () => {
+    const result = parseChambaConfig({
+      version: 1,
+      worktrees: { maxParallel: 3, perWorkerMemMB: 1536 },
+    });
+    expect(result.ok).toBe(true);
+  });
+
+  it('rejects a non-positive maxParallel', () => {
+    const result = parseChambaConfig({ version: 1, worktrees: { maxParallel: 0 } });
     expect(result.ok).toBe(false);
   });
 });

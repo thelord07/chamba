@@ -3,8 +3,8 @@ import { EFFORT_LEVELS } from '../config/roles.js';
 import {
   getModel,
   MODEL_CATALOG,
-  modelCaveat,
   type ModelInfo,
+  modelCaveat,
   modelsByProvider,
   resolveEffort,
 } from './catalog.js';

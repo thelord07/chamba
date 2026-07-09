@@ -45,6 +45,9 @@ chamba (the tool) handles the supervising, validating and plumbing around it.
 - **Safe by default.** No chamba agent deletes or destroys anything on its own — a DB
   drop/reset/truncate, deleting files or data, a force-push or a branch delete all stop
   and ask for your explicit confirmation first (a Claude Code hook enforces it too).
+- **Resource-aware parallelism.** Before a multi-repo `/ticket` fans out workers, chamba
+  sizes safe concurrency from the machine's RAM/CPU (no LLM) — so a big ticket runs in
+  waves instead of thrashing an 8/16 GB laptop. Cap it with `worktrees.maxParallel`.
 
 ## Use chamba from your editor
 
@@ -91,7 +94,8 @@ the log directory and worktrees.
 | `chamba_summarize_to_vault` | `{ title, content, projectSlug? }` | Writes a run summary to `proyectos/` — grouped per project (git remote) + a per-folder `INDEX.md` for cheap recall |
 | `chamba_save_plan` | `{ title, content, projectSlug? }` | Saves a plan to `plans/` — same per-project grouping + index |
 | `chamba_vault_status` | `{}` | Resolved vault path + the notes chamba can see (diagnostic) |
-| `chamba_doctor` | `{}` | Environment health check (no LLM): Node, git, workspace, config, vault, logs, worktrees → pass/warn/fail. Also `npx @chamba/mcp doctor` |
+| `chamba_doctor` | `{}` | Environment health check (no LLM): Node, system (RAM/CPU), git (multi-repo aware), workspace, config, vault, logs, worktrees → pass/warn/fail. Also `npx @chamba/mcp doctor` |
+| `chamba_resource_budget` | `{ requested?, perWorkerMemMB? }` | Safe parallelism for **this** machine (no LLM): reads live RAM/CPU/load → how many worktrees/workers to run at once. Consult it before a multi-repo fan-out |
 | `chamba_generate_plan` | `{ task, context? }` | A structured plan template to fill |
 | `chamba_review_plan` | `{ plan, task, context? }` | `{ approved, issues, suggestions, riskFlags }` — no LLM |
 | `chamba_create_worktree` | `{ taskSlug, workerId, baseBranch? }` | An isolated git worktree |

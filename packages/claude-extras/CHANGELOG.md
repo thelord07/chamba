@@ -1,5 +1,30 @@
 # @chamba/claude-extras
 
+## 0.12.0
+
+### Minor Changes
+
+- Resource-aware parallelism + multi-repo doctor fix.
+
+  **Safe parallelism (no LLM).** New `chamba_resource_budget` tool reads live RAM, CPU
+  cores and load and returns how many worktrees/subagents to run at once, so a multi-repo
+  `/ticket` fans out in **waves** instead of thrashing or OOM-ing an 8/16 GB machine.
+  `chamba_create_worktrees` now returns `recommendedParallelism`, and the `/ticket` and
+  `/orq` prompts run per-repo workers in waves of that size. Cap or tune it with
+  `worktrees.maxParallel` / `worktrees.perWorkerMemMB` in `.chamba/config.json`. Conservative
+  by default (2 GB/worker estimate) — an OOM is a worse failure than one fewer parallel worker.
+
+  **Doctor: multi-repo aware.** `chamba doctor` no longer false-positives "not a git repo"
+  on a multi-repo container (where the root is a folder of repos, not a repo itself) — it
+  reports the repo count instead. It also adds a `system` line: total/free RAM, cores, and
+  the safe parallel-worker ceiling.
+
+### Patch Changes
+
+- Updated dependencies
+  - @chamba/core@0.12.0
+  - @chamba/adapters@0.12.0
+
 ## 0.11.1
 
 ### Patch Changes

@@ -26,6 +26,16 @@ export interface WorktreeConfig {
   repos: string[] | null;
   /** Escape hatch: if set, chamba shells out to this command instead of the built-in. */
   command: string | null;
+  /**
+   * Hard cap on how many repos/workers the orchestrator runs in parallel.
+   * `null` = auto (chamba sizes it from the machine's RAM/CPU).
+   */
+  maxParallel: number | null;
+  /**
+   * Estimated RAM per parallel worker, in MB, used to size safe parallelism.
+   * `null` = the built-in default (2 GB). Lower it for light stacks.
+   */
+  perWorkerMemMB: number | null;
 }
 
 export type PartialWorktreeConfig = Partial<WorktreeConfig>;
@@ -51,6 +61,8 @@ export const DEFAULT_WORKTREE_CONFIG: WorktreeConfig = {
   editorWorkspace: null,
   repos: null,
   command: null,
+  maxParallel: null,
+  perWorkerMemMB: null,
 };
 
 /** Merge a partial (on-disk) worktree config over the compiled defaults. */
@@ -68,5 +80,7 @@ export function resolveWorktreeConfig(file?: PartialWorktreeConfig): WorktreeCon
     editorWorkspace: file.editorWorkspace !== undefined ? file.editorWorkspace : d.editorWorkspace,
     repos: file.repos !== undefined ? file.repos : d.repos,
     command: file.command !== undefined ? file.command : d.command,
+    maxParallel: file.maxParallel !== undefined ? file.maxParallel : d.maxParallel,
+    perWorkerMemMB: file.perWorkerMemMB !== undefined ? file.perWorkerMemMB : d.perWorkerMemMB,
   };
 }

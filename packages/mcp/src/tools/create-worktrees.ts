@@ -1,5 +1,6 @@
 import {
   buildTicketBranch,
+  computeConcurrencyBudget,
   detectGitRepos,
   editorWorkspaceDir,
   joinPath,
@@ -114,15 +115,37 @@ export function registerCreateWorktrees(
         workspaceFile = await writeEditorWorkspace(services.fs, dir, ticket, items);
       }
 
-      logger.info({ tool: TOOL_NAME, ticket, repos: results.length }, 'create-worktrees');
+      // Size safe parallelism from the machine so the orchestrator can fan out
+      // in waves instead of launching a worker per repo and exhausting RAM.
+      const budget = computeConcurrencyBudget({
+        resources: services.system.resources(),
+        requested: results.length,
+        perWorkerMemMB: worktrees.perWorkerMemMB ?? undefined,
+        cap: worktrees.maxParallel ?? undefined,
+      });
+
+      logger.info(
+        {
+          tool: TOOL_NAME,
+          ticket,
+          repos: results.length,
+          recommendedParallelism: budget.recommended,
+        },
+        'create-worktrees',
+      );
 
       const lines = results.map(
         (r) =>
           `- ${r.repo}: ${r.status} → ${r.worktreePath}${r.envCopied > 0 ? ` (${r.envCopied} env)` : ''}`,
       );
+      const parallelNote =
+        results.length > 1
+          ? `\n\nParallelism: run up to ${budget.recommended} of these at a time — ${budget.reason}.`
+          : '';
       const text =
         `Worktrees for ${ticket} on branch ${branch} (${worktrees.layout} layout):\n${lines.join('\n')}` +
         `${workspaceFile ? `\nEditor workspace: ${workspaceFile}` : ''}` +
+        parallelNote +
         '\n\nBranches are left open — review, commit and merge by hand.';
 
       return {
@@ -133,6 +156,8 @@ export function registerCreateWorktrees(
           layout: worktrees.layout,
           workspaceFile,
           worktrees: results,
+          recommendedParallelism: budget.recommended,
+          parallelismReason: budget.reason,
         } as Record<string, unknown>,
       };
     },

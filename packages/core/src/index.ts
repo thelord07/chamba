@@ -83,6 +83,14 @@ export type { ClockPort } from './ports/clock.js';
 // Ports
 export type { DirEntry, FilesystemPort } from './ports/filesystem.js';
 export type { ProcessExecOptions, ProcessPort, ProcessResult } from './ports/process.js';
+export type { SystemPort, SystemResources } from './ports/system.js';
+// Resource budget (safe parallelism, no LLM)
+export type {
+  BudgetLimit,
+  ConcurrencyBudget,
+  ConcurrencyBudgetInput,
+} from './resources/budget.js';
+export { computeConcurrencyBudget } from './resources/budget.js';
 export type { ProcessHandler, RecordedCall } from './testing/fake-process.js';
 export { FakeProcess } from './testing/fake-process.js';
 

@@ -43,6 +43,10 @@ El modelo de tu editor hace el razonamiento y llama a las tools de chamba. Eso s
   — un drop/reset/truncate de DB, borrar archivos o datos, un force-push o borrar una
   rama se detienen y te piden confirmación explícita primero (un hook de Claude Code
   también lo refuerza).
+- **Paralelismo consciente de recursos.** Antes de que un `/ticket` multi-repo abra
+  workers, chamba dimensiona la concurrencia segura según la RAM/CPU de la máquina (sin
+  LLM) — así un ticket grande corre en oleadas en vez de trabar una laptop de 8/16 GB.
+  Lo capás con `worktrees.maxParallel`.
 
 ## Usá chamba desde tu editor
 
@@ -90,7 +94,8 @@ el directorio de logs y los worktrees.
 | `chamba_summarize_to_vault` | `{ title, content, projectSlug? }` | Escribe un resumen a `proyectos/` — agrupado por proyecto (git remote) + un `INDEX.md` por carpeta para recall barato |
 | `chamba_save_plan` | `{ title, content, projectSlug? }` | Guarda un plan en `plans/` — mismo agrupamiento por proyecto + índice |
 | `chamba_vault_status` | `{}` | Ruta del vault resuelta + las notas que chamba ve (diagnóstico) |
-| `chamba_doctor` | `{}` | Chequeo de salud del entorno (sin LLM): Node, git, workspace, config, vault, logs, worktrees → pass/warn/fail. También `npx @chamba/mcp doctor` |
+| `chamba_doctor` | `{}` | Chequeo de salud del entorno (sin LLM): Node, sistema (RAM/CPU), git (consciente de multi-repo), workspace, config, vault, logs, worktrees → pass/warn/fail. También `npx @chamba/mcp doctor` |
+| `chamba_resource_budget` | `{ requested?, perWorkerMemMB? }` | Paralelismo seguro para **esta** máquina (sin LLM): lee RAM/CPU/carga en vivo → cuántos worktrees/workers correr a la vez. Consultalo antes de un fan-out multi-repo |
 | `chamba_generate_plan` | `{ task, context? }` | Un template de plan para completar |
 | `chamba_review_plan` | `{ plan, task, context? }` | `{ approved, issues, suggestions, riskFlags }` — sin LLM |
 | `chamba_create_worktree` | `{ taskSlug, workerId, baseBranch? }` | Un git worktree aislado |

@@ -24,6 +24,14 @@ function makeServices(
       },
     },
     clock: { now: () => new Date('2026-07-05T10:00:00Z'), today: () => '2026-07-05' },
+    system: {
+      resources: () => ({
+        totalMemBytes: 16 * 1024 ** 3,
+        freeMemBytes: 8 * 1024 ** 3,
+        cpus: 8,
+        loadAvg1: 0,
+      }),
+    },
     cwd: '/proj',
     homedir: '/home/test',
     obsidianVaultPath: opts.vaultPath,

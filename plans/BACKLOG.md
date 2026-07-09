@@ -51,6 +51,12 @@ Detalle en [tier1-doctor-memory-presets.md](tier1-doctor-memory-presets.md).
 - Aprieta el loop de QA de 0.7.0.
 - Archivos: `packages/claude-extras/assets/agents/planner.md`, `packages/core/src/plan/validator.ts`, tests.
 
+### C. Paralelismo consciente de recursos (RAM/CPU) — ✅ HECHO (0.12.0)
+Detalle en [resource-aware-parallelism.md](resource-aware-parallelism.md).
+- Tool determinista `chamba_resource_budget` (mide vía `node:os`, aritmética pura, cero LLM);
+  `create_worktrees` devuelve `recommendedParallelism`; `/ticket` y `/orq` corren por **oleadas**.
+  Cap en `worktrees.maxParallel` / `worktrees.perWorkerMemMB`. Doctor suma línea `system`.
+
 ---
 
 ## 🔭 Tier 3 — después
@@ -81,10 +87,9 @@ Mismo patrón que QA/Playwright: **detectar → usar si está → degradar a scr
 
 ## 🐛 Fixes / mejoras encontradas
 
-### Doctor: falso-positivo en workspaces multi-repo
-Encontrado dogfooding en **finalis**. El check "Git repo" corre `git rev-parse` sólo en el `cwd`; en un workspace multi-repo (el top-level es contenedor, los sub-repos son git) warnea de más.
-- Fix: usar `detectGitRepos` (ya existe en core) y reportar *"N git repos found (multi-repo workspace)"* en vez de ⚠.
-- Es una mejora chica al feature que acabamos de shippear (0.10.0). Buen candidato a un 0.10.1.
+### Doctor: falso-positivo en workspaces multi-repo — ✅ HECHO (0.12.0)
+Encontrado dogfooding en **finalis**. El check "Git repo" corría `git rev-parse` sólo en el `cwd`; en un workspace multi-repo (el top-level es contenedor, los sub-repos son git) warneaba de más.
+- Fix: cuando el `cwd` no es work tree, usa `detectGitRepos` y reporta *"multi-repo workspace — N git repos"* (ok) en vez de ⚠; salta el check de worktrees en el contenedor.
 
 ---
 

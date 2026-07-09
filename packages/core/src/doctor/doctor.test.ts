@@ -26,6 +26,7 @@ function input(over: Partial<DoctorInput> = {}, handler: ProcessHandler = gitOk)
     obsidianVaultPath: '/vault',
     obsidianSearchRoots: [],
     nodeVersion: 'v22.3.0',
+    resources: { totalMemBytes: 16 * 1024 ** 3, freeMemBytes: 8 * 1024 ** 3, cpus: 8, loadAvg1: 0 },
     ...over,
   };
 }
@@ -42,6 +43,8 @@ describe('runDoctor', () => {
     expect(report.healthy).toBe(true);
     expect(report.fail).toBe(0);
     expect(byId(report.checks, 'node').status).toBe('ok');
+    expect(byId(report.checks, 'system').status).toBe('ok');
+    expect(byId(report.checks, 'system').detail).toContain('parallel');
     expect(byId(report.checks, 'git').status).toBe('ok');
     expect(byId(report.checks, 'git-repo').status).toBe('ok');
     expect(byId(report.checks, 'workspace').status).toBe('ok');
@@ -82,6 +85,26 @@ describe('runDoctor', () => {
     expect(byId(report.checks, 'git-repo').status).toBe('warn');
     expect(report.checks.find((c) => c.id === 'worktrees')).toBeUndefined();
     expect(report.healthy).toBe(true); // warn does not break healthy
+  });
+
+  it('treats a multi-repo container as ok, not a false-positive warn', async () => {
+    const notRepo: ProcessHandler = (cmd, args) => {
+      if (cmd === 'git' && args[0] === 'rev-parse') return { stdout: '', exitCode: 128 };
+      return gitOk(cmd, args);
+    };
+    const fs = new MemoryFilesystem({
+      '/proj/.chamba/workspace.md': '# Workspace\n',
+      '/proj/api/.git/config': '',
+      '/proj/web/.git/config': '',
+    });
+    const report = await runDoctor(input({ fs }, notRepo));
+    const repo = byId(report.checks, 'git-repo');
+    expect(repo.status).toBe('ok');
+    expect(repo.detail).toContain('multi-repo workspace');
+    expect(repo.detail).toContain('2 git repos');
+    // the worktree list is meaningless on the container → skipped
+    expect(report.checks.find((c) => c.id === 'worktrees')).toBeUndefined();
+    expect(report.healthy).toBe(true);
   });
 
   it('warns when the workspace file and vault are missing', async () => {

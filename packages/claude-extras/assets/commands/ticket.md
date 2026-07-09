@@ -65,9 +65,16 @@ the workspace.
    (title: the ticket id) to persist it under the vault's `plans/` folder.
 5. Create isolated worktrees ONLY for the repos the plan identified: call
    `chamba_create_worktrees` with the ticket and that repo list. ALL work happens
-   inside these worktrees — never edit the main checkouts.
+   inside these worktrees — never edit the main checkouts. Its result includes
+   `recommendedParallelism` — a safe number of repos to work at once for THIS machine's
+   RAM/CPU (or call `chamba_resource_budget` yourself with the repo count).
 6. For each subtask/repo, delegate implementation to the **implementer** subagent
    (in that repo's worktree) and the tests to the **tester** subagent; run them.
+   **Respect the machine budget:** if `recommendedParallelism` is below the number of
+   repos, fan out in **waves** of that size instead of launching a worker per repo at
+   once — on an 8/16 GB laptop, every worker (dev server + build) running together can
+   thrash or OOM. Say the cap and why in one line when it bites; the same applies to any
+   dev servers the QA phase starts.
 7. **Verify against the real diff** (not the plan). For each touched repo: have the
    **reviewer** subagent audit the actual diff for correctness, missing tests, and
    **referential closure** — anything the change deleted must leave no orphaned

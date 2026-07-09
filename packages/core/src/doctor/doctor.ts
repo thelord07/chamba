@@ -1,9 +1,12 @@
 import { loadConfig } from '../config/loader.js';
 import type { FilesystemPort } from '../ports/filesystem.js';
 import type { ProcessPort } from '../ports/process.js';
+import type { SystemResources } from '../ports/system.js';
+import { computeConcurrencyBudget } from '../resources/budget.js';
 import { joinPath } from '../util/path.js';
 import { ObsidianDetector } from '../workspace/obsidian-detector.js';
 import { WORKSPACE_DIR, WORKSPACE_RELATIVE_PATH } from '../workspace/workspace.js';
+import { detectGitRepos } from '../worktree/git-repo-detector.js';
 
 /** Outcome of a single health check. `fail` is the only status that is not-healthy. */
 export type CheckStatus = 'ok' | 'warn' | 'fail';
@@ -41,6 +44,8 @@ export interface DoctorInput {
   obsidianSearchRoots?: string[];
   /** Running Node version, e.g. `process.version` ("v22.3.0"). */
   nodeVersion?: string;
+  /** Live machine resources; when present, adds a `system` capacity line. */
+  resources?: SystemResources;
 }
 
 const MIN_NODE_MAJOR = 22;
@@ -58,14 +63,17 @@ export async function runDoctor(input: DoctorInput): Promise<DoctorReport> {
   const checks: DoctorCheck[] = [];
 
   checks.push(checkNode(input.nodeVersion));
+  if (input.resources) checks.push(checkSystem(input.resources));
   checks.push(await checkGit(input));
   const repo = await checkGitRepo(input);
-  checks.push(repo);
+  checks.push(repo.check);
   checks.push(await checkWorkspace(input));
   checks.push(await checkConfig(input));
   checks.push(await checkVault(input));
   checks.push(await checkLogDir(input));
-  if (repo.status === 'ok') checks.push(await checkWorktrees(input));
+  // The worktree list only makes sense inside a single repo's work tree, not on
+  // a multi-repo container (where each child, not the root, is the git repo).
+  if (repo.directWorkTree) checks.push(await checkWorktrees(input));
 
   const ok = checks.filter((c) => c.status === 'ok').length;
   const warn = checks.filter((c) => c.status === 'warn').length;
@@ -100,6 +108,18 @@ function parseNodeMajor(version?: string): number | null {
   return m ? Number(m[1]) : null;
 }
 
+/** Informational: the machine's capacity and the safe parallel-worker ceiling. */
+function checkSystem(resources: SystemResources): DoctorCheck {
+  const budget = computeConcurrencyBudget({ resources });
+  const workers = budget.recommended === 1 ? 'worker' : 'workers';
+  return {
+    id: 'system',
+    name: 'System',
+    status: 'ok',
+    detail: `${budget.totalMemGB} GB RAM (${budget.freeMemGB} GB free), ${budget.cpus} cores → up to ${budget.recommended} parallel ${workers}`,
+  };
+}
+
 async function checkGit(input: DoctorInput): Promise<DoctorCheck> {
   const base = { id: 'git', name: 'git' };
   const res = await tryExec(input.process, 'git', ['--version']);
@@ -114,7 +134,16 @@ async function checkGit(input: DoctorInput): Promise<DoctorCheck> {
   };
 }
 
-async function checkGitRepo(input: DoctorInput): Promise<DoctorCheck> {
+/**
+ * The git-repo check plus whether the cwd is itself a work tree (vs a container
+ * of repos). `directWorkTree` gates the worktree-list check downstream.
+ */
+interface GitRepoResult {
+  check: DoctorCheck;
+  directWorkTree: boolean;
+}
+
+async function checkGitRepo(input: DoctorInput): Promise<GitRepoResult> {
   const base = { id: 'git-repo', name: 'Git repo' };
   const res = await tryExec(
     input.process,
@@ -123,14 +152,48 @@ async function checkGitRepo(input: DoctorInput): Promise<DoctorCheck> {
     input.cwd,
   );
   if (res && res.exitCode === 0 && res.stdout.trim() === 'true') {
-    return { ...base, status: 'ok', detail: `${input.cwd} is a git work tree` };
+    return {
+      check: { ...base, status: 'ok', detail: `${input.cwd} is a git work tree` },
+      directWorkTree: true,
+    };
   }
+
+  // Not a work tree itself — but it may be a multi-repo container (each child
+  // dir is its own git repo, e.g. a "workspace" folder). That's a valid setup,
+  // not a problem: report the repo count instead of a false-positive warning.
+  const childRepos = await detectChildRepos(input.fs, input.cwd);
+  if (childRepos.length > 0) {
+    const preview = childRepos.slice(0, 4).join(', ');
+    const more = childRepos.length > 4 ? ', …' : '';
+    return {
+      check: {
+        ...base,
+        status: 'ok',
+        detail: `multi-repo workspace — ${childRepos.length} git repo${
+          childRepos.length === 1 ? '' : 's'
+        } (${preview}${more})`,
+      },
+      directWorkTree: false,
+    };
+  }
+
   return {
-    ...base,
-    status: 'warn',
-    detail: `${input.cwd} is not a git repo`,
-    hint: 'Worktree tools (create/list/cleanup) are unavailable outside a git repo.',
+    check: {
+      ...base,
+      status: 'warn',
+      detail: `${input.cwd} is not a git repo`,
+      hint: 'Worktree tools (create/list/cleanup) are unavailable outside a git repo.',
+    },
+    directWorkTree: false,
   };
+}
+
+async function detectChildRepos(fs: FilesystemPort, cwd: string): Promise<string[]> {
+  try {
+    return await detectGitRepos(fs, cwd);
+  } catch {
+    return [];
+  }
 }
 
 async function checkWorkspace(input: DoctorInput): Promise<DoctorCheck> {

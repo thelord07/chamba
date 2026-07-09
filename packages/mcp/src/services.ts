@@ -1,6 +1,6 @@
 import { homedir } from 'node:os';
-import { NodeFilesystem, NodeProcess, SystemClock } from '@chamba/adapters';
-import type { ClockPort, FilesystemPort, ProcessPort } from '@chamba/core';
+import { NodeFilesystem, NodeProcess, NodeSystem, SystemClock } from '@chamba/adapters';
+import type { ClockPort, FilesystemPort, ProcessPort, SystemPort } from '@chamba/core';
 
 /**
  * The OS-level services every tool needs, wired to Node adapters by default.
@@ -11,6 +11,8 @@ export interface Services {
   fs: FilesystemPort;
   process: ProcessPort;
   clock: ClockPort;
+  /** Reads live machine resources (RAM/CPU) for safe-parallelism sizing. */
+  system: SystemPort;
   /** Workspace root used when a tool doesn't receive an explicit one. */
   cwd: string;
   /** User home directory, used to probe common Obsidian vault locations. */
@@ -24,6 +26,7 @@ export function createNodeServices(): Services {
     fs: new NodeFilesystem(),
     process: new NodeProcess(),
     clock: new SystemClock(),
+    system: new NodeSystem(),
     cwd: process.cwd(),
     homedir: homedir(),
     obsidianVaultPath: process.env.CHAMBA_OBSIDIAN_VAULT_PATH,
