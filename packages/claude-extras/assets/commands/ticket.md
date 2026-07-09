@@ -84,8 +84,9 @@ the workspace.
    **running app** — driving the browser if the project has E2E tooling, otherwise
    co-piloting with me. **The login is always my step**: it opens the browser and
    asks me to log in (and to re-log in per user on multi-user flows) while it drives
-   and watches. It reports PASS/FAIL per criterion. If there's no `## QA plan`, skip
-   this step. This is the only interactive touchpoint at the end.
+   and watches. It reports PASS/FAIL per criterion, each backed by a numbered
+   evidence screenshot in a per-run folder kept **outside any git repo**. If there's no
+   `## QA plan`, skip this step. This is the only interactive touchpoint at the end.
 9. Call `chamba_summarize_to_vault` with a summary of what changed.
 10. STOP and report for my review. The report MUST include:
     - the repos touched and why;

@@ -30,5 +30,7 @@ specific editor primitive — adapt to what you have.
    the app, opens the browser, and asks me to log in — then it drives each acceptance
    criterion against the running app (re-asking me to log in per user on multi-user
    flows).
-4. Report **PASS/FAIL per acceptance criterion** with the evidence. Everything is
-   local and non-destructive — do NOT commit, push, or touch production.
+4. Report **PASS/FAIL per acceptance criterion**, each line linking its numbered
+   evidence screenshot in the run folder (kept **outside any git repo** — never inside
+   the public chamba repo), and end with the path to that folder. Everything is local
+   and non-destructive — do NOT commit, push, or touch production.

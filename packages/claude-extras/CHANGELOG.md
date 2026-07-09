@@ -1,5 +1,26 @@
 # @chamba/claude-extras
 
+## 0.11.1
+
+### Patch Changes
+
+- qa agent: formalize and organize screenshot evidence, kept **outside every git repo**.
+  It now captures a numbered screenshot for **every** acceptance criterion (PASS and FAIL)
+  into a fixed, categorized layout — `<evidence-root>/<ticket>/<run-date>/
+NN-<criterion>-<PASS|FAIL>.png` plus a `report.md` per run, one folder per run so
+  re-runs don't overwrite. The evidence root is the workspace's `.chamba/qa-evidence/`
+  only when the workspace isn't itself a git repo; otherwise it falls back to
+  `~/.chamba/qa-evidence/<workspace>/` so nothing is ever committable — never loose in a
+  repo root and never inside chamba's own public repo. Backstop: if evidence ever lands
+  inside a git working tree, the agent auto-adds `qa-evidence/` to that repo's
+  `.gitignore`. Reflected in the `/ticket` and `/qa` command reports.
+- qa agent: discover before you create. Before seeding or provisioning anything, it now
+  inventories existing users, roles and the RBAC/permissions model, and asks whether to
+  reuse them instead of creating throwaway accounts — only requesting new users for the
+  gaps existing ones don't cover. Faster setup, no permissions pollution.
+  - @chamba/adapters@0.11.1
+  - @chamba/core@0.11.1
+
 ## 0.11.0
 
 ### Patch Changes
