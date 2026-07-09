@@ -137,10 +137,11 @@ const CONTENT = {
     benefits: [
       { no: '01', title: 'Cero API keys', body: 'Sin ANTHROPIC_API_KEY ni OPENAI_API_KEY. Tu editor ya paga su propio modelo; chamba nunca llama a un LLM.' },
       { no: '02', title: 'Todo editor MCP, desde el día uno', body: 'Un solo servidor stdio funciona en Cursor, Claude Code, VS Code, Windsurf, Cline y OpenCode.' },
-      { no: '03', title: '/ticket de punta a punta', body: 'Orquestador‑trabajador: plan → worktrees por repo → implementación → verificación del diff → QA, con un único gate de clarificación. El fan-out corre en oleadas dimensionadas a la RAM/CPU de tu máquina. Nunca hace auto‑merge, push, ni borra datos sin tu confirmación explícita.' },
+      { no: '03', title: '/ticket de punta a punta', body: 'Orquestador‑trabajador: plan → worktrees por repo → implementación → verificación del diff → QA, con un único gate de clarificación. Nunca hace auto‑merge, push, ni borra datos sin tu confirmación explícita.' },
       { no: '04', title: 'Tests con tu propio runner', body: 'El subagente tester escribe y corre tests para cada cambio con el runner y las convenciones de tu repo, y reporta pass/fail honestamente. Unitarios e integración — aparte del QA de aceptación sobre la app corriendo.' },
       { no: '05', title: 'Modelo + effort por agente', body: 'Configurás qué modelo y esfuerzo usa cada rol (planner, reviewer, qa, implementer…), o cambiás todo de una con un preset: budget · balanced · quality · fast. Multi‑proveedor, con Claude Fable 5 opt‑in.' },
-      { no: '06', title: 'El vault como memoria del equipo', body: 'chamba lee tu vault de Obsidian al contexto, guarda resúmenes en proyectos/, planes en plans/ y memoria entre sesiones (remember/recall). Agrupa las notas por proyecto (git remote) y mantiene un INDEX.md por carpeta, así el recall escanea un índice barato. Todo markdown plano: el equipo lo comparte y commitea — memoria colectiva que sobrevive a un solo chat.' }
+      { no: '06', title: 'El vault como memoria del equipo', body: 'chamba lee tu vault de Obsidian al contexto, guarda resúmenes en proyectos/, planes en plans/ y memoria entre sesiones (remember/recall). Agrupa las notas por proyecto (git remote) y mantiene un INDEX.md por carpeta, así el recall escanea un índice barato. Todo markdown plano: el equipo lo comparte y commitea — memoria colectiva que sobrevive a un solo chat.' },
+      { no: '07', title: 'Se adapta a tu potencia', body: 'chamba mide la RAM y la CPU de tu máquina y ajusta cuántos repos trabaja en paralelo: si te sobra potencia, abre más; si es una laptop de 8/16 GB, corre en oleadas para que nada se trabe ni se caiga por falta de memoria. La chamba no se frena. Todo sin LLM, y lo capás con worktrees.maxParallel.' }
     ],
     toolsKicker: 'Herramientas',
     toolsTitle: 'Las herramientas MCP que expone',
@@ -201,7 +202,8 @@ const CONTENT = {
       { label: 'Fase de QA de aceptación', a: '✅', b: '⚠️', c: '❌' },
       { label: 'Modelo + effort por agente', a: '✅', b: '⚠️', c: '❌' },
       { label: 'Contexto Obsidian + escritura', a: '✅', b: '❌', c: '❌' },
-      { label: 'Memoria entre sesiones', a: '✅', b: '⚠️', c: '⚠️' }
+      { label: 'Memoria entre sesiones', a: '✅', b: '⚠️', c: '⚠️' },
+      { label: 'Se adapta a la potencia de la máquina', a: '✅', b: '❌', c: '❌' }
     ],
     rmKicker: 'Roadmap + Changelog',
     rmTitle: 'Construido en público, fase por fase',
@@ -260,10 +262,11 @@ const CONTENT = {
     benefits: [
       { no: '01', title: 'Zero API keys', body: 'No ANTHROPIC_API_KEY, no OPENAI_API_KEY. Your editor already pays for its own model; chamba never calls an LLM.' },
       { no: '02', title: 'Every MCP editor, day one', body: 'One stdio server works in Cursor, Claude Code, VS Code, Windsurf, Cline and OpenCode.' },
-      { no: '03', title: 'End‑to‑end /ticket', body: 'Orchestrator‑worker: plan → per‑repo worktrees → implement → diff verify → QA, with one clarification gate. The fan-out runs in waves sized to your machine’s RAM/CPU. It never auto‑merges, pushes, or deletes data without your explicit confirmation.' },
+      { no: '03', title: 'End‑to‑end /ticket', body: 'Orchestrator‑worker: plan → per‑repo worktrees → implement → diff verify → QA, with one clarification gate. It never auto‑merges, pushes, or deletes data without your explicit confirmation.' },
       { no: '04', title: 'Tests with your own runner', body: 'The tester subagent writes and runs tests for each change with your repo’s runner and conventions, and reports pass/fail honestly. Unit and integration — separate from acceptance QA on the running app.' },
       { no: '05', title: 'Per‑agent model + effort', body: 'Set which model and effort each role uses (planner, reviewer, qa, implementer…), or flip everything at once with a preset: budget · balanced · quality · fast. Multi‑provider, with Claude Fable 5 opt‑in.' },
-      { no: '06', title: 'The vault as team memory', body: 'chamba reads your Obsidian vault into context, saves summaries to proyectos/, plans to plans/ and cross‑session memory (remember/recall). It groups notes per project (git remote) and keeps a per‑folder INDEX.md so recall scans a cheap index. All plain markdown: your team shares and commits it — collective memory that outlives a single chat.' }
+      { no: '06', title: 'The vault as team memory', body: 'chamba reads your Obsidian vault into context, saves summaries to proyectos/, plans to plans/ and cross‑session memory (remember/recall). It groups notes per project (git remote) and keeps a per‑folder INDEX.md so recall scans a cheap index. All plain markdown: your team shares and commits it — collective memory that outlives a single chat.' },
+      { no: '07', title: 'Adapts to your machine', body: 'chamba reads your RAM and CPU and tunes how many repos it works in parallel: plenty of power → more at once; an 8/16 GB laptop → it runs in waves so nothing stalls or crashes for lack of memory. The work keeps moving. All LLM‑free, and you cap it with worktrees.maxParallel.' }
     ],
     toolsKicker: 'Tools',
     toolsTitle: 'The MCP tools it exposes',
@@ -324,7 +327,8 @@ const CONTENT = {
       { label: 'Acceptance‑QA phase', a: '✅', b: '⚠️', c: '❌' },
       { label: 'Per‑agent model + effort', a: '✅', b: '⚠️', c: '❌' },
       { label: 'Obsidian context + write‑back', a: '✅', b: '❌', c: '❌' },
-      { label: 'Cross‑session memory', a: '✅', b: '⚠️', c: '⚠️' }
+      { label: 'Cross‑session memory', a: '✅', b: '⚠️', c: '⚠️' },
+      { label: 'Adapts to your machine', a: '✅', b: '❌', c: '❌' }
     ],
     rmKicker: 'Roadmap + Changelog',
     rmTitle: 'Built in public, phase by phase',
