@@ -18,7 +18,7 @@ chamba (the tool) handles the supervising, validating and plumbing around it.
 
 📖 [Español](./README.es.md) · 🧩 [Editor setup guides](./examples/) · 🗺️ [Roadmap](#roadmap)
 
-> 🎉 **v0.1.0 is live on npm** — `npx @chamba/mcp`. Built in public, phase by phase
+> 🎉 **v0.11.1 is live on npm** — `npx @chamba/mcp`. Built in public, phase by phase
 > ([`PLAN.md`](./PLAN.md)). Pre-1.0: usable today, still evolving.
 
 ## Demo
@@ -42,6 +42,9 @@ chamba (the tool) handles the supervising, validating and plumbing around it.
   back, and persist knowledge as plain markdown. Notes are grouped per project (by git
   remote) and each folder keeps a lightweight `INDEX.md`, so recall scans a cheap index
   instead of reading every note.
+- **Safe by default.** No chamba agent deletes or destroys anything on its own — a DB
+  drop/reset/truncate, deleting files or data, a force-push or a branch delete all stop
+  and ask for your explicit confirmation first (a Claude Code hook enforces it too).
 
 ## Use chamba from your editor
 
@@ -147,6 +150,14 @@ chamba still never calls a model: this only tells your editor's model how to del
 Other editors read the same config via `chamba_get_agent_config`. See the
 [claude-extras README](./packages/claude-extras/README.md#configuration-per-agent-model--effort).
 
+**Acceptance QA, as a co-pilot.** When a ticket is user-facing, the `qa` agent validates
+the acceptance criteria against the *running* app — driving a real browser if the repo
+has Playwright/Cypress (or a browser MCP), otherwise running the app from the worktree
+and co-piloting with you. Every login is your step; it reuses the users/roles that
+already exist instead of creating throwaway accounts, seeds only additively, and captures
+a numbered screenshot per criterion (PASS and FAIL) into a per-run evidence folder kept
+outside every git repo. Run it inside `/ticket` or on its own with `/qa`.
+
 ## Packages
 
 | Package | What it is |
@@ -179,6 +190,7 @@ Other editors read the same config via `chamba_get_agent_config`. See the
 - ✅ **0.1.0 published on npm**
 - ✅ Per-agent model + effort config (wizard + `chamba_get_agent_config`)
 - ✅ Multi-repo worktrees + `/ticket` flow (config-driven, env copy, `.code-workspace`)
+- ✅ Acceptance-QA co-pilot (`/qa` + `qa` agent): validates criteria on the running app, screenshot evidence, login always human
 - 🔭 V2: semantic vault search, MCP sampling, more knowledge bases
 
 See [`PLAN.md`](./PLAN.md) for the full phase plan.

@@ -18,8 +18,8 @@ chamba (la herramienta) se encarga de supervisar, validar y toda la plomería.
 
 📖 [English](./README.md) · 🧩 [Guías de configuración por editor](./examples/) · 🗺️ [Roadmap](#roadmap)
 
-> ⚠️ Pre-1.0, construido en público fase por fase ([`PLAN.md`](./PLAN.md)). El set
-> completo de tools de V1 ya está implementado; falta el release y el pulido.
+> 🎉 **v0.11.1 en npm** — `npx @chamba/mcp`. Construido en público, fase por fase
+> ([`PLAN.md`](./PLAN.md)). Pre-1.0: usable hoy, todavía evolucionando.
 
 ## La idea clave: chamba NO llama a un LLM
 
@@ -39,6 +39,10 @@ El modelo de tu editor hace el razonamiento y llama a las tools de chamba. Eso s
   de vuelta, y persiste conocimiento como markdown plano. Las notas se agrupan por
   proyecto (por git remote) y cada carpeta mantiene un `INDEX.md` liviano, así el recall
   escanea un índice barato en vez de leer todas las notas.
+- **Seguro por defecto.** Ningún agente de chamba borra ni destruye nada por su cuenta
+  — un drop/reset/truncate de DB, borrar archivos o datos, un force-push o borrar una
+  rama se detienen y te piden confirmación explícita primero (un hook de Claude Code
+  también lo refuerza).
 
 ## Usá chamba desde tu editor
 
@@ -125,8 +129,8 @@ Cursor/VS Code ya tienen todo vía MCP. En **Claude Code** podés además agrega
 commands, subagents y hooks:
 
 ```bash
-npx @chamba/claude-extras install     # /orq, /workspace, /worktrees, /recall +
-                                      # agentes implementer/reviewer/tester + 2 hooks
+npx @chamba/claude-extras install     # /ticket, /workspace, /map, /qa, /worktrees … +
+                                      # agentes planner/implementer/reviewer/tester/qa + 2 hooks
 npx @chamba/claude-extras uninstall
 ```
 
@@ -134,13 +138,21 @@ Idempotente, no sobrescribe tus archivos (`--force` para forzar), preserva otros
 servers en `~/.claude.json`. Después: `/orq agrega un endpoint de health check`.
 
 **Config por agente.** El primer install corre un wizard para elegir modelo + esfuerzo
-por rol (orchestrator, planner, reviewer, implementer, tester, summarizer, researcher),
+por rol (orchestrator, planner, reviewer, implementer, tester, qa, summarizer, researcher),
 con defaults eficientes pre-configurados — modelos potentes para razonar, rápidos y
 baratos para lo mecánico. Reconfigurás con `npx @chamba/claude-extras config <show|set|wizard|…>`,
 o cambiás todo el dial de costo/calidad de una con `config preset <budget|balanced|quality|fast>`.
 chamba sigue sin llamar a ningún modelo: esto solo le dice al modelo de tu editor cómo
 delegar. Otros editores leen la misma config vía `chamba_get_agent_config`. Ver el
 [README de claude-extras](./packages/claude-extras/README.md#configuration-per-agent-model--effort).
+
+**QA de aceptación, como co-piloto.** Cuando un ticket es user-facing, el agente `qa`
+valida los criterios de aceptación contra la app *corriendo* — maneja un navegador real
+si el repo tiene Playwright/Cypress (o un MCP de browser), si no levanta la app desde el
+worktree y co-pilotea con vos. Cada login es tu paso; reusa los usuarios/roles que ya
+existen en vez de crear cuentas descartables, siembra solo de forma aditiva, y captura
+una screenshot numerada por criterio (PASS y FAIL) en una carpeta de evidencia por
+corrida, fuera de todo repo git. Corrélo dentro de `/ticket` o suelto con `/qa`.
 
 ## Roadmap
 
@@ -154,6 +166,7 @@ delegar. Otros editores leen la misma config vía `chamba_get_agent_config`. Ver
 - ✅ **0.1.0 publicado en npm**
 - ✅ Config de modelo + esfuerzo por agente (wizard + `chamba_get_agent_config`)
 - ✅ Worktrees multi-repo + flujo `/ticket` (por config, copia de `.env`, `.code-workspace`)
+- ✅ Co-piloto de QA de aceptación (`/qa` + agente `qa`): valida criterios sobre la app corriendo, evidencia en screenshots, login siempre humano
 - 🔭 V2: búsqueda semántica del vault, MCP sampling, más bases de conocimiento
 
 Ver [`PLAN.md`](./PLAN.md) para el plan completo de fases.
