@@ -45,20 +45,19 @@ Detalle en [tier1-doctor-memory-presets.md](tier1-doctor-memory-presets.md).
 
 ---
 
-## 🔜 Tier 2 — próximo (target 0.13.0)
+## ✅ Tier 2 — HECHO (0.13.0)
+Detalle en [tier2-rollback-gwt.md](tier2-rollback-gwt.md).
 
-### A. Backup/rollback del instalador (claude-extras)
-- Snapshot de `~/.claude.json` + assets instalados **antes** de `install --force` y `uninstall`.
-- Nuevo `chamba-install rollback` que restaura el último snapshot.
-- Retención de N snapshots + "pin"; dedup por hash.
-- Encaja con "nunca destruir en silencio".
-- Archivos: `packages/claude-extras/src/installer.ts` (+ snapshot store), `cli.ts` (verbo `rollback`), tests.
+### A. Backup/rollback del instalador — ✅ HECHO (0.13.0)
+- `install --force` y `uninstall` hacen **snapshot** de `~/.claude.json` + assets bajo
+  `~/.chamba/backups/` antes de tocar nada. Nuevo `chamba-install rollback`
+  (`--list` / `<id>` / `--pin`). Dedup por hash (FNV-1a), retención newest-5 + pineados.
+  `SnapshotStore` puro sobre `FilesystemPort`.
 
-### B. Aceptación en Given/When/Then (planner + reviewer)
-- El `planner` emite los criterios del `## QA plan` como **Given/When/Then**.
-- El reviewer heurístico (sin LLM) valida que cada criterio sea **testeable** (tiene G/W/T) → si no, warning.
-- Aprieta el loop de QA de 0.7.0.
-- Archivos: `packages/claude-extras/assets/agents/planner.md`, `packages/core/src/plan/validator.ts`, tests.
+### B. Aceptación en Given/When/Then — ✅ HECHO (0.13.0)
+- El `planner` emite los criterios del `## QA plan` como **Given/When/Then**
+  (Dado/Cuando/Entonces); el reviewer heurístico (sin LLM) warnea `qa-criteria-not-testable`
+  si el QA plan no los estructura así.
 
 ### C. Paralelismo consciente de recursos (RAM/CPU) — ✅ HECHO (0.12.0)
 Detalle en [resource-aware-parallelism.md](resource-aware-parallelism.md).
@@ -114,10 +113,9 @@ Encontrado dogfooding en **finalis**. El check "Git repo" corría `git rev-parse
 - ✅ **0.11.0** — auth detection, qa co-piloto, delete-guard.
 - ✅ **0.11.1** — qa: evidencia con screenshots + reuso de users.
 - ✅ **0.12.0** — paralelismo consciente de recursos + fix doctor multi-repo.
+- ✅ **0.13.0** — Tier 2: rollback del instalador + aceptación Given/When/Then.
 
 ## Orden sugerido (lo que sigue)
-1. **0.13.0** — Tier 2 restante: **A** backup/rollback del instalador + **B** aceptación en
-   Given/When/Then. (Se pueden partir en 0.13.0 y 0.14.0 si conviene shipear de a uno.)
-2. **0.14.0+** — Tier 3, arrancando por *ticket design-aware (Figma)* que es el de más valor
+1. **0.14.0+** — Tier 3, arrancando por *ticket design-aware (Figma)* que es el de más valor
    para el día a día; después skills registry, más editores, calidad de release.
-3. **1.0.0** — pulido y estabilización cuando Tier 2/3 core esté sólido.
+2. **1.0.0** — pulido y estabilización cuando Tier 3 core esté sólido.
