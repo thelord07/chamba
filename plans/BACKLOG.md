@@ -67,18 +67,16 @@ Detalle en [resource-aware-parallelism.md](resource-aware-parallelism.md).
 
 ---
 
-## 🔭 Tier 3 — después (0.14.0+)
+## 🔭 Tier 3 — en curso (0.14.0+)
 
-### 1. Ticket "design-aware" (Figma MCP)  ← idea nueva de esta conversación
-Mismo patrón que QA/Playwright: **detectar → usar si está → degradar a screenshots**. chamba no llama a Figma; el modelo del editor sí.
-- **Planner**: sección `## Design` cuando el ticket es visual (link Figma/screenshots, frames/nodes, breakpoints, estados).
-- **Implementer**: si hay Figma MCP, saca tokens/medidas/tipografía exactas; si no, trabaja de screenshots + specs.
-- **QA**: check visual — **Figma MCP + Playwright MCP combinados** (Playwright renderiza, Figma da la referencia, reporta PASS/FAIL visual). Si no hay MCP, contra screenshots.
-- Refuerzo no-LLM opcional: `validator.ts` → si el ticket es front y trae link `figma.com` pero el plan no capturó diseño → warning `missing-design-capture` (espíritu de `missing-qa-plan`).
-- Honestidad: venderlo como "design-accurate / verificado contra Figma", no "pixel perfect mágico".
-- Archivos: `ticket.md` (preámbulo degrade), `planner.md`, `implementer.md`, `qa.md`, `validator.ts`.
+### 1. Ticket "design-aware" (Figma MCP) — ✅ HECHO (0.14.0)
+Detalle en [tier3-design-aware.md](tier3-design-aware.md).
+- `planner` emite `## Design` para tickets visuales; `implementer` saca tokens/medidas de un
+  Figma MCP si está (si no, screenshots); `qa` suma check visual contra la referencia;
+  reviewer heurístico warnea `missing-design-capture` (link figma sin `## Design`). Honesto:
+  design-accurate, no "pixel perfect". chamba no llama a Figma; el MCP del editor sí.
 
-### 2. Registry de skills/playbooks (index-first)
+### 2. Registry de skills/playbooks (index-first) ← próximo (0.15.0)
 - `.chamba/skills/*.md` indexados `{name, description, scope, path}`; el modelo matchea tarea→description y lee el `SKILL.md` completo (tokens baratos, cero LLM del lado de chamba).
 - Enviarlo **vacío**; la comunidad lo llena. Ojo scope creep → opt-in.
 
@@ -114,8 +112,10 @@ Encontrado dogfooding en **finalis**. El check "Git repo" corría `git rev-parse
 - ✅ **0.11.1** — qa: evidencia con screenshots + reuso de users.
 - ✅ **0.12.0** — paralelismo consciente de recursos + fix doctor multi-repo.
 - ✅ **0.13.0** — Tier 2: rollback del instalador + aceptación Given/When/Then.
+- ✅ **0.14.0** — Tier 3 #1: ticket design-aware (Figma).
 
 ## Orden sugerido (lo que sigue)
-1. **0.14.0+** — Tier 3, arrancando por *ticket design-aware (Figma)* que es el de más valor
-   para el día a día; después skills registry, más editores, calidad de release.
-2. **1.0.0** — pulido y estabilización cuando Tier 3 core esté sólido.
+1. **0.15.0** — Tier 3 #2: registry de skills/playbooks (index-first).
+2. **0.16.0** — Tier 3 #3: más editores (examples/) — barato, MCP-first.
+3. **0.17.0** — Tier 3 #4: calidad de release (golden tests, doctor gate, `--yes`, checklist).
+4. **1.0.0** — pulido y estabilización cuando Tier 3 esté sólido.

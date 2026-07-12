@@ -209,6 +209,21 @@ export function validatePlan(input: ValidatePlanInput): ValidationResult {
     );
   }
 
+  // 11. A design reference (Figma) is present but the plan never captured the design.
+  if (/figma\.com/i.test(plan) && !hasSection(sec, 'design')) {
+    issues.push({
+      code: 'missing-design-capture',
+      severity: 'warning',
+      message:
+        'The ticket references a Figma design but the plan has no "## Design" section: ' +
+        'the frames/nodes, breakpoints and states to build to and verify against.',
+    });
+    suggestions.push(
+      'Add a "## Design" section (Figma link or screenshots, the specific frames/nodes, ' +
+        'breakpoints, and states) so the implementer builds to it and the qa agent verifies against it.',
+    );
+  }
+
   return { issues, suggestions, riskFlags };
 }
 

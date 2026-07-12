@@ -69,7 +69,9 @@ the workspace.
    `recommendedParallelism` — a safe number of repos to work at once for THIS machine's
    RAM/CPU (or call `chamba_resource_budget` yourself with the repo count).
 6. For each subtask/repo, delegate implementation to the **implementer** subagent
-   (in that repo's worktree) and the tests to the **tester** subagent; run them.
+   (in that repo's worktree) and the tests to the **tester** subagent; run them. If the
+   plan has a `## Design` section, the implementer builds to it — exact tokens/measures
+   from a Figma MCP if one is configured, otherwise the screenshots + specs.
    **Respect the machine budget:** if `recommendedParallelism` is below the number of
    repos, fan out in **waves** of that size instead of launching a worker per repo at
    once — on an 8/16 GB laptop, every worker (dev server + build) running together can
@@ -88,8 +90,9 @@ the workspace.
    subagent to **co-pilot** it from the worktree: apply the local data seed, ask me
    to provision any identity-provider users (Auth0/Firebase/…) rather than creating
    them itself, run the app, and validate each acceptance criterion against the
-   **running app** — driving the browser if the project has E2E tooling, otherwise
-   co-piloting with me. **The login is always my step**: it opens the browser and
+   **running app** — plus, when the plan has a `## Design` section, a **visual check**
+   against the design reference (Figma MCP if configured, else the screenshots) —
+   driving the browser if the project has E2E tooling, otherwise co-piloting with me. **The login is always my step**: it opens the browser and
    asks me to log in (and to re-log in per user on multi-user flows) while it drives
    and watches. It reports PASS/FAIL per criterion, each backed by a numbered
    evidence screenshot in a per-run folder kept **outside any git repo**. If there's no

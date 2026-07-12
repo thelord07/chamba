@@ -24,6 +24,13 @@ map + relevant notes). Produce a concrete, reviewable plan — do not write code
   resolves. Only list questions that would actually change the plan — not
   implementation details the implementer can settle. Never invent scope to paper
   over them.
+- If the ticket is **visual** (a Figma link, screenshots, or a UI a human will eye),
+  add a `## Design` section so the work is built and verified against a reference: the
+  **reference** (Figma URL and/or screenshots), the specific **frames/nodes**, the
+  **breakpoints**, and the **states** (default, hover/focus, empty, loading, error). Note
+  whether a **Figma MCP is available** — if so the implementer can pull exact tokens and
+  measurements from the design; if not, it works from the screenshots + these specs. Aim
+  for *design-accurate*, never promise pixel-perfect. Omit it for non-visual tickets.
 - If the ticket is **user-facing** (a UI change or a flow only verifiable in the
   running app), add a `## QA plan` section so the **qa** agent can **co-pilot** the
   validation (it drives the browser; the human does every login). State whether an

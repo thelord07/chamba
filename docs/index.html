@@ -68,7 +68,7 @@
 
 <script>
 const AC = 'var(--accent)', OK = 'var(--accent2)', AM = 'var(--amber)', MU = 'var(--muted)';
-const VERSION = '0.13.0';
+const VERSION = '0.14.0';
 
 const EDITORS = [
   { id: 'cursor', name: 'Cursor', file: '.cursor/mcp.json',
@@ -128,7 +128,8 @@ const CONTENT = {
       cards: [
         { tag: 'ultracode', title: 'ultracode en Claude Code', body: 'Enciende ultracode y los pasos de verify, review y QA de chamba se abren en chequeos multi‑agente adversariales. Gasta más tokens. chamba lo aprovecha si está disponible y, si no, corre en un solo pase sin romperse.' },
         { tag: 'Fable 5', title: 'Fable 5 opt‑in', body: 'Modelo premium que asignás a mano a un rol (planner, reviewer, qa) cuando el ticket lo amerita. No es el default: lo activás vos. chamba te muestra el costo y el requisito de retención de datos en el wizard, el hint de config y el frontmatter del subagente.' },
-        { tag: 'QA', title: 'QA en el navegador', body: 'El agente qa valida los criterios contra la app corriendo: maneja un navegador real vía Playwright MCP en Claude Code o el navegador integrado de Cursor. Sin tooling de browser, levanta la app desde el worktree y te copilotea criterio por criterio. Co‑piloto, no autopiloto: cada login lo hacés vos, reusa los usuarios que ya existen en vez de crear cuentas de más, y deja una screenshot por criterio (PASS y FAIL) como evidencia fuera de todo repo git. Reporta PASS/FAIL y nunca commitea ni borra datos.' }
+        { tag: 'QA', title: 'QA en el navegador', body: 'El agente qa valida los criterios contra la app corriendo: maneja un navegador real vía Playwright MCP en Claude Code o el navegador integrado de Cursor. Sin tooling de browser, levanta la app desde el worktree y te copilotea criterio por criterio. Co‑piloto, no autopiloto: cada login lo hacés vos, reusa los usuarios que ya existen en vez de crear cuentas de más, y deja una screenshot por criterio (PASS y FAIL) como evidencia fuera de todo repo git. Reporta PASS/FAIL y nunca commitea ni borra datos.' },
+        { tag: 'Figma', title: 'Design-aware', body: 'Para tickets visuales: el planner captura el diseño (link Figma o screenshots), el implementer saca tokens y medidas exactas de un Figma MCP si está configurado (si no, de screenshots), y el qa hace un check visual contra la referencia. chamba no llama a Figma; lo hace el MCP de tu editor. Honesto: design‑accurate, no «pixel perfect».' }
       ],
       note: 'Fable 5 es premium y NO forma parte de los planes de suscripción de Claude: usarlo es una decisión de costo y acceso de quien lo corre.'
     },
@@ -217,7 +218,7 @@ const CONTENT = {
       { badge: 'Listo', dot: OK, title: 'Modelo + effort por agente', desc: 'Reparto por rol, wizard y Claude Fable 5 opt‑in.' },
       { badge: 'Listo', dot: OK, title: 'QA de aceptación (/qa + agente qa)', desc: 'Valida los criterios contra la app corriendo; Playwright o co‑piloto, con evidencia en screenshots y login siempre humano.' },
       { badge: 'Listo', dot: OK, title: '/map de arquitectura + carpeta plans/', desc: 'Mapa cross‑repo al vault y planes persistidos.' },
-      { badge: 'Ahora', dot: AM, title: 'v0.13.0 en npm', desc: '@chamba/mcp, core, adapters y claude‑extras publicados.' },
+      { badge: 'Ahora', dot: AM, title: 'v0.14.0 en npm', desc: '@chamba/mcp, core, adapters y claude‑extras publicados.' },
       { badge: 'Siguiente', dot: AC, title: 'Release 1.0.0 estable', desc: 'Pulido final y publicación 1.0.' },
       { badge: 'Explorando', dot: MU, title: 'V2: registro de servicios, búsqueda semántica', desc: 'Registro con detección de drift y búsqueda del vault.' }
     ],
@@ -253,7 +254,8 @@ const CONTENT = {
       cards: [
         { tag: 'ultracode', title: 'ultracode in Claude Code', body: 'Turn on ultracode and chamba’s verify, review and QA passes fan out into adversarial multi‑agent checks. It costs more tokens. chamba uses it when it’s available and falls back to a single pass elsewhere, no breakage.' },
         { tag: 'Fable 5', title: 'Fable 5 opt‑in', body: 'Premium model you assign by hand to a role (planner, reviewer, qa) when a hard ticket warrants it. It’s not the default: you switch it on. chamba surfaces its cost and data‑retention requirement in the wizard, the config hint and the subagent frontmatter.' },
-        { tag: 'QA', title: 'Browser QA', body: 'The qa agent validates acceptance criteria against the running app: it drives a real browser via a Playwright MCP in Claude Code or Cursor’s built‑in browser. With no browser tooling, it runs the app from the worktree and co‑pilots each criterion with you. Co‑pilot, not autopilot: every login is your step, it reuses the users that already exist instead of creating throwaway accounts, and drops a screenshot per criterion (PASS and FAIL) as evidence kept outside every git repo. Reports PASS/FAIL and never commits or deletes data.' }
+        { tag: 'QA', title: 'Browser QA', body: 'The qa agent validates acceptance criteria against the running app: it drives a real browser via a Playwright MCP in Claude Code or Cursor’s built‑in browser. With no browser tooling, it runs the app from the worktree and co‑pilots each criterion with you. Co‑pilot, not autopilot: every login is your step, it reuses the users that already exist instead of creating throwaway accounts, and drops a screenshot per criterion (PASS and FAIL) as evidence kept outside every git repo. Reports PASS/FAIL and never commits or deletes data.' },
+        { tag: 'Figma', title: 'Design-aware', body: 'For visual tickets: the planner captures the design (Figma link or screenshots), the implementer pulls exact tokens and measurements from a Figma MCP if one is configured (else from screenshots), and the qa agent runs a visual check against the reference. chamba never calls Figma; your editor’s MCP does. Honest: design‑accurate, not “pixel‑perfect”.' }
       ],
       note: 'Fable 5 is premium and NOT part of consumer Claude subscription plans: using it is a cost and access decision for whoever runs it.'
     },
@@ -342,7 +344,7 @@ const CONTENT = {
       { badge: 'Shipped', dot: OK, title: 'Per‑agent model + effort config', desc: 'Per‑role split, wizard and Claude Fable 5 opt‑in.' },
       { badge: 'Shipped', dot: OK, title: 'Acceptance QA (/qa + qa agent)', desc: 'Validates criteria against the running app; Playwright or co‑pilot, with screenshot evidence and login always human.' },
       { badge: 'Shipped', dot: OK, title: '/map architecture + plans/ folder', desc: 'Cross‑repo map to the vault and persisted plans.' },
-      { badge: 'Now', dot: AM, title: 'v0.13.0 on npm', desc: '@chamba/mcp, core, adapters and claude‑extras published.' },
+      { badge: 'Now', dot: AM, title: 'v0.14.0 on npm', desc: '@chamba/mcp, core, adapters and claude‑extras published.' },
       { badge: 'Next', dot: AC, title: 'Stable 1.0.0 release', desc: 'Final polish and the 1.0 publish.' },
       { badge: 'Exploring', dot: MU, title: 'V2: service registry, semantic search', desc: 'Registry with drift detection and vault search.' }
     ],

@@ -163,6 +163,12 @@ already exist instead of creating throwaway accounts, seeds only additively, and
 a numbered screenshot per criterion (PASS and FAIL) into a per-run evidence folder kept
 outside every git repo. Run it inside `/ticket` or on its own with `/qa`.
 
+**Design-aware for visual tickets.** Same detect→use→degrade pattern: the planner captures
+the design in a `## Design` section, the implementer pulls exact tokens/measurements from a
+**Figma MCP** if one is configured (else it works from screenshots), and the qa agent does a
+**visual check** against the reference. chamba never calls Figma — your editor's MCP does —
+and it's honest about being *design-accurate / verified against the reference*, not "pixel-perfect".
+
 ## Packages
 
 | Package | What it is |

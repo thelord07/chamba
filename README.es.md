@@ -160,6 +160,12 @@ existen en vez de crear cuentas descartables, siembra solo de forma aditiva, y c
 una screenshot numerada por criterio (PASS y FAIL) en una carpeta de evidencia por
 corrida, fuera de todo repo git. Corrélo dentro de `/ticket` o suelto con `/qa`.
 
+**Design-aware para tickets visuales.** Mismo patrón detectar→usar→degradar: el planner
+captura el diseño en una sección `## Design`, el implementer saca tokens/medidas exactas de
+un **Figma MCP** si está configurado (si no, trabaja de screenshots), y el qa hace un
+**check visual** contra la referencia. chamba nunca llama a Figma — lo hace el MCP de tu
+editor — y es honesto: *design-accurate / verificado contra la referencia*, no "pixel perfect".
+
 ## Roadmap
 
 - ✅ MCP server + scanner de workspace

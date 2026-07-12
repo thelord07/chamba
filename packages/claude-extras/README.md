@@ -261,6 +261,17 @@ Run `npx playwright install chromium` once — the browsers land in your **user 
 nothing is added to your `package.json` or `node_modules`. chamba never bundles or runs a
 browser itself — the `qa` agent uses whatever is available and co-pilots when nothing is.
 
+## Design-aware tickets (Figma)
+
+Same pattern as QA: **detect → use if present → degrade to screenshots**. For a visual
+ticket, the **planner** adds a `## Design` section (Figma link/screenshots, the frames/nodes,
+breakpoints, states). The **implementer** pulls exact tokens and measurements from a **Figma
+MCP** if one is configured, otherwise builds from the screenshots + specs. The **qa** agent
+adds a **visual check** — comparing the rendered UI to the design reference and reporting a
+visual PASS/FAIL. The heuristic reviewer warns `missing-design-capture` when a plan links
+Figma but never captures the design. chamba never calls Figma — your editor's Figma MCP does;
+it's honest about being **design-accurate / verified against the reference**, not "pixel-perfect".
+
 ## License
 
 MIT

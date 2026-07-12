@@ -232,4 +232,37 @@ describe('validatePlan', () => {
   it('does not raise the G/W/T warning for a backend-only plan', () => {
     expect(codes(GOOD_PLAN)).not.toContain('qa-criteria-not-testable');
   });
+
+  it('warns when a Figma link is present but the plan has no Design section', () => {
+    const plan = `## Acceptance criteria
+- [ ] the settings screen matches the design, with tests
+
+## Subtasks
+1. **implementer** — build the screen in src/screens/Settings.tsx
+2. **tester** — add vitest tests
+
+Reference: https://www.figma.com/file/abc/Settings?node-id=12-34`;
+    const issue = validatePlan({ plan, task: 't' }).issues.find(
+      (i) => i.code === 'missing-design-capture',
+    );
+    expect(issue?.severity).toBe('warning');
+  });
+
+  it('does not warn when the plan captures the design in a ## Design section', () => {
+    const plan = `## Acceptance criteria
+- [ ] the settings screen matches the design, with tests
+
+## Design
+- Figma: https://www.figma.com/file/abc/Settings?node-id=12-34
+- Frames: Settings/Default, Settings/Empty; breakpoints 375 / 1024; states: hover, error.
+
+## Subtasks
+1. **implementer** — build the screen in src/screens/Settings.tsx
+2. **tester** — add vitest tests`;
+    expect(codes(plan)).not.toContain('missing-design-capture');
+  });
+
+  it('does not warn about design when there is no Figma reference', () => {
+    expect(codes(GOOD_PLAN)).not.toContain('missing-design-capture');
+  });
 });

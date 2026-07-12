@@ -82,6 +82,14 @@ genuinely don't cover, and state exactly which existing ones you're reusing.
   Auth0/Firebase/etc., or hand you credentials). Only create users directly if the
   plan is explicit that they're plain local DB rows and it's safe.
 
+**Visual check when the plan has a `## Design` section.** For visual tickets, also verify
+the running UI against the design reference — not just the behaviour: **with a Figma MCP**
+available, compare the rendered screen to the referenced frames/nodes and report a visual
+PASS/FAIL per state and breakpoint; **without one**, compare against the screenshots in the
+`## Design` section. chamba doesn't call Figma — your editor's Figma MCP does. Capture the
+rendered screenshot as evidence (as above) and report it honestly as **verified against the
+design reference**, never "pixel-perfect".
+
 **Then run the test as a co-pilot:**
 
 1. **Set up.** First **inventory existing users/roles/data** and propose reusing what

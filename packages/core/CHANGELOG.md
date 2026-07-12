@@ -1,5 +1,21 @@
 # @chamba/core
 
+## 0.14.0
+
+### Minor Changes
+
+- Tier 3 #1: design-aware tickets (Figma). Same detect→use→degrade pattern as QA — chamba
+  never calls Figma; your editor's Figma MCP does.
+
+  - **planner** adds a `## Design` section for visual tickets (Figma link/screenshots, the
+    frames/nodes, breakpoints, states).
+  - **implementer** pulls exact tokens/measurements from a Figma MCP when configured, else
+    builds from the screenshots + specs — design-accurate, never "pixel-perfect".
+  - **qa** adds a visual check: compare the rendered UI to the design reference (Figma MCP +
+    browser, or against the screenshots) and report a visual PASS/FAIL.
+  - Heuristic reviewer (`chamba_review_plan`, no LLM) warns `missing-design-capture` when a
+    plan links Figma but has no `## Design` section.
+
 ## 0.13.0
 
 ### Minor Changes
