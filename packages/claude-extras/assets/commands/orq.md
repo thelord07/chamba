@@ -15,7 +15,8 @@ and reconcile them; with **one subagent at a time**, run the passes sequentially
 **no subagents**, do the work inline yourself. Never assume a specific editor
 primitive — adapt to what you have.
 
-1. Call `chamba_load_context` with the task to pull workspace + relevant notes.
+1. Call `chamba_load_context` with the task to pull workspace + relevant notes, and
+   `chamba_load_skills` for matching team playbooks — read and follow the ones it returns.
 2. Delegate to the **planner** subagent to produce the plan (goal, acceptance
    criteria, subtasks with workers, risks, files).
 3. Call `chamba_review_plan` with the plan and have the **reviewer** subagent

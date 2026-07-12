@@ -1,6 +1,6 @@
 {
   "name": "@chamba/core",
-  "version": "0.14.0",
+  "version": "0.15.0",
   "description": "Core logic for chamba: workspace scanner, plan + heuristic reviewer, git worktrees, Obsidian, memory — no Node APIs, no LLM",
   "license": "MIT",
   "type": "module",

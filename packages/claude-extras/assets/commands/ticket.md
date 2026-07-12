@@ -29,7 +29,9 @@ only for the repos actually touched — do not create a worktree for every repo 
 the workspace.
 
 1. Call `chamba_load_context` with the ticket to pull the workspace map (all repos
-   and what each one is) + relevant Obsidian notes + each repo's coding rules.
+   and what each one is) + relevant Obsidian notes + each repo's coding rules. Also call
+   `chamba_load_skills` with the ticket to surface any team playbooks/conventions that
+   match — read the body of the ones it returns and follow them.
 2. Obtain the plan:
    - **If I passed `-p <plan-path>` and the file exists:** read it and use it as
      THE plan — do NOT delegate to the planner. Run it through `chamba_review_plan`

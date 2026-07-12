@@ -91,6 +91,7 @@ the log directory and worktrees.
 | `chamba_workspace_show` | `{}` | Contents of `.chamba/workspace.md` |
 | `chamba_workspace_reload` | `{}` | A diff vs a fresh re-scan (no writes) |
 | `chamba_load_context` | `{ task, includeObsidian? }` | Workspace summary + relevant vault notes |
+| `chamba_load_skills` | `{ task, max? }` | Relevant team playbooks from `.chamba/skills/*.md` (index-first, no LLM) + the full catalog. Ships empty, opt-in |
 | `chamba_summarize_to_vault` | `{ title, content, projectSlug? }` | Writes a run summary to `proyectos/` — grouped per project (git remote) + a per-folder `INDEX.md` for cheap recall |
 | `chamba_save_plan` | `{ title, content, projectSlug? }` | Saves a plan to `plans/` — same per-project grouping + index |
 | `chamba_vault_status` | `{}` | Resolved vault path + the notes chamba can see (diagnostic) |

@@ -55,6 +55,7 @@ describe('chamba MCP server', () => {
       'chamba_get_agent_config',
       'chamba_list_worktrees',
       'chamba_load_context',
+      'chamba_load_skills',
       'chamba_recall',
       'chamba_remember',
       'chamba_resource_budget',

@@ -272,6 +272,26 @@ visual PASS/FAIL. The heuristic reviewer warns `missing-design-capture` when a p
 Figma but never captures the design. chamba never calls Figma — your editor's Figma MCP does;
 it's honest about being **design-accurate / verified against the reference**, not "pixel-perfect".
 
+## Skills / playbooks
+
+Reusable conventions and playbooks live in `.chamba/skills/*.md`, each with frontmatter:
+
+```markdown
+---
+name: knex-multitenant
+description: Multi-tenant Knex queries — always filter by tenant_id
+scope: backend
+---
+The playbook body: steps, conventions, gotchas, examples.
+```
+
+At the start of a task, `/ticket` and `/orq` call **`chamba_load_skills`**, which matches the
+task against each skill's `description` (index-first, **no LLM**) and returns the relevant ones
+**with their body** plus the full catalog — so the model reads a cheap index and only pulls the
+playbooks that apply. It ships **empty and opt-in**: you and your team fill `.chamba/skills/`
+over time (project scope), and personal playbooks can live in `~/.chamba/skills/` (a project
+skill of the same name wins).
+
 ## License
 
 MIT

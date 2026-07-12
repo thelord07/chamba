@@ -91,6 +91,15 @@ export type {
   ConcurrencyBudgetInput,
 } from './resources/budget.js';
 export { computeConcurrencyBudget } from './resources/budget.js';
+// Skills / playbooks registry (index-first, no LLM)
+export type { Skill, SkillRef } from './skills/skill.js';
+export {
+  collectSkillRefs,
+  parseSkillFrontmatter,
+  rankSkills,
+  readSkill,
+  SKILLS_DIR,
+} from './skills/skill-registry.js';
 export type { ProcessHandler, RecordedCall } from './testing/fake-process.js';
 export { FakeProcess } from './testing/fake-process.js';
 

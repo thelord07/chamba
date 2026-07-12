@@ -68,7 +68,7 @@
 
 <script>
 const AC = 'var(--accent)', OK = 'var(--accent2)', AM = 'var(--amber)', MU = 'var(--muted)';
-const VERSION = '0.14.0';
+const VERSION = '0.15.0';
 
 const EDITORS = [
   { id: 'cursor', name: 'Cursor', file: '.cursor/mcp.json',
@@ -153,6 +153,7 @@ const CONTENT = {
       { name: 'workspace_show', in: '{ }', out: 'Contenido de .chamba/workspace.md' },
       { name: 'workspace_reload', in: '{ }', out: 'Un diff contra un re‑escaneo (sin escribir)' },
       { name: 'load_context', in: '{ task, includeObsidian? }', out: 'Resumen del workspace + notas del vault + reglas de código' },
+      { name: 'load_skills', in: '{ task, max? }', out: 'Playbooks relevantes de .chamba/skills (index-first, sin LLM)' },
       { name: 'summarize_to_vault', in: '{ title, content, projectSlug? }', out: 'Escribe un resumen a la carpeta proyectos/' },
       { name: 'save_plan', in: '{ title, content, projectSlug? }', out: 'Guarda un plan en la carpeta plans/' },
       { name: 'vault_status', in: '{ }', out: 'Ruta del vault + las notas que chamba ve (diagnóstico)' },
@@ -218,7 +219,7 @@ const CONTENT = {
       { badge: 'Listo', dot: OK, title: 'Modelo + effort por agente', desc: 'Reparto por rol, wizard y Claude Fable 5 opt‑in.' },
       { badge: 'Listo', dot: OK, title: 'QA de aceptación (/qa + agente qa)', desc: 'Valida los criterios contra la app corriendo; Playwright o co‑piloto, con evidencia en screenshots y login siempre humano.' },
       { badge: 'Listo', dot: OK, title: '/map de arquitectura + carpeta plans/', desc: 'Mapa cross‑repo al vault y planes persistidos.' },
-      { badge: 'Ahora', dot: AM, title: 'v0.14.0 en npm', desc: '@chamba/mcp, core, adapters y claude‑extras publicados.' },
+      { badge: 'Ahora', dot: AM, title: 'v0.15.0 en npm', desc: '@chamba/mcp, core, adapters y claude‑extras publicados.' },
       { badge: 'Siguiente', dot: AC, title: 'Release 1.0.0 estable', desc: 'Pulido final y publicación 1.0.' },
       { badge: 'Explorando', dot: MU, title: 'V2: registro de servicios, búsqueda semántica', desc: 'Registro con detección de drift y búsqueda del vault.' }
     ],
@@ -279,6 +280,7 @@ const CONTENT = {
       { name: 'workspace_show', in: '{ }', out: 'Contents of .chamba/workspace.md' },
       { name: 'workspace_reload', in: '{ }', out: 'A diff vs a fresh re‑scan (no writes)' },
       { name: 'load_context', in: '{ task, includeObsidian? }', out: 'Workspace summary + vault notes + coding rules' },
+      { name: 'load_skills', in: '{ task, max? }', out: 'Relevant playbooks from .chamba/skills (index-first, no LLM)' },
       { name: 'summarize_to_vault', in: '{ title, content, projectSlug? }', out: 'Writes a run summary to proyectos/' },
       { name: 'save_plan', in: '{ title, content, projectSlug? }', out: 'Saves a plan to plans/' },
       { name: 'vault_status', in: '{ }', out: 'Resolved vault path + the notes chamba can see' },
@@ -344,7 +346,7 @@ const CONTENT = {
       { badge: 'Shipped', dot: OK, title: 'Per‑agent model + effort config', desc: 'Per‑role split, wizard and Claude Fable 5 opt‑in.' },
       { badge: 'Shipped', dot: OK, title: 'Acceptance QA (/qa + qa agent)', desc: 'Validates criteria against the running app; Playwright or co‑pilot, with screenshot evidence and login always human.' },
       { badge: 'Shipped', dot: OK, title: '/map architecture + plans/ folder', desc: 'Cross‑repo map to the vault and persisted plans.' },
-      { badge: 'Now', dot: AM, title: 'v0.14.0 on npm', desc: '@chamba/mcp, core, adapters and claude‑extras published.' },
+      { badge: 'Now', dot: AM, title: 'v0.15.0 on npm', desc: '@chamba/mcp, core, adapters and claude‑extras published.' },
       { badge: 'Next', dot: AC, title: 'Stable 1.0.0 release', desc: 'Final polish and the 1.0 publish.' },
       { badge: 'Exploring', dot: MU, title: 'V2: service registry, semantic search', desc: 'Registry with drift detection and vault search.' }
     ],

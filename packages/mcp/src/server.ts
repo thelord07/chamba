@@ -10,6 +10,7 @@ import { registerGeneratePlan } from './tools/generate-plan.js';
 import { registerGetAgentConfig } from './tools/get-agent-config.js';
 import { registerListWorktrees } from './tools/list-worktrees.js';
 import { registerLoadContext } from './tools/load-context.js';
+import { registerLoadSkills } from './tools/load-skills.js';
 import { registerRecall } from './tools/recall.js';
 import { registerRemember } from './tools/remember.js';
 import { registerResourceBudget } from './tools/resource-budget.js';
@@ -38,6 +39,7 @@ export function createServer(logger: Logger, services: Services = createNodeServ
   registerWorkspaceInit(server, logger, services);
   registerWorkspaceReload(server, logger, services);
   registerLoadContext(server, logger, services);
+  registerLoadSkills(server, logger, services);
   registerSummarizeToVault(server, logger, services);
   registerVaultStatus(server, logger, services);
   registerDoctor(server, logger, services);

@@ -1,5 +1,24 @@
 # @chamba/mcp
 
+## 0.15.0
+
+### Minor Changes
+
+- Tier 3 #2: skills/playbooks registry (index-first, no LLM).
+
+  New `chamba_load_skills` tool: reusable conventions live in `.chamba/skills/*.md` (project,
+  then `~/.chamba/skills`) with frontmatter `{ name, description, scope? }`. chamba matches the
+  task against each skill's `description` and returns the relevant ones **with their body** plus
+  the full catalog — the model reads a cheap index and only pulls the playbooks that apply. Zero
+  LLM on chamba's side. `/ticket` and `/orq` call it at the start of a task. Ships **empty and
+  opt-in** — you and your team fill it over time.
+
+### Patch Changes
+
+- Updated dependencies
+  - @chamba/core@0.15.0
+  - @chamba/adapters@0.15.0
+
 ## 0.14.0
 
 ### Patch Changes

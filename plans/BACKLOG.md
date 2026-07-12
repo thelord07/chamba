@@ -76,9 +76,11 @@ Detalle en [tier3-design-aware.md](tier3-design-aware.md).
   reviewer heurístico warnea `missing-design-capture` (link figma sin `## Design`). Honesto:
   design-accurate, no "pixel perfect". chamba no llama a Figma; el MCP del editor sí.
 
-### 2. Registry de skills/playbooks (index-first) ← próximo (0.15.0)
-- `.chamba/skills/*.md` indexados `{name, description, scope, path}`; el modelo matchea tarea→description y lee el `SKILL.md` completo (tokens baratos, cero LLM del lado de chamba).
-- Enviarlo **vacío**; la comunidad lo llena. Ojo scope creep → opt-in.
+### 2. Registry de skills/playbooks (index-first) — ✅ HECHO (0.15.0)
+Detalle en [tier3-skills-registry.md](tier3-skills-registry.md).
+- Tool `chamba_load_skills`: `.chamba/skills/*.md` (proyecto + `~/.chamba/skills`) con frontmatter
+  `{name, description, scope?}`; matchea tarea↔description (index-first, cero LLM), devuelve las
+  relevantes con cuerpo + el catálogo. Wired en `/ticket` y `/orq`. Vacío/opt-in.
 
 ### 3. Más editores (examples/)
 - Guías de setup para Gemini CLI, Codex, Kiro, Zed, JetBrains, Trae. Como es MCP-first, "soportar" = un snippet de config. Barato, agranda el TAM.
@@ -113,9 +115,9 @@ Encontrado dogfooding en **finalis**. El check "Git repo" corría `git rev-parse
 - ✅ **0.12.0** — paralelismo consciente de recursos + fix doctor multi-repo.
 - ✅ **0.13.0** — Tier 2: rollback del instalador + aceptación Given/When/Then.
 - ✅ **0.14.0** — Tier 3 #1: ticket design-aware (Figma).
+- ✅ **0.15.0** — Tier 3 #2: registry de skills/playbooks (index-first).
 
 ## Orden sugerido (lo que sigue)
-1. **0.15.0** — Tier 3 #2: registry de skills/playbooks (index-first).
-2. **0.16.0** — Tier 3 #3: más editores (examples/) — barato, MCP-first.
-3. **0.17.0** — Tier 3 #4: calidad de release (golden tests, doctor gate, `--yes`, checklist).
-4. **1.0.0** — pulido y estabilización cuando Tier 3 esté sólido.
+1. **0.16.0** — Tier 3 #3: más editores (examples/) — barato, MCP-first.
+2. **0.17.0** — Tier 3 #4: calidad de release (golden tests, doctor gate, `--yes`, checklist).
+3. **1.0.0** — pulido y estabilización cuando Tier 3 esté sólido.
