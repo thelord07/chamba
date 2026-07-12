@@ -14,7 +14,7 @@ Detalle en [tier1-doctor-memory-presets.md](tier1-doctor-memory-presets.md).
 
 ---
 
-## ✳️ Post-0.10.0 — sin publicar todavía (próximo release)
+## ✅ 0.11.0 / 0.11.1 — PUBLICADO
 - **qa como co-piloto (HECHO)** — el agente `qa` ya no crea usuarios de identity
   provider (Auth0/Firebase/Cognito → te los pide/confirma); el **login siempre es
   humano** (abre el browser y pausa, no automatiza credenciales); multi-user →
@@ -32,11 +32,20 @@ Detalle en [tier1-doctor-memory-presets.md](tier1-doctor-memory-presets.md).
   también pregunta ante wipes de DB (`prisma migrate reset`, `--force-reset`,
   `DROP`/`TRUNCATE`, `db:reset`…) y más borrados fs/git/docker. Changeset:
   `never-delete-without-asking` (patch).
-- **doctor multi-repo fix (pendiente)** — ver 🐛 abajo; entra en el mismo release.
+- **qa: evidencia + reuso de users (HECHO, 0.11.1)** — screenshots numeradas por criterio
+  (PASS/FAIL) en carpeta categorizada **fuera de todo repo git**; "discover before you
+  create" (inventaria users/roles/RBAC existentes y los reusa en vez de crear cuentas
+  descartables). Archivos: `qa.md`, comandos `ticket.md` + `qa.md`.
 
 ---
 
-## 🔜 Tier 2 — próximo (target 0.11.0)
+## ✅ 0.12.0 — PUBLICADO
+- **Paralelismo consciente de recursos (RAM/CPU)** — ver Tier 2 · C abajo (detalle completo).
+- **doctor multi-repo fix** — ver 🐛 abajo.
+
+---
+
+## 🔜 Tier 2 — próximo (target 0.13.0)
 
 ### A. Backup/rollback del instalador (claude-extras)
 - Snapshot de `~/.claude.json` + assets instalados **antes** de `install --force` y `uninstall`.
@@ -59,7 +68,7 @@ Detalle en [resource-aware-parallelism.md](resource-aware-parallelism.md).
 
 ---
 
-## 🔭 Tier 3 — después
+## 🔭 Tier 3 — después (0.14.0+)
 
 ### 1. Ticket "design-aware" (Figma MCP)  ← idea nueva de esta conversación
 Mismo patrón que QA/Playwright: **detectar → usar si está → degradar a screenshots**. chamba no llama a Figma; el modelo del editor sí.
@@ -100,7 +109,15 @@ Encontrado dogfooding en **finalis**. El check "Git repo" corría `git rev-parse
 
 ---
 
-## Orden sugerido
-1. **0.10.1** — fix doctor multi-repo (chico, ya lo entendemos).
-2. **0.11.0** — Tier 2 (rollback + G/W/T).
-3. **0.12.0+** — Tier 3, arrancando por *ticket design-aware (Figma)* que es el de más valor para el día a día.
+## Estado de releases
+- ✅ **0.10.0** — Tier 1: doctor, memoria index-first, presets.
+- ✅ **0.11.0** — auth detection, qa co-piloto, delete-guard.
+- ✅ **0.11.1** — qa: evidencia con screenshots + reuso de users.
+- ✅ **0.12.0** — paralelismo consciente de recursos + fix doctor multi-repo.
+
+## Orden sugerido (lo que sigue)
+1. **0.13.0** — Tier 2 restante: **A** backup/rollback del instalador + **B** aceptación en
+   Given/When/Then. (Se pueden partir en 0.13.0 y 0.14.0 si conviene shipear de a uno.)
+2. **0.14.0+** — Tier 3, arrancando por *ticket design-aware (Figma)* que es el de más valor
+   para el día a día; después skills registry, más editores, calidad de release.
+3. **1.0.0** — pulido y estabilización cuando Tier 2/3 core esté sólido.
