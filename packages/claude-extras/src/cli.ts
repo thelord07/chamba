@@ -6,18 +6,23 @@ import { joinPath } from '@chamba/core';
 import { runConfigCommand } from './config-cli.js';
 import { ConfigStore } from './config-store.js';
 import { CATEGORIES, Installer, type InstallResult } from './installer.js';
+import { SnapshotStore } from './snapshot-store.js';
 import { runWizard } from './wizard.js';
 
 function buildInstaller(): Installer {
   const home = homedir();
+  const fs = new NodeFilesystem();
   // assets/ ships alongside dist/ in the published package.
   const assetsDir = fileURLToPath(new URL('../assets', import.meta.url));
   return new Installer({
-    fs: new NodeFilesystem(),
+    fs,
     assetsDir,
     claudeDir: joinPath(home, '.claude'),
     claudeJsonPath: joinPath(home, '.claude.json'),
     globalConfigPath: joinPath(home, '.chamba/config.json'),
+    snapshotStore: new SnapshotStore(fs, joinPath(home, '.chamba/backups/claude-extras'), () =>
+      new Date().toISOString(),
+    ),
   });
 }
 
@@ -88,6 +93,11 @@ async function main(): Promise<void> {
     return;
   }
 
+  if (command === 'rollback') {
+    await runRollback(installer, rest);
+    return;
+  }
+
   if (command === undefined || command === 'install') {
     const force = rest.includes('--force');
     await maybeRunWizard(rest);
@@ -97,9 +107,57 @@ async function main(): Promise<void> {
   }
 
   process.stderr.write(
-    `Unknown command "${command}". Usage: chamba-install [install|uninstall|apply|config <sub>] [--force] [--version]\n`,
+    `Unknown command "${command}". Usage: chamba-install [install|uninstall|apply|rollback|config <sub>] [--force] [--version]\n`,
   );
   process.exitCode = 1;
+}
+
+/**
+ * `rollback` restores the state captured before the last `install --force` or
+ * `uninstall`. `--list` shows snapshots, `--pin <id>` protects one from pruning,
+ * a bare `<id>` restores that specific snapshot instead of the newest.
+ */
+async function runRollback(installer: Installer, rest: string[]): Promise<void> {
+  if (rest.includes('--list')) {
+    const snaps = await installer.listSnapshots();
+    if (snaps.length === 0) {
+      process.stdout.write(
+        'No snapshots yet. They are taken before `install --force` and `uninstall`.\n',
+      );
+      return;
+    }
+    const lines = snaps.map(
+      (s) => `${s.pinned ? '📌' : '  '} ${s.id}  —  ${s.reason} (${s.fileCount} files)`,
+    );
+    process.stdout.write(`Snapshots (newest first):\n${lines.join('\n')}\n`);
+    return;
+  }
+
+  const pinAt = rest.indexOf('--pin');
+  if (pinAt !== -1) {
+    const id = rest[pinAt + 1];
+    if (!id) {
+      process.stderr.write('Usage: chamba-install rollback --pin <id>\n');
+      process.exitCode = 1;
+      return;
+    }
+    const ok = await installer.pinSnapshot(id);
+    process.stdout.write(ok ? `Pinned snapshot ${id}.\n` : `No snapshot ${id} to pin.\n`);
+    if (!ok) process.exitCode = 1;
+    return;
+  }
+
+  const id = rest.find((a) => !a.startsWith('-'));
+  const result = await installer.rollback(id);
+  if (!result) {
+    process.stdout.write(id ? `No snapshot ${id} to restore.\n` : 'No snapshot to restore yet.\n');
+    process.exitCode = 1;
+    return;
+  }
+  process.stdout.write(
+    `Restored ${result.restored.length} file(s) from snapshot ${result.snapshotId} ` +
+      `(${result.reason}, ${result.createdAt}).\n`,
+  );
 }
 
 /**

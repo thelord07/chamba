@@ -32,9 +32,12 @@ map + relevant notes). Produce a concrete, reviewable plan — do not write code
   and the exact users + roles the test needs — marking which must be **provisioned by
   the human in the identity provider** vs. seeded as local DB rows (the qa agent must
   not create identity-provider users itself); how to run the app from the worktree;
-  and any E2E/browser tooling the repo already has. Then, per acceptance criterion:
-  the URL/entry point, **which user/role logs in** (login is a human step), and the
-  expected behaviour. Finish with a concrete step-by-step. If the change isn't
+  and any E2E/browser tooling the repo already has. Then write **each acceptance
+  criterion as Given/When/Then** (Dado/Cuando/Entonces): the **Given** precondition
+  (seeded data, the URL/entry point, **which user/role logs in** — login is a human
+  step), the **When** action, and the **Then** observable result. Given/When/Then keeps
+  every criterion unambiguous for the qa agent to walk and for the heuristic reviewer to
+  check. Finish with a concrete step-by-step. If the change isn't
   user-facing, omit the section — don't invent QA for a backend-only change.
 
 Return the plan as structured markdown. The orchestrator runs it through

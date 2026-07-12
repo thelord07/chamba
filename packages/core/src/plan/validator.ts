@@ -194,6 +194,21 @@ export function validatePlan(input: ValidatePlanInput): ValidationResult {
     );
   }
 
+  // 10. QA plan present but its criteria aren't in Given/When/Then form → ambiguous to test.
+  if (hasQaSection && !hasGivenWhenThen(qaSectionText(sec))) {
+    issues.push({
+      code: 'qa-criteria-not-testable',
+      severity: 'warning',
+      message:
+        "The QA plan's acceptance criteria are not in Given/When/Then form. Each should " +
+        'state the precondition (Given), the action (When) and the observable result (Then) ' +
+        'so it is unambiguous to test.',
+    });
+    suggestions.push(
+      'Rewrite each QA acceptance criterion as Given/When/Then (Dado/Cuando/Entonces).',
+    );
+  }
+
   return { issues, suggestions, riskFlags };
 }
 
@@ -228,6 +243,22 @@ function hasSection(map: Map<string, string[]>, name: string): boolean {
     if (heading.includes(name)) return true;
   }
   return false;
+}
+
+/** Text of the first QA-ish section, most specific heading first. */
+function qaSectionText(map: Map<string, string[]>): string {
+  for (const name of ['qa plan', 'acceptance test', 'manual test', 'qa']) {
+    const lines = getSection(map, name);
+    if (lines.length > 0) return lines.join('\n');
+  }
+  return '';
+}
+
+/** True if the text carries a Given/When/Then structure (English or Spanish). */
+function hasGivenWhenThen(text: string): boolean {
+  const en = /\bgiven\b/i.test(text) && /\bwhen\b/i.test(text) && /\bthen\b/i.test(text);
+  const es = /\bdado\b/i.test(text) && /\bcuando\b/i.test(text) && /\bentonces\b/i.test(text);
+  return en || es;
 }
 
 function listItems(lines: string[]): string[] {

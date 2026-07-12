@@ -13,10 +13,25 @@ slash commands, subagents and hooks on top of the chamba MCP server.
 npx @chamba/claude-extras install      # add commands, agents, hooks + register MCP
 npx @chamba/claude-extras install --force   # overwrite existing files
 npx @chamba/claude-extras uninstall    # remove them
+npx @chamba/claude-extras rollback     # undo the last --force / uninstall
 npx @chamba/claude-extras --version    # print the installed version
 ```
 
 Check the MCP server's version the same way: `npx @chamba/mcp --version`.
+
+**Safe by default — rollback.** Before an `install --force` or an `uninstall`, chamba
+snapshots the current state it manages (`~/.claude.json` + the installed commands, agents
+and hooks) under `~/.chamba/backups/`. If an overwrite or removal wasn't what you wanted,
+`rollback` restores it:
+
+```bash
+npx @chamba/claude-extras rollback            # restore the most recent snapshot
+npx @chamba/claude-extras rollback --list     # list snapshots (newest first)
+npx @chamba/claude-extras rollback <id>       # restore a specific snapshot
+npx @chamba/claude-extras rollback --pin <id> # protect one from pruning
+```
+
+Snapshots dedup by content and the newest 5 (plus any pinned) are kept.
 
 It installs into `~/.claude/`:
 
@@ -214,9 +229,11 @@ on a big monorepo, mapping everything is expensive.
 ## Acceptance QA with the `qa` agent
 
 For user-facing tickets, the **planner** adds a `## QA plan` to the plan (local seed, test
-users, URLs, login steps, and the expected behaviour per acceptance criterion), and
-`/ticket` runs a final **acceptance-QA** phase: the `qa` subagent validates each criterion
-against the **running app**, not the code. It **adapts to the project** — if the repo has
+users, URLs, login steps) and writes each acceptance criterion as **Given/When/Then**
+(Dado/Cuando/Entonces) — precondition, action, observable result — so it's unambiguous to
+test. The heuristic reviewer (`chamba_review_plan`, no LLM) warns `qa-criteria-not-testable`
+when a QA plan skips that structure. Then `/ticket` runs a final **acceptance-QA** phase:
+the `qa` subagent validates each criterion against the **running app**, not the code. It **adapts to the project** — if the repo has
 Playwright/Cypress (or a browser MCP) it drives the browser; otherwise it runs the repos
 from the worktree, applies the local seed, and co-pilots with you, asking you to log in and
 telling you what to click while you watch. It reports PASS/FAIL per criterion and never

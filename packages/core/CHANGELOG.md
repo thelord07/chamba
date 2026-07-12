@@ -1,5 +1,23 @@
 # @chamba/core
 
+## 0.13.0
+
+### Minor Changes
+
+- Tier 2: installer rollback + Given/When/Then acceptance criteria.
+
+  **Installer rollback (safe by default).** Before an `install --force` or an `uninstall`,
+  `@chamba/claude-extras` now snapshots the state it manages (`~/.claude.json` + the
+  installed commands/agents/hooks) under `~/.chamba/backups/`. New command:
+  `chamba-install rollback` (restore the newest), `rollback --list`, `rollback <id>`,
+  `rollback --pin <id>`. Snapshots dedup by content and the newest 5 (plus pinned) are kept.
+  Nothing is destroyed silently — an unwanted overwrite or removal is one command to undo.
+
+  **Given/When/Then acceptance.** The `planner` now writes each `## QA plan` acceptance
+  criterion as Given/When/Then (Dado/Cuando/Entonces) — precondition, action, observable
+  result — so it's unambiguous to test. The heuristic reviewer (`chamba_review_plan`, no LLM)
+  warns `qa-criteria-not-testable` when a QA plan skips that structure.
+
 ## 0.12.0
 
 ### Minor Changes

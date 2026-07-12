@@ -186,4 +186,50 @@ describe('validatePlan', () => {
   it('does not warn for a backend-only plan', () => {
     expect(codes(GOOD_PLAN)).not.toContain('missing-qa-plan');
   });
+
+  it('warns when a QA plan has criteria not in Given/When/Then form', () => {
+    const plan = `## Acceptance criteria
+- [ ] the dashboard shows the widget, with tests
+
+## Subtasks
+1. **implementer** — add the widget in src/components/Widget.tsx
+2. **tester** — add vitest tests
+
+## QA plan
+- Seed a demo user, log in at /dashboard, confirm the widget renders.`;
+    const issue = validatePlan({ plan, task: 't' }).issues.find(
+      (i) => i.code === 'qa-criteria-not-testable',
+    );
+    expect(issue?.severity).toBe('warning');
+  });
+
+  it('does not warn when the QA plan uses Given/When/Then', () => {
+    const plan = `## Acceptance criteria
+- [ ] the dashboard shows the widget, with tests
+
+## Subtasks
+1. **implementer** — add the widget in src/components/Widget.tsx
+2. **tester** — add vitest tests
+
+## QA plan
+- **Given** a logged-in demo user, **When** they open /dashboard, **Then** the new widget renders with today's totals.`;
+    expect(codes(plan)).not.toContain('qa-criteria-not-testable');
+  });
+
+  it('accepts Spanish Dado/Cuando/Entonces in the QA plan', () => {
+    const plan = `## Acceptance criteria
+- [ ] el tablero muestra el widget, con tests
+
+## Subtasks
+1. **implementer** — agregá el widget en src/components/Widget.tsx
+2. **tester** — agregá tests de vitest
+
+## QA plan
+- **Dado** un usuario logueado, **Cuando** abre /dashboard, **Entonces** el widget renderiza los totales de hoy.`;
+    expect(codes(plan)).not.toContain('qa-criteria-not-testable');
+  });
+
+  it('does not raise the G/W/T warning for a backend-only plan', () => {
+    expect(codes(GOOD_PLAN)).not.toContain('qa-criteria-not-testable');
+  });
 });

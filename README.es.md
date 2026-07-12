@@ -140,7 +140,8 @@ npx @chamba/claude-extras uninstall
 ```
 
 Idempotente, no sobrescribe tus archivos (`--force` para forzar), preserva otros MCP
-servers en `~/.claude.json`. Después: `/orq agrega un endpoint de health check`.
+servers en `~/.claude.json`. `--force` y `uninstall` hacen snapshot del estado actual antes,
+así `npx @chamba/claude-extras rollback` los deshace. Después: `/orq agrega un endpoint de health check`.
 
 **Config por agente.** El primer install corre un wizard para elegir modelo + esfuerzo
 por rol (orchestrator, planner, reviewer, implementer, tester, qa, summarizer, researcher),

@@ -1,6 +1,7 @@
 import { MemoryFilesystem } from '@chamba/core';
 import { describe, expect, it } from 'vitest';
 import { Installer } from './installer.js';
+import { SnapshotStore } from './snapshot-store.js';
 
 const ASSETS = {
   '/assets/commands/orq.md': '# orq',
@@ -144,5 +145,68 @@ describe('Installer.uninstall', () => {
     const config = JSON.parse(await fs.readFile('/home/.claude.json'));
     expect(config.mcpServers.chamba).toBeUndefined();
     expect(config.mcpServers.other).toEqual({ command: 'x' });
+  });
+});
+
+function buildWithStore(extra: Record<string, string> = {}) {
+  const fs = new MemoryFilesystem({ ...ASSETS, ...extra });
+  let clock = '2026-07-12T10:00:00.000Z';
+  const store = new SnapshotStore(fs, '/home/.chamba/backups', () => clock);
+  const installer = new Installer({
+    fs,
+    assetsDir: '/assets',
+    claudeDir: '/home/.claude',
+    claudeJsonPath: '/home/.claude.json',
+    globalConfigPath: '/home/.chamba/config.json',
+    snapshotStore: store,
+  });
+  return {
+    fs,
+    installer,
+    setClock: (t: string) => {
+      clock = t;
+    },
+  };
+}
+
+describe('Installer snapshots & rollback', () => {
+  it('snapshots before --force and rolls back the previous content', async () => {
+    const { fs, installer } = buildWithStore({ '/home/.claude.json': '{}' });
+    await installer.install(); // plain install: no snapshot
+    await fs.writeFile('/home/.claude/commands/orq.md', 'MY EDIT');
+
+    await installer.install({ force: true }); // snapshots the edit, then overwrites
+    expect(await fs.readFile('/home/.claude/commands/orq.md')).toBe('# orq'); // clobbered
+
+    const rb = await installer.rollback();
+    expect(rb?.restored).toContain('/home/.claude/commands/orq.md');
+    expect(rb?.reason).toBe('install --force');
+    expect(await fs.readFile('/home/.claude/commands/orq.md')).toBe('MY EDIT'); // restored
+  });
+
+  it('snapshots before uninstall and can restore the removed files + MCP entry', async () => {
+    const { fs, installer } = buildWithStore({ '/home/.claude.json': '{}' });
+    await installer.install();
+
+    await installer.uninstall();
+    expect(await fs.exists('/home/.claude/commands/orq.md')).toBe(false);
+    expect(JSON.parse(await fs.readFile('/home/.claude.json')).mcpServers?.chamba).toBeUndefined();
+
+    const rb = await installer.rollback();
+    expect(rb).not.toBeNull();
+    expect(await fs.exists('/home/.claude/commands/orq.md')).toBe(true);
+    expect(JSON.parse(await fs.readFile('/home/.claude.json')).mcpServers.chamba).toBeDefined();
+  });
+
+  it('does not snapshot on a plain (non-force) install', async () => {
+    const { installer } = buildWithStore({ '/home/.claude.json': '{}' });
+    await installer.install();
+    expect(await installer.listSnapshots()).toHaveLength(0);
+  });
+
+  it('rollback is a no-op without a configured store', async () => {
+    const { installer } = build({ '/home/.claude.json': '{}' });
+    await installer.install();
+    expect(await installer.rollback()).toBeNull();
   });
 });

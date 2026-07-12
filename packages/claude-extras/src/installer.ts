@@ -1,10 +1,17 @@
 import type { FilesystemPort, ResolvedConfig } from '@chamba/core';
-import { joinPath, loadConfig } from '@chamba/core';
+import { dirname, joinPath, loadConfig } from '@chamba/core';
 import {
   AGENT_ROLE_BY_FILE,
   parseAgentMarkdown,
   renderAgentMarkdown,
 } from './agent-frontmatter.js';
+import {
+  DEFAULT_KEEP,
+  type SaveResult,
+  type SnapshotFile,
+  type SnapshotMeta,
+  type SnapshotStore,
+} from './snapshot-store.js';
 
 /** The Claude Code subdirectory each asset category installs into. */
 export const CATEGORIES = [
@@ -26,6 +33,17 @@ export interface InstallerOptions {
   claudeJsonPath: string;
   /** Global chamba config (e.g. `~/.chamba/config.json`); defaults used if absent. */
   globalConfigPath?: string;
+  /** When set, `install --force` and `uninstall` snapshot the current state first. */
+  snapshotStore?: SnapshotStore;
+  /** How many unpinned snapshots to retain (default 5). */
+  snapshotKeep?: number;
+}
+
+export interface RollbackResult {
+  restored: string[];
+  snapshotId: string;
+  createdAt: string;
+  reason: string;
 }
 
 export interface ApplyResult {
@@ -62,6 +80,8 @@ export class Installer {
 
   async install(options: { force?: boolean } = {}): Promise<InstallResult> {
     const claudeDetected = await this.detectClaudeCode();
+    // Only --force is destructive (it overwrites); snapshot before clobbering.
+    if (options.force) await this.snapshot('install --force');
     const installed: string[] = [];
     const skipped: string[] = [];
     const counts: Record<string, number> = {};
@@ -90,6 +110,7 @@ export class Installer {
   }
 
   async uninstall(): Promise<UninstallResult> {
+    await this.snapshot('uninstall');
     const removed: string[] = [];
     for (const { dir } of CATEGORIES) {
       const names = await this.assetNames(dir);
@@ -103,6 +124,57 @@ export class Installer {
     }
     const mcpRemoved = await this.removeMcpServer();
     return { removed, mcpRemoved };
+  }
+
+  /**
+   * Capture the current on-disk state chamba manages — `.claude.json` plus every
+   * installed asset — into the snapshot store, then prune old snapshots. No-op
+   * when no store is configured or there's nothing installed yet.
+   */
+  async snapshot(reason: string): Promise<SaveResult | null> {
+    const store = this.opts.snapshotStore;
+    if (!store) return null;
+
+    const files: SnapshotFile[] = [];
+    const json = await this.readIfExists(this.opts.claudeJsonPath);
+    if (json !== null) files.push({ path: this.opts.claudeJsonPath, content: json });
+    for (const { dir } of CATEGORIES) {
+      for (const name of await this.assetNames(dir)) {
+        const target = joinPath(this.opts.claudeDir, dir, name);
+        const content = await this.readIfExists(target);
+        if (content !== null) files.push({ path: target, content });
+      }
+    }
+    if (files.length === 0) return null;
+
+    const result = await store.save(files, reason);
+    await store.prune(this.opts.snapshotKeep ?? DEFAULT_KEEP);
+    return result;
+  }
+
+  /** Restore a snapshot (newest by default), writing every captured file back. */
+  async rollback(id?: string): Promise<RollbackResult | null> {
+    const store = this.opts.snapshotStore;
+    if (!store) return null;
+    const loaded = await store.load(id);
+    if (!loaded) return null;
+
+    const restored: string[] = [];
+    for (const file of loaded.files) {
+      await this.opts.fs.mkdir(dirname(file.path));
+      await this.opts.fs.writeFile(file.path, file.content);
+      restored.push(file.path);
+    }
+    const { id: snapshotId, createdAt, reason } = loaded.meta;
+    return { restored, snapshotId, createdAt, reason };
+  }
+
+  async listSnapshots(): Promise<SnapshotMeta[]> {
+    return (await this.opts.snapshotStore?.list()) ?? [];
+  }
+
+  async pinSnapshot(id: string): Promise<boolean> {
+    return (await this.opts.snapshotStore?.pin(id)) ?? false;
   }
 
   /**
