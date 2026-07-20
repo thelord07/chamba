@@ -17,8 +17,13 @@ is **off-limits unless I explicitly confirm it**. If a step seems to need it, ST
 ask me first; never do it on your own. (This is the rule that keeps a QA run from ever
 wiping my local DB.)
 
-**First, adapt to the project — don't assume a stack.** Inspect the repos in the
-worktree and decide how to run the test by their nature:
+**First, detect what this project + machine support — don't assume a stack.** Call
+`chamba_qa_capabilities` (deterministic, no LLM): it reports whether the project is web
+or mobile (React Native / Expo), which E2E tooling ships, and — for mobile — which iOS
+simulators / Android emulators are actually available on this machine. Then pick the mode
+by the project's nature:
+
+**Web:**
 
 - **Browser E2E already in the project** (`playwright`/`@playwright/test`/`cypress`
   dep or config, or a browser MCP available to you) → use it to open and drive the
@@ -26,6 +31,23 @@ worktree and decide how to run the test by their nature:
 - **No E2E tooling** → run the app yourself (start the relevant repos from the
   worktree, docker-compose, etc.) and co-pilot with me — open what you can, give me
   the exact step-by-step, and tell me precisely what to click and what I should see.
+
+**Mobile (React Native / Expo):** chamba detects the app and lists the devices, but it
+**never boots a simulator or runs Expo — your editor's mobile MCP or the terminal does.**
+Pick by what `chamba_qa_capabilities` reports:
+
+- **A mobile MCP is available** (an Expo MCP, a device-control MCP like `mobile-mcp`, or
+  Maestro) → use it to boot a simulator/emulator, launch the app (`expo start`, a dev
+  client, or an EAS build) and drive each criterion; capture device screenshots.
+- **A simulator/emulator is available but no MCP** → co-pilot: run `expo start`, boot the
+  sim (`xcrun simctl boot` / `emulator @avd`), open the app, and give me the exact
+  step-by-step; grab screenshots with `xcrun simctl io booted screenshot` /
+  `adb exec-out screencap`.
+- **No device tooling at all** → honest fallback: co-pilot on my physical device via Expo
+  Go / a QR code — I drive, you guide, I capture each shot.
+- Notes: prefer a simulator/emulator for reproducibility; Expo Go runs managed apps, but
+  native modules need a dev client / EAS build. The **login stays human** here too, and a
+  different actor means resetting the app back to the login screen (more manual on mobile).
 
 **Keep the repo clean.** If you need a browser and the project has none, prefer a
 Playwright MCP if configured (runs via `npx`, installs Chromium to my user cache —
@@ -97,7 +119,9 @@ design reference**, never "pixel-perfect".
    and confirm the users/roles the plan needs — asking me to provision any that live in
    the auth provider and that don't already exist. State what's ready, what you're
    reusing, and what you still need from me before starting.
-2. **Run the app** from the worktree and confirm it's up (the URL / entry point).
+2. **Run the app** from the worktree and confirm it's up: the URL / entry point for
+   web, or the booted simulator/emulator (or Expo Go on my device) with the app loaded
+   for mobile.
 3. **Open the browser and hand me the login.** Navigate to the entry point, then
    **pause and ask me to log in** with the specified test user — I'm watching and
    I'll do it. **Never automate credentials** (SSO / 2FA / Auth0 / Firebase make that

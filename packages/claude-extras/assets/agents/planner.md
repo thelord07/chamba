@@ -46,6 +46,12 @@ map + relevant notes). Produce a concrete, reviewable plan — do not write code
   every criterion unambiguous for the qa agent to walk and for the heuristic reviewer to
   check. Finish with a concrete step-by-step. If the change isn't
   user-facing, omit the section — don't invent QA for a backend-only change.
+  - **Mobile app (React Native / Expo)?** Then the `## QA plan` must also name the **run
+    target**: which platform(s) (iOS / Android), whether to run on a **simulator/emulator
+    or Expo Go on a device**, and **how to launch** (`expo start`, a dev client, or an EAS
+    build). chamba doesn't drive the device — the qa agent uses the editor's mobile MCP if
+    there is one, else co-pilots on a simulator/emulator; it can call `chamba_qa_capabilities`
+    to see what this machine has. Login still stays human.
 
 Return the plan as structured markdown. The orchestrator runs it through
 `chamba_review_plan` and the reviewer subagent, then resolves any `## Open

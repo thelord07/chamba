@@ -97,6 +97,7 @@ the log directory and worktrees.
 | `chamba_vault_status` | `{}` | Resolved vault path + the notes chamba can see (diagnostic) |
 | `chamba_doctor` | `{}` | Environment health check (no LLM): Node, system (RAM/CPU), git (multi-repo aware), workspace, config, vault, logs, worktrees → pass/warn/fail. Also `npx @chamba/mcp doctor` |
 | `chamba_resource_budget` | `{ requested?, perWorkerMemMB? }` | Safe parallelism for **this** machine (no LLM): reads live RAM/CPU/load → how many worktrees/workers to run at once. Consult it before a multi-repo fan-out |
+| `chamba_qa_capabilities` | `{}` | What acceptance QA can run against (no LLM): web vs mobile (React Native / Expo), E2E tooling, and the iOS simulators / Android emulators actually available (read-only `xcrun simctl` / `adb` / `emulator` — lists, never boots). The qa agent picks its mode from this |
 | `chamba_generate_plan` | `{ task, context? }` | A structured plan template to fill |
 | `chamba_review_plan` | `{ plan, task, context? }` | `{ approved, issues, suggestions, riskFlags }` — no LLM |
 | `chamba_create_worktree` | `{ taskSlug, workerId, baseBranch? }` | An isolated git worktree |

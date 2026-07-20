@@ -265,4 +265,47 @@ Reference: https://www.figma.com/file/abc/Settings?node-id=12-34`;
   it('does not warn about design when there is no Figma reference', () => {
     expect(codes(GOOD_PLAN)).not.toContain('missing-design-capture');
   });
+
+  it('warns when a mobile QA plan names no run target', () => {
+    const plan = `## Acceptance criteria
+- [ ] the Expo screen shows the profile, with tests
+
+## Subtasks
+1. **implementer** — build the screen in src/screens/Profile.tsx
+2. **tester** — add vitest tests
+
+## QA plan
+- **Given** a logged-in user, **When** they open Profile, **Then** their name renders.`;
+    const issue = validatePlan({ plan, task: 't' }).issues.find(
+      (i) => i.code === 'mobile-qa-missing-target',
+    );
+    expect(issue?.severity).toBe('warning');
+  });
+
+  it('does not warn when the mobile QA plan names a simulator/platform target', () => {
+    const plan = `## Acceptance criteria
+- [ ] the Expo screen shows the profile, with tests
+
+## Subtasks
+1. **implementer** — build the screen in src/screens/Profile.tsx
+2. **tester** — add vitest tests
+
+## QA plan
+- Target: iOS simulator (iPhone 15) via expo start.
+- **Given** a logged-in user, **When** they open Profile, **Then** their name renders.`;
+    expect(codes(plan)).not.toContain('mobile-qa-missing-target');
+  });
+
+  it('does not raise the mobile-target warning for a non-mobile plan', () => {
+    const plan = `## Acceptance criteria
+- [ ] the React dashboard shows the widget, with tests
+
+## Subtasks
+1. **implementer** — add the widget in src/components/Widget.tsx
+2. **tester** — add vitest tests
+
+## QA plan
+- Seed a demo user, log in at /dashboard, confirm the widget renders.`;
+    expect(codes(plan)).not.toContain('mobile-qa-missing-target');
+  });
 });

@@ -23,13 +23,14 @@ specific editor primitive — adapt to what you have.
    - `chamba_load_context` for the ticket and infer the acceptance criteria from the
      ticket + workspace. If you still can't tell what to verify, ask me for the
      ticket text before going further.
-3. Delegate to the **qa** subagent to **co-pilot** it: it detects the project's
-   tooling (Playwright/Cypress/browser MCP, how to run the app, the seed mechanism +
-   auth system), applies the local data seed, asks me to provision any
-   identity-provider users (Auth0/Firebase/…) rather than creating them itself, runs
-   the app, opens the browser, and asks me to log in — then it drives each acceptance
-   criterion against the running app (re-asking me to log in per user on multi-user
-   flows).
+3. Delegate to the **qa** subagent to **co-pilot** it: it calls `chamba_qa_capabilities`
+   to detect the project + machine (web vs **React Native / Expo**, E2E tooling, and any
+   iOS simulators / Android emulators available), applies the local data seed, asks me to
+   provision any identity-provider users (Auth0/Firebase/…) rather than creating them
+   itself, runs the app — the browser for web, a **simulator/emulator** (editor's mobile
+   MCP or `expo start` co-piloted) or Expo Go for mobile — and asks me to log in, then it
+   drives each acceptance criterion against the running app (re-asking me to log in per
+   user on multi-user flows).
 4. Report **PASS/FAIL per acceptance criterion**, each line linking its numbered
    evidence screenshot in the run folder (kept **outside any git repo** — never inside
    the public chamba repo), and end with the path to that folder. Everything is local

@@ -39,6 +39,11 @@ const RESOLVED_MARKER_RE =
 // Signals a user-facing change that warrants an acceptance-QA phase.
 const FRONTEND_RE =
   /\b(react|vue|angular|next\.?js|nextjs|svelte|frontend|front-end|user interface|screen|browser)\b|\bUI\b|\.(tsx|jsx|vue|svelte)\b/i;
+// Signals the ticket targets a mobile app (React Native / Expo).
+const MOBILE_SIGNAL_RE = /\b(react native|react-native|expo|expo-router|detox|maestro)\b/i;
+// Names a concrete mobile run target (platform / simulator / device) in the QA plan.
+const MOBILE_TARGET_RE =
+  /\b(ios|android|simulator|emulator|expo go|device|iphone|ipad|pixel|avd)\b/i;
 
 const DEFAULT_MODULES = new Set([
   'packages',
@@ -221,6 +226,23 @@ export function validatePlan(input: ValidatePlanInput): ValidationResult {
     suggestions.push(
       'Add a "## Design" section (Figma link or screenshots, the specific frames/nodes, ' +
         'breakpoints, and states) so the implementer builds to it and the qa agent verifies against it.',
+    );
+  }
+
+  // 12. Mobile ticket with a QA plan that never names a run target (platform/device).
+  if (hasQaSection && MOBILE_SIGNAL_RE.test(plan) && !MOBILE_TARGET_RE.test(qaSectionText(sec))) {
+    issues.push({
+      code: 'mobile-qa-missing-target',
+      severity: 'warning',
+      message:
+        'The ticket targets a mobile app (React Native / Expo) but the QA plan names no run ' +
+        'target: which platform (iOS/Android), and whether to run on a simulator/emulator or ' +
+        'a physical device via Expo Go.',
+    });
+    suggestions.push(
+      'State the QA run target in the "## QA plan": platform(s), a simulator/emulator (or Expo Go ' +
+        'on a device), and how to launch (expo start / dev client / EAS build). ' +
+        'Run chamba_qa_capabilities to see what this machine has.',
     );
   }
 

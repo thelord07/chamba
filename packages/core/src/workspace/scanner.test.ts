@@ -90,6 +90,83 @@ describe('WorkspaceScanner', () => {
     expect(byProvider['JWT (jsonwebtoken)']?.projects).toContain('webapp');
   });
 
+  it('detects a managed Expo app (both platforms, no native dirs)', async () => {
+    const ws = await scan(
+      {
+        '/app/package.json': JSON.stringify({
+          name: 'mobileapp',
+          dependencies: { expo: '^51', react: '18', 'react-native': '0.74' },
+        }),
+        '/app/app.json': '{"expo":{"name":"mobileapp"}}',
+        '/app/App.tsx': 'export default function App(){return null}\n',
+      },
+      '/app',
+    );
+
+    expect(ws.framework).toBe('Expo (React Native)');
+    const m = (ws.mobile ?? []).find((x) => x.project === 'mobileapp');
+    expect(m?.expo).toBe('managed');
+    expect(m?.reactNative).toBe(true);
+    expect(m?.platforms).toEqual(['ios', 'android']);
+    expect(m?.hasEas).toBe(false);
+  });
+
+  it('detects a bare React Native app with native dirs, EAS and Detox', async () => {
+    const ws = await scan(
+      {
+        '/rn/package.json': JSON.stringify({
+          name: 'bareapp',
+          dependencies: { expo: '^51', 'react-native': '0.74', 'expo-dev-client': '^4' },
+          devDependencies: { detox: '^20' },
+        }),
+        '/rn/eas.json': '{"build":{}}',
+        '/rn/ios/Podfile': 'platform :ios\n',
+        '/rn/android/build.gradle': 'apply plugin: "com.android.application"\n',
+        '/rn/.maestro/login.yaml': 'appId: com.bareapp\n',
+        '/rn/App.tsx': 'export default function App(){return null}\n',
+      },
+      '/rn',
+    );
+
+    const m = (ws.mobile ?? []).find((x) => x.project === 'bareapp');
+    expect(m?.expo).toBe('bare');
+    expect(m?.platforms).toEqual(['ios', 'android']);
+    expect(m?.hasEas).toBe(true);
+    expect(m?.hasDevClient).toBe(true);
+    expect(m?.e2e).toEqual(expect.arrayContaining(['Detox', 'Maestro']));
+  });
+
+  it('detects React Native without Expo', async () => {
+    const ws = await scan(
+      {
+        '/rn/package.json': JSON.stringify({
+          name: 'rnapp',
+          dependencies: { 'react-native': '0.74', react: '18' },
+        }),
+        '/rn/ios/Podfile': 'platform :ios\n',
+        '/rn/index.js': 'export {};\n',
+      },
+      '/rn',
+    );
+
+    expect(ws.framework).toBe('React Native');
+    const m = (ws.mobile ?? []).find((x) => x.project === 'rnapp');
+    expect(m?.reactNative).toBe(true);
+    expect(m?.expo).toBeUndefined();
+    expect(m?.platforms).toEqual(['ios']);
+  });
+
+  it('leaves mobile empty for a non-mobile project', async () => {
+    const ws = await scan(
+      {
+        '/p/package.json': JSON.stringify({ name: 'p', dependencies: { react: '^18' } }),
+        '/p/src/app.tsx': 'export {};\n',
+      },
+      '/p',
+    );
+    expect(ws.mobile).toBeUndefined();
+  });
+
   it('leaves auth empty when no auth library is present', async () => {
     const ws = await scan(
       {

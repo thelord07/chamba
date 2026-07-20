@@ -261,6 +261,18 @@ Run `npx playwright install chromium` once — the browsers land in your **user 
 nothing is added to your `package.json` or `node_modules`. chamba never bundles or runs a
 browser itself — the `qa` agent uses whatever is available and co-pilots when nothing is.
 
+**Mobile QA (React Native / Expo).** Same pattern, one rung down. `chamba_workspace_init`
+detects a mobile app (Expo managed/bare, EAS, dev-client, E2E tooling) into a `## Mobile`
+section, and the `qa` agent calls **`chamba_qa_capabilities`** — a read-only probe (no LLM)
+that reports web vs mobile and enumerates the **iOS simulators / Android emulators actually
+available** on the machine (`xcrun simctl` / `adb` / `emulator -list-avds` — it lists, never
+boots). Then the `qa` agent picks its mode: if an **Expo/mobile MCP** is configured it drives
+a simulator/emulator through it; if only a simulator/emulator is available it co-pilots via
+`expo start`; if neither, it co-pilots on your physical device via **Expo Go**. chamba never
+boots a device or runs Expo — your editor's mobile MCP or the terminal does. Login stays
+human, as everywhere in QA. To drive devices automatically, add an Expo or device-control MCP
+(e.g. `mobile-mcp`) at user scope, same as the Playwright MCP above.
+
 ## Design-aware tickets (Figma)
 
 Same pattern as QA: **detect → use if present → degrade to screenshots**. For a visual

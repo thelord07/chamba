@@ -2,7 +2,15 @@ import type { FilesystemPort } from '../ports/filesystem.js';
 import { basename, dirname, extname, joinPath } from '../util/path.js';
 import { detectGitRepos } from '../worktree/git-repo-detector.js';
 import { detectRuleSources } from './rules.js';
-import type { AuthFinding, ProjectAuth, ProjectRef, Workspace } from './workspace.js';
+import type {
+  AuthFinding,
+  MobileFinding,
+  MobilePlatform,
+  MobileTarget,
+  ProjectAuth,
+  ProjectRef,
+  Workspace,
+} from './workspace.js';
 
 const MAX_DEPTH = 6;
 
@@ -45,18 +53,29 @@ const LANGUAGE_BY_EXT: Record<string, string> = {
 const MANIFEST_FILES = new Set(['package.json', 'pyproject.toml', 'Cargo.toml', 'go.mod']);
 
 // Dependency name -> framework label. First match wins (ordered by specificity).
+// Expo/React Native go before `react` so a mobile app isn't mislabelled "React".
 const FRAMEWORKS: ReadonlyArray<readonly [string, string]> = [
   ['next', 'Next.js'],
   ['@nestjs/core', 'NestJS'],
   ['@angular/core', 'Angular'],
   ['remix', 'Remix'],
   ['astro', 'Astro'],
+  ['expo', 'Expo (React Native)'],
+  ['react-native', 'React Native'],
   ['svelte', 'Svelte'],
   ['vue', 'Vue'],
   ['react', 'React'],
   ['hono', 'Hono'],
   ['fastify', 'Fastify'],
   ['express', 'Express'],
+];
+
+// Mobile E2E tooling: dependency name -> label. Substring/prefix aware below.
+const MOBILE_E2E_LIBS: ReadonlyArray<readonly [string, string]> = [
+  ['detox', 'Detox'],
+  ['@wdio/', 'Appium/WebdriverIO'],
+  ['webdriverio', 'Appium/WebdriverIO'],
+  ['appium', 'Appium/WebdriverIO'],
 ];
 
 const PY_FRAMEWORKS: ReadonlyArray<readonly [string, string]> = [
@@ -128,6 +147,7 @@ export class WorkspaceScanner {
     const framework = rootProject?.framework ?? projects.find((p) => p.framework)?.framework;
     const conventions = await this.detectConventions(root);
     const auth = aggregateAuth(projects);
+    const mobile = aggregateMobile(projects);
     const description = await this.detectDescription(root, rootProject, framework, languages);
 
     // Repos to scan for coding rules: the root, each child git repo, and each
@@ -144,6 +164,7 @@ export class WorkspaceScanner {
       framework,
       conventions,
       auth,
+      ...(mobile.length > 0 ? { mobile } : {}),
       projects,
       ruleSources,
       folderMap: [...acc.topDirs].sort(),
@@ -240,12 +261,14 @@ export class WorkspaceScanner {
       const name = typeof pkg?.name === 'string' && pkg.name.length > 0 ? pkg.name : fallbackName;
       const language = languages.includes('TypeScript') ? 'TypeScript' : 'JavaScript';
       const auth = detectNodeAuth(pkg);
+      const mobile = await this.detectMobile(root, path, pkg);
       return {
         name,
         path,
         language,
         framework: detectNodeFramework(pkg),
         ...(auth.length > 0 ? { auth } : {}),
+        ...(mobile ? { mobile } : {}),
       };
     }
     if (manifestName === 'pyproject.toml') {
@@ -267,6 +290,60 @@ export class WorkspaceScanner {
       return { name: fallbackName, path, language: 'Go' };
     }
     return null;
+  }
+
+  /**
+   * Detect a React Native / Expo app from a project's manifest + nearby files.
+   * Returns undefined for a non-mobile project. Detection only — chamba never
+   * runs a simulator, it just reports what the project targets.
+   */
+  private async detectMobile(
+    root: string,
+    projPath: string,
+    pkg: Record<string, unknown> | null,
+  ): Promise<MobileTarget | undefined> {
+    if (!pkg) return undefined;
+    const deps = {
+      ...(asRecord(pkg.dependencies) ?? {}),
+      ...(asRecord(pkg.devDependencies) ?? {}),
+    };
+    const depNames = Object.keys(deps);
+    const hasExpo = depNames.some((d) => d === 'expo' || d.startsWith('@expo/'));
+    const hasReactNative = 'react-native' in deps;
+    if (!hasExpo && !hasReactNative) return undefined;
+
+    const dir = projPath === '.' ? root : joinPath(root, projPath);
+    const hasIos = await this.pathExists(joinPath(dir, 'ios'));
+    const hasAndroid = await this.pathExists(joinPath(dir, 'android'));
+    const hasDevClient = 'expo-dev-client' in deps;
+    const hasEas = await this.pathExists(joinPath(dir, 'eas.json'));
+
+    const platforms: MobilePlatform[] = [];
+    if (hasIos) platforms.push('ios');
+    if (hasAndroid) platforms.push('android');
+    // Managed Expo has no native dirs but still targets both platforms.
+    if (platforms.length === 0) platforms.push('ios', 'android');
+
+    const e2e = detectMobileE2e(depNames);
+    if (await this.pathExists(joinPath(dir, '.maestro'))) e2e.push('Maestro');
+
+    const target: MobileTarget = {
+      reactNative: hasReactNative,
+      platforms,
+      hasEas,
+      hasDevClient,
+      e2e,
+    };
+    if (hasExpo) target.expo = hasIos && hasAndroid ? 'bare' : hasDevClient ? 'bare' : 'managed';
+    return target;
+  }
+
+  private async pathExists(path: string): Promise<boolean> {
+    try {
+      return await this.fs.exists(path);
+    } catch {
+      return false;
+    }
   }
 
   private async detectConventions(root: string): Promise<string[]> {
@@ -472,6 +549,27 @@ function aggregateAuth(projects: ProjectRef[]): AuthFinding[] {
       projects: [...e.projects].sort(),
     }))
     .sort((a, b) => a.provider.localeCompare(b.provider));
+}
+
+/** Map dependency names to mobile E2E tool labels (deduped, first-match order). */
+function detectMobileE2e(depNames: string[]): string[] {
+  const found: string[] = [];
+  for (const [sig, label] of MOBILE_E2E_LIBS) {
+    const hit = sig.endsWith('/')
+      ? depNames.some((d) => d.startsWith(sig))
+      : depNames.some((d) => d === sig || d.startsWith(`${sig}-`));
+    if (hit && !found.includes(label)) found.push(label);
+  }
+  return found;
+}
+
+/** Collect per-project mobile targets into workspace-level findings (one per app). */
+function aggregateMobile(projects: ProjectRef[]): MobileFinding[] {
+  const found: MobileFinding[] = [];
+  for (const p of projects) {
+    if (p.mobile) found.push({ project: p.name, ...p.mobile });
+  }
+  return found.sort((a, b) => a.project.localeCompare(b.project));
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {

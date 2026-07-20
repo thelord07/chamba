@@ -69,6 +69,14 @@ Detalle en [resource-aware-parallelism.md](resource-aware-parallelism.md).
 
 ## 🔭 Tier 3 — en curso (0.14.0+)
 
+### 0. QA móvil (React Native / Expo) — ✅ HECHO (0.16.0)
+Detalle en [mobile-qa-expo.md](mobile-qa-expo.md).
+- El scanner detecta RN/Expo (managed/bare, EAS, dev-client, e2e Detox/Maestro/Appium) → sección
+  `## Mobile`. Nuevo tool `chamba_qa_capabilities` (read-only, cero LLM): enumera simuladores/
+  emuladores disponibles (`xcrun simctl` / `adb` / `emulator -list-avds`) + tooling E2E. El `qa`
+  gana el modo móvil (usa el MCP de device del editor si está; si no, co-pilotea en simulador/
+  emulador o Expo Go). chamba detecta y lista; el device lo maneja el MCP/terminal, no chamba.
+
 ### 1. Ticket "design-aware" (Figma MCP) — ✅ HECHO (0.14.0)
 Detalle en [tier3-design-aware.md](tier3-design-aware.md).
 - `planner` emite `## Design` para tickets visuales; `implementer` saca tokens/medidas de un
@@ -82,7 +90,7 @@ Detalle en [tier3-skills-registry.md](tier3-skills-registry.md).
   `{name, description, scope?}`; matchea tarea↔description (index-first, cero LLM), devuelve las
   relevantes con cuerpo + el catálogo. Wired en `/ticket` y `/orq`. Vacío/opt-in.
 
-### 3. Más editores (examples/)
+### 3. Más editores (examples/) — 🔜 próximo (0.17.0)
 - Guías de setup para Gemini CLI, Codex, Kiro, Zed, JetBrains, Trae. Como es MCP-first, "soportar" = un snippet de config. Barato, agranda el TAM.
 
 ### 4. Calidad de release (proceso)
@@ -116,8 +124,9 @@ Encontrado dogfooding en **finalis**. El check "Git repo" corría `git rev-parse
 - ✅ **0.13.0** — Tier 2: rollback del instalador + aceptación Given/When/Then.
 - ✅ **0.14.0** — Tier 3 #1: ticket design-aware (Figma).
 - ✅ **0.15.0** — Tier 3 #2: registry de skills/playbooks (index-first).
+- ✅ **0.16.0** — Tier 3 #0: QA móvil (React Native / Expo) + `chamba_qa_capabilities`.
 
 ## Orden sugerido (lo que sigue)
-1. **0.16.0** — Tier 3 #3: más editores (examples/) — barato, MCP-first.
-2. **0.17.0** — Tier 3 #4: calidad de release (golden tests, doctor gate, `--yes`, checklist).
+1. **0.17.0** — Tier 3 #3: más editores (examples/) — barato, MCP-first.
+2. **0.18.0** — Tier 3 #4: calidad de release (golden tests, doctor gate, `--yes`, checklist).
 3. **1.0.0** — pulido y estabilización cuando Tier 3 esté sólido.

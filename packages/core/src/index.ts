@@ -84,6 +84,15 @@ export type { ClockPort } from './ports/clock.js';
 export type { DirEntry, FilesystemPort } from './ports/filesystem.js';
 export type { ProcessExecOptions, ProcessPort, ProcessResult } from './ports/process.js';
 export type { SystemPort, SystemResources } from './ports/system.js';
+// QA capabilities (project + machine probe for acceptance QA, no LLM)
+export type {
+  AndroidDevices,
+  IosDevices,
+  ProjectKind,
+  QaCapabilities,
+  QaCapabilitiesInput,
+} from './qa/capabilities.js';
+export { detectQaCapabilities } from './qa/capabilities.js';
 // Resource budget (safe parallelism, no LLM)
 export type {
   BudgetLimit,
@@ -117,7 +126,15 @@ export type { RuleConvention, RuleExcerpt, RuleSource } from './workspace/rules.
 // Coding rules (multi-editor)
 export { detectRuleSources, RULE_SOURCES, readRuleExcerpts } from './workspace/rules.js';
 export { WorkspaceScanner } from './workspace/scanner.js';
-export type { AuthFinding, ProjectAuth, ProjectRef, Workspace } from './workspace/workspace.js';
+export type {
+  AuthFinding,
+  MobileFinding,
+  MobilePlatform,
+  MobileTarget,
+  ProjectAuth,
+  ProjectRef,
+  Workspace,
+} from './workspace/workspace.js';
 // Workspace
 export {
   renderWorkspaceMarkdown,

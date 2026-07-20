@@ -94,9 +94,12 @@ the workspace.
    them itself, run the app, and validate each acceptance criterion against the
    **running app** — plus, when the plan has a `## Design` section, a **visual check**
    against the design reference (Figma MCP if configured, else the screenshots) —
-   driving the browser if the project has E2E tooling, otherwise co-piloting with me. **The login is always my step**: it opens the browser and
-   asks me to log in (and to re-log in per user on multi-user flows) while it drives
-   and watches. It reports PASS/FAIL per criterion, each backed by a numbered
+   driving the browser if the project has E2E tooling, otherwise co-piloting with me.
+   It first calls `chamba_qa_capabilities` to see what this project + machine support;
+   for a **React Native / Expo** app it runs on a **simulator/emulator** (via the
+   editor's mobile MCP, or `expo start` co-piloted) or Expo Go on my device. **The login
+   is always my step**: it opens the app and asks me to log in (and to re-log in per
+   user on multi-user flows) while it drives and watches. It reports PASS/FAIL per criterion, each backed by a numbered
    evidence screenshot in a per-run folder kept **outside any git repo**. If there's no
    `## QA plan`, skip this step. This is the only interactive touchpoint at the end.
 9. Call `chamba_summarize_to_vault` with a summary of what changed.

@@ -21,6 +21,35 @@ export interface AuthFinding {
   projects: string[];
 }
 
+/** Mobile target platform. */
+export type MobilePlatform = 'ios' | 'android';
+
+/**
+ * A React Native / Expo app detected in one project — what the QA co-pilot needs
+ * to run acceptance tests on a simulator/emulator. Detection only: chamba never
+ * boots a device, it lists what the project targets and what tooling it ships.
+ */
+export interface MobileTarget {
+  /** Expo flavor, when Expo is present: managed (no native dirs) or bare/prebuilt. */
+  expo?: 'managed' | 'bare';
+  /** `react-native` is a direct dependency. */
+  reactNative: boolean;
+  /** Target platforms detected (native dirs, or both by default for managed Expo). */
+  platforms: MobilePlatform[];
+  /** `eas.json` is present (EAS Build/Submit configured). */
+  hasEas: boolean;
+  /** `expo-dev-client` is a dependency (custom dev client, not plain Expo Go). */
+  hasDevClient: boolean;
+  /** Mobile E2E tooling detected (e.g. Detox, Maestro, Appium/WebdriverIO). */
+  e2e: string[];
+}
+
+/** A workspace-level mobile finding: a mobile target plus the project it belongs to. */
+export interface MobileFinding extends MobileTarget {
+  /** Project name where the mobile app was detected. */
+  project: string;
+}
+
 export interface ProjectRef {
   name: string;
   /** Path relative to the workspace root; `.` for the root project. */
@@ -29,6 +58,8 @@ export interface ProjectRef {
   framework?: string;
   /** Auth libraries detected in this project's manifest. */
   auth?: ProjectAuth[];
+  /** React Native / Expo target, when this project is a mobile app. */
+  mobile?: MobileTarget;
 }
 
 export interface Workspace {
@@ -39,6 +70,8 @@ export interface Workspace {
   conventions: string[];
   /** Auth stack detected across projects — the base the QA phase relies on. */
   auth?: AuthFinding[];
+  /** React Native / Expo apps detected — what mobile QA runs against. */
+  mobile?: MobileFinding[];
   projects: ProjectRef[];
   /** Coding-rule files found across repos (Cursor, Claude, Trae, …). */
   ruleSources: RuleSource[];
@@ -112,6 +145,18 @@ export function renderWorkspaceMarkdown(ws: Workspace): string {
   }
   lines.push('');
 
+  if (ws.mobile && ws.mobile.length > 0) {
+    lines.push('## Mobile');
+    lines.push('');
+    lines.push('> React Native / Expo apps detected — what the QA co-pilot runs acceptance');
+    lines.push('> tests against on a simulator/emulator. chamba only detects and lists; your');
+    lines.push("> editor's mobile MCP (Expo, device control) or the terminal drives the device.");
+    lines.push('> The login step stays human, as everywhere else in QA.');
+    lines.push('');
+    for (const m of ws.mobile) lines.push(`- ${renderMobileFinding(m)}`);
+    lines.push('');
+  }
+
   lines.push('## Coding rules');
   lines.push('');
   lines.push('> Rule files found per repo (read non-exclusively across editors). chamba');
@@ -148,4 +193,19 @@ export function renderWorkspaceMarkdown(ws: Workspace): string {
   lines.push('');
 
   return lines.join('\n');
+}
+
+/** One `## Mobile` bullet, e.g. `**app** — Expo (managed), iOS·Android, EAS, e2e: Detox`. */
+function renderMobileFinding(m: MobileFinding): string {
+  const parts: string[] = [];
+  if (m.expo) parts.push(`Expo (${m.expo})`);
+  else if (m.reactNative) parts.push('React Native');
+  if (m.platforms.length > 0) {
+    parts.push(m.platforms.map((p) => (p === 'ios' ? 'iOS' : 'Android')).join('·'));
+  }
+  if (m.hasDevClient) parts.push('dev-client');
+  if (m.hasEas) parts.push('EAS');
+  if (m.e2e.length > 0) parts.push(`e2e: ${m.e2e.join(', ')}`);
+  const suffix = parts.length > 0 ? ` — ${parts.join(', ')}` : '';
+  return `**${m.project}**${suffix}`;
 }

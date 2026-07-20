@@ -11,6 +11,7 @@ import { registerGetAgentConfig } from './tools/get-agent-config.js';
 import { registerListWorktrees } from './tools/list-worktrees.js';
 import { registerLoadContext } from './tools/load-context.js';
 import { registerLoadSkills } from './tools/load-skills.js';
+import { registerQaCapabilities } from './tools/qa-capabilities.js';
 import { registerRecall } from './tools/recall.js';
 import { registerRemember } from './tools/remember.js';
 import { registerResourceBudget } from './tools/resource-budget.js';
@@ -44,6 +45,7 @@ export function createServer(logger: Logger, services: Services = createNodeServ
   registerVaultStatus(server, logger, services);
   registerDoctor(server, logger, services);
   registerResourceBudget(server, logger, services);
+  registerQaCapabilities(server, logger, services);
   registerGeneratePlan(server, logger, services);
   registerReviewPlan(server, logger, services);
   registerSavePlan(server, logger, services);

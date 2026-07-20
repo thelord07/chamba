@@ -1,5 +1,28 @@
 # @chamba/mcp
 
+## 0.16.0
+
+### Minor Changes
+
+- feat(qa): mobile QA — detect React Native/Expo and run on simulators/emulators via MCP
+
+  The workspace scanner detects React Native / Expo apps (Expo managed vs bare, EAS,
+  dev-client, and mobile E2E tooling like Detox/Maestro/Appium) into a `## Mobile` section.
+  New tool `chamba_qa_capabilities` (read-only, no LLM) reports web vs mobile, the E2E
+  tooling present, and enumerates the iOS simulators / Android emulators actually available
+  on the machine (`xcrun simctl` / `adb` / `emulator -list-avds` — it lists, never boots).
+  The `qa` agent gains a mobile mode: it drives a simulator/emulator through the editor's
+  Expo/mobile MCP if one is configured, else co-pilots via `expo start` or Expo Go on a
+  physical device. The planner emits a mobile-aware `## QA plan` (platform, launch, target)
+  and the heuristic reviewer warns `mobile-qa-missing-target`. chamba never boots a device
+  or calls Expo — the editor's MCP or the terminal does. Login stays human.
+
+### Patch Changes
+
+- Updated dependencies
+  - @chamba/core@0.16.0
+  - @chamba/adapters@0.16.0
+
 ## 0.15.0
 
 ### Minor Changes
