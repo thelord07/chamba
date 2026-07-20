@@ -184,6 +184,13 @@ editor — y es honesto: *design-accurate / verificado contra la referencia*, no
 - ✅ Config de modelo + esfuerzo por agente (wizard + `chamba_get_agent_config`)
 - ✅ Worktrees multi-repo + flujo `/ticket` (por config, copia de `.env`, `.code-workspace`)
 - ✅ Co-piloto de QA de aceptación (`/qa` + agente `qa`): valida criterios sobre la app corriendo, evidencia en screenshots, login siempre humano
+- ✅ Detección del stack de auth (`## Auth`) + guarda anti-borrado (ningún agente borra datos sin preguntar)
+- ✅ Paralelismo consciente de recursos (`chamba_resource_budget`, según RAM/CPU) + `chamba_doctor` multi-repo
+- ✅ Backup/rollback del instalador (`chamba-install rollback`) + aceptación Given/When/Then
+- ✅ Tickets design-aware (Figma `## Design` → tokens por MCP o screenshots)
+- ✅ Registro de skills/playbooks (`chamba_load_skills`, index-first, opt-in)
+- ✅ QA móvil para React Native / Expo (`chamba_qa_capabilities` → simuladores/emuladores)
+- ✅ **0.16.0 publicado en npm**
 - 🔭 V2: búsqueda semántica del vault, MCP sampling, más bases de conocimiento
 
 Ver [`PLAN.md`](./PLAN.md) para el plan completo de fases.
