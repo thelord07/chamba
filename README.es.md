@@ -157,10 +157,13 @@ delegar. Otros editores leen la misma config vía `chamba_get_agent_config`. Ver
 **QA de aceptación, como co-piloto.** Cuando un ticket es user-facing, el agente `qa`
 valida los criterios de aceptación contra la app *corriendo* — maneja un navegador real
 si el repo tiene Playwright/Cypress (o un MCP de browser), si no levanta la app desde el
-worktree y co-pilotea con vos. Cada login es tu paso; reusa los usuarios/roles que ya
-existen en vez de crear cuentas descartables, siembra solo de forma aditiva, y captura
-una screenshot numerada por criterio (PASS y FAIL) en una carpeta de evidencia por
-corrida, fuera de todo repo git. Corrélo dentro de `/ticket` o suelto con `/qa`.
+worktree y co-pilotea con vos. Para apps **React Native / Expo** corre en un **simulador o
+emulador** (vía el MCP de Expo/móvil de tu editor, o `expo start` co-piloteado, o Expo Go
+en tu teléfono) — `chamba_qa_capabilities` reporta qué tiene esta máquina. Cada login es tu
+paso; reusa los usuarios/roles que ya existen en vez de crear cuentas descartables, siembra
+solo de forma aditiva, y captura una screenshot numerada por criterio (PASS y FAIL) en una
+carpeta de evidencia por corrida, fuera de todo repo git. Corrélo dentro de `/ticket` o
+suelto con `/qa`.
 
 **Design-aware para tickets visuales.** Mismo patrón detectar→usar→degradar: el planner
 captura el diseño en una sección `## Design`, el implementer saca tokens/medidas exactas de

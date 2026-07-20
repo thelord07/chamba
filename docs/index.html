@@ -166,6 +166,7 @@ const CONTENT = {
       { name: 'cleanup_worktree', in: '{ branch }', out: 'Borra el dir, conserva la rama' },
       { name: 'cleanup_worktrees', in: '{ ticket, repos? }', out: 'Borra los worktrees de un ticket, conserva las ramas' },
       { name: 'resource_budget', in: '{ requested?, perWorkerMemMB? }', out: 'Paralelismo seguro según RAM/CPU en vivo (sin LLM)' },
+      { name: 'qa_capabilities', in: '{ }', out: 'Web vs móvil (RN/Expo) + simuladores/emuladores disponibles para la QA (read-only, sin LLM)' },
       { name: 'remember', in: '{ key, content, tags? }', out: 'Persiste una memoria en markdown' },
       { name: 'recall', in: '{ query }', out: 'Busca en las memorias guardadas' }
     ],
@@ -293,6 +294,7 @@ const CONTENT = {
       { name: 'cleanup_worktree', in: '{ branch }', out: 'Removes the dir, keeps the branch' },
       { name: 'cleanup_worktrees', in: '{ ticket, repos? }', out: 'Removes a ticket’s worktrees, keeps branches' },
       { name: 'resource_budget', in: '{ requested?, perWorkerMemMB? }', out: 'Safe parallelism from live RAM/CPU (no LLM)' },
+      { name: 'qa_capabilities', in: '{ }', out: 'Web vs mobile (RN/Expo) + available simulators/emulators for QA (read-only, no LLM)' },
       { name: 'remember', in: '{ key, content, tags? }', out: 'Persists a markdown memory' },
       { name: 'recall', in: '{ query }', out: 'Searches saved memories' }
     ],

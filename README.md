@@ -160,10 +160,13 @@ Other editors read the same config via `chamba_get_agent_config`. See the
 **Acceptance QA, as a co-pilot.** When a ticket is user-facing, the `qa` agent validates
 the acceptance criteria against the *running* app — driving a real browser if the repo
 has Playwright/Cypress (or a browser MCP), otherwise running the app from the worktree
-and co-piloting with you. Every login is your step; it reuses the users/roles that
-already exist instead of creating throwaway accounts, seeds only additively, and captures
-a numbered screenshot per criterion (PASS and FAIL) into a per-run evidence folder kept
-outside every git repo. Run it inside `/ticket` or on its own with `/qa`.
+and co-piloting with you. For **React Native / Expo** apps it runs on a **simulator or
+emulator** (via your editor's Expo/mobile MCP, or `expo start` co-piloted, or Expo Go on
+your device) — `chamba_qa_capabilities` reports what this machine has. Every login is your
+step; it reuses the users/roles that already exist instead of creating throwaway accounts,
+seeds only additively, and captures a numbered screenshot per criterion (PASS and FAIL)
+into a per-run evidence folder kept outside every git repo. Run it inside `/ticket` or on
+its own with `/qa`.
 
 **Design-aware for visual tickets.** Same detect→use→degrade pattern: the planner captures
 the design in a `## Design` section, the implementer pulls exact tokens/measurements from a
