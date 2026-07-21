@@ -1,0 +1,9 @@
+{
+  "context_servers": {
+    "chamba": {
+      "source": "custom",
+      "command": "npx",
+      "args": ["-y", "@chamba/mcp"]
+    }
+  }
+}

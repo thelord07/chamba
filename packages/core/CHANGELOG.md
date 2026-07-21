@@ -1,5 +1,18 @@
 # @chamba/core
 
+## 0.17.0
+
+### Minor Changes
+
+- feat(workspace): support more editors — Gemini CLI, Codex, JetBrains, Trae, Zed, Kiro
+
+  Add setup guides under `examples/` for six more MCP-capable editors, and teach the
+  coding-rule scanner their conventions: `GEMINI.md` (Gemini CLI), `.junie/guidelines.md`
+  (JetBrains Junie), `.kiro/steering` (Kiro), and `.rules` (Zed) — so `chamba_load_context`
+  picks up those editors' rules too. chamba stays editor-agnostic: "supporting" an editor is
+  a config snippet + rule detection, no LLM. Docs (README EN/ES, mcp README, landing tabs +
+  pills) list the new editors.
+
 ## 0.16.0
 
 ### Minor Changes

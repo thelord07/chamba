@@ -68,7 +68,7 @@
 
 <script>
 const AC = 'var(--accent)', OK = 'var(--accent2)', AM = 'var(--amber)', MU = 'var(--muted)';
-const VERSION = '0.16.0';
+const VERSION = '0.17.0';
 
 const EDITORS = [
   { id: 'cursor', name: 'Cursor', file: '.cursor/mcp.json',
@@ -80,6 +80,18 @@ const EDITORS = [
   { id: 'windsurf', name: 'Windsurf', file: '~/.codeium/windsurf/mcp_config.json',
     config: '{\n  "mcpServers": {\n    "chamba": {\n      "command": "npx",\n      "args": ["-y", "@chamba/mcp"]\n    }\n  }\n}' },
   { id: 'opencode', name: 'OpenCode', file: 'opencode.json',
+    config: '{\n  "mcpServers": {\n    "chamba": {\n      "command": "npx",\n      "args": ["-y", "@chamba/mcp"]\n    }\n  }\n}' },
+  { id: 'gemini', name: 'Gemini CLI', file: '~/.gemini/settings.json',
+    config: '{\n  "mcpServers": {\n    "chamba": {\n      "command": "npx",\n      "args": ["-y", "@chamba/mcp"]\n    }\n  }\n}' },
+  { id: 'codex', name: 'Codex', file: '~/.codex/config.toml',
+    config: '[mcp_servers.chamba]\ncommand = "npx"\nargs = ["-y", "@chamba/mcp"]' },
+  { id: 'jetbrains', name: 'JetBrains', file: 'Settings → AI Assistant → MCP',
+    config: '{\n  "mcpServers": {\n    "chamba": {\n      "command": "npx",\n      "args": ["-y", "@chamba/mcp"]\n    }\n  }\n}' },
+  { id: 'trae', name: 'Trae', file: '.trae/mcp.json',
+    config: '{\n  "mcpServers": {\n    "chamba": {\n      "command": "npx",\n      "args": ["-y", "@chamba/mcp"]\n    }\n  }\n}' },
+  { id: 'zed', name: 'Zed', file: '~/.config/zed/settings.json',
+    config: '{\n  "context_servers": {\n    "chamba": {\n      "source": "custom",\n      "command": "npx",\n      "args": ["-y", "@chamba/mcp"]\n    }\n  }\n}' },
+  { id: 'kiro', name: 'Kiro', file: '.kiro/settings/mcp.json',
     config: '{\n  "mcpServers": {\n    "chamba": {\n      "command": "npx",\n      "args": ["-y", "@chamba/mcp"]\n    }\n  }\n}' }
 ];
 
@@ -89,14 +101,26 @@ const EDITOR_DESCS = {
     claude: 'Un solo comando en la terminal. Guía en examples/claude-code-setup.',
     vscode: 'Ojo: VS Code usa "servers", no "mcpServers". Guía en examples/vscode-setup.',
     windsurf: 'Vive en ~/.codeium/windsurf/mcp_config.json. Guía en examples/windsurf-setup.',
-    opencode: 'Añádelo a opencode.json. Guía en examples/opencode-setup. Para Obsidian: env CHAMBA_OBSIDIAN_VAULT_PATH.'
+    opencode: 'Añádelo a opencode.json. Guía en examples/opencode-setup. Para Obsidian: env CHAMBA_OBSIDIAN_VAULT_PATH.',
+    gemini: 'Añádelo a ~/.gemini/settings.json (clave mcpServers). Guía en examples/gemini-cli-setup.',
+    codex: 'Ojo: Codex usa TOML, no JSON — [mcp_servers.chamba] en ~/.codex/config.toml. Guía en examples/codex-setup.',
+    jetbrains: 'Settings → Tools → AI Assistant → MCP (clave mcpServers). Guía en examples/jetbrains-setup.',
+    trae: 'Trae → Settings → MCP → Add Manually (o .trae/mcp.json). Guía en examples/trae-setup.',
+    zed: 'Ojo: Zed usa "context_servers", no "mcpServers", en ~/.config/zed/settings.json. Guía en examples/zed-setup.',
+    kiro: 'Añádelo a .kiro/settings/mcp.json (clave mcpServers). Guía en examples/kiro-setup.'
   },
   en: {
     cursor: 'Full guide in examples/cursor-setup. Add a "chamba" entry to your mcpServers block.',
     claude: 'A single terminal command. Guide in examples/claude-code-setup.',
     vscode: 'Note: VS Code uses "servers", not "mcpServers". Guide in examples/vscode-setup.',
     windsurf: 'Lives in ~/.codeium/windsurf/mcp_config.json. Guide in examples/windsurf-setup.',
-    opencode: 'Add it to opencode.json. Guide in examples/opencode-setup. For Obsidian: env CHAMBA_OBSIDIAN_VAULT_PATH.'
+    opencode: 'Add it to opencode.json. Guide in examples/opencode-setup. For Obsidian: env CHAMBA_OBSIDIAN_VAULT_PATH.',
+    gemini: 'Add it to ~/.gemini/settings.json (mcpServers key). Guide in examples/gemini-cli-setup.',
+    codex: 'Note: Codex uses TOML, not JSON — [mcp_servers.chamba] in ~/.codex/config.toml. Guide in examples/codex-setup.',
+    jetbrains: 'Settings → Tools → AI Assistant → MCP (mcpServers key). Guide in examples/jetbrains-setup.',
+    trae: 'Trae → Settings → MCP → Add Manually (or .trae/mcp.json). Guide in examples/trae-setup.',
+    zed: 'Note: Zed uses "context_servers", not "mcpServers", in ~/.config/zed/settings.json. Guide in examples/zed-setup.',
+    kiro: 'Add it to .kiro/settings/mcp.json (mcpServers key). Guide in examples/kiro-setup.'
   }
 };
 
@@ -119,7 +143,7 @@ const CONTENT = {
     heroTermLabel: 'instálalo en segundos',
     heroCta: 'Ver instalación',
     heroEditorsLabel: 'Funciona en',
-    editorPills: ['Cursor', 'Claude Code', 'VS Code', 'Windsurf', 'Cline', 'OpenCode'],
+    editorPills: ['Cursor', 'Claude Code', 'VS Code', 'Windsurf', 'Cline', 'OpenCode', 'Zed', 'JetBrains', 'Gemini CLI', 'Codex', 'Trae', 'Kiro'],
     glossary: '«Chamba» es la palabra latina para trabajo — la chamba. Le pasas al modelo su chamba; chamba (la herramienta) se encarga de supervisar, validar y hacer la plomería alrededor.',
     powerups: {
       kicker: 'Con tu editor',
@@ -137,7 +161,7 @@ const CONTENT = {
     whyTitle: 'Coordinación real, sin un LLM extra',
     benefits: [
       { no: '01', title: 'Cero API keys', body: 'Sin ANTHROPIC_API_KEY ni OPENAI_API_KEY. Tu editor ya paga su propio modelo; chamba nunca llama a un LLM.' },
-      { no: '02', title: 'Todo editor MCP, desde el día uno', body: 'Un solo servidor stdio funciona en Cursor, Claude Code, VS Code, Windsurf, Cline y OpenCode.' },
+      { no: '02', title: 'Todo editor MCP, desde el día uno', body: 'Un solo servidor stdio funciona en Cursor, Claude Code, VS Code, Windsurf, Cline, OpenCode, Zed, JetBrains, Gemini CLI, Codex, Trae y Kiro.' },
       { no: '03', title: '/ticket de punta a punta', body: 'Orquestador‑trabajador: plan → worktrees por repo → implementación → verificación del diff → QA, con un único gate de clarificación. Nunca hace auto‑merge, push, ni borra datos sin tu confirmación explícita.' },
       { no: '04', title: 'Tests con tu propio runner', body: 'El subagente tester escribe y corre tests para cada cambio con el runner y las convenciones de tu repo, y reporta pass/fail honestamente. Unitarios e integración — aparte del QA de aceptación sobre la app corriendo.' },
       { no: '05', title: 'Modelo + effort por agente', body: 'Configurás qué modelo y esfuerzo usa cada rol (planner, reviewer, qa, implementer…), o cambiás todo de una con un preset: budget · balanced · quality · fast. Multi‑proveedor, con Claude Fable 5 opt‑in.' },
@@ -220,7 +244,8 @@ const CONTENT = {
       { badge: 'Listo', dot: OK, title: 'Modelo + effort por agente', desc: 'Reparto por rol, wizard y Claude Fable 5 opt‑in.' },
       { badge: 'Listo', dot: OK, title: 'QA de aceptación (/qa + agente qa)', desc: 'Valida los criterios contra la app corriendo — web (Playwright/co‑piloto) o móvil (React Native/Expo en simulador/emulador vía el MCP de tu editor); evidencia en screenshots y login siempre humano.' },
       { badge: 'Listo', dot: OK, title: '/map de arquitectura + carpeta plans/', desc: 'Mapa cross‑repo al vault y planes persistidos.' },
-      { badge: 'Ahora', dot: AM, title: 'v0.16.0 en npm', desc: 'QA móvil (Expo/React Native): detecta la app y enumera simuladores/emuladores; el agente qa corre ahí vía tu MCP.' },
+      { badge: 'Listo', dot: OK, title: 'QA móvil (Expo/React Native)', desc: 'Detecta la app y enumera simuladores/emuladores; el agente qa corre ahí vía tu MCP.' },
+      { badge: 'Ahora', dot: AM, title: 'v0.17.0 en npm', desc: 'Más editores: Zed, JetBrains, Gemini CLI, Codex, Trae y Kiro — guías de setup + detección de sus reglas de código.' },
       { badge: 'Siguiente', dot: AC, title: 'Release 1.0.0 estable', desc: 'Pulido final y publicación 1.0.' },
       { badge: 'Explorando', dot: MU, title: 'V2: registro de servicios, búsqueda semántica', desc: 'Registro con detección de drift y búsqueda del vault.' }
     ],
@@ -247,7 +272,7 @@ const CONTENT = {
     heroTermLabel: 'install in seconds',
     heroCta: 'See setup',
     heroEditorsLabel: 'Works in',
-    editorPills: ['Cursor', 'Claude Code', 'VS Code', 'Windsurf', 'Cline', 'OpenCode'],
+    editorPills: ['Cursor', 'Claude Code', 'VS Code', 'Windsurf', 'Cline', 'OpenCode', 'Zed', 'JetBrains', 'Gemini CLI', 'Codex', 'Trae', 'Kiro'],
     glossary: '“Chamba” is the LATAM word for work — la chamba. You hand the model its chamba; chamba (the tool) handles the supervising, validating and plumbing around it.',
     powerups: {
       kicker: 'With your editor',
@@ -265,7 +290,7 @@ const CONTENT = {
     whyTitle: 'Real coordination, no extra LLM',
     benefits: [
       { no: '01', title: 'Zero API keys', body: 'No ANTHROPIC_API_KEY, no OPENAI_API_KEY. Your editor already pays for its own model; chamba never calls an LLM.' },
-      { no: '02', title: 'Every MCP editor, day one', body: 'One stdio server works in Cursor, Claude Code, VS Code, Windsurf, Cline and OpenCode.' },
+      { no: '02', title: 'Every MCP editor, day one', body: 'One stdio server works in Cursor, Claude Code, VS Code, Windsurf, Cline, OpenCode, Zed, JetBrains, Gemini CLI, Codex, Trae and Kiro.' },
       { no: '03', title: 'End‑to‑end /ticket', body: 'Orchestrator‑worker: plan → per‑repo worktrees → implement → diff verify → QA, with one clarification gate. It never auto‑merges, pushes, or deletes data without your explicit confirmation.' },
       { no: '04', title: 'Tests with your own runner', body: 'The tester subagent writes and runs tests for each change with your repo’s runner and conventions, and reports pass/fail honestly. Unit and integration — separate from acceptance QA on the running app.' },
       { no: '05', title: 'Per‑agent model + effort', body: 'Set which model and effort each role uses (planner, reviewer, qa, implementer…), or flip everything at once with a preset: budget · balanced · quality · fast. Multi‑provider, with Claude Fable 5 opt‑in.' },
@@ -348,7 +373,8 @@ const CONTENT = {
       { badge: 'Shipped', dot: OK, title: 'Per‑agent model + effort config', desc: 'Per‑role split, wizard and Claude Fable 5 opt‑in.' },
       { badge: 'Shipped', dot: OK, title: 'Acceptance QA (/qa + qa agent)', desc: 'Validates criteria against the running app — web (Playwright/co‑pilot) or mobile (React Native/Expo on a simulator/emulator via your editor MCP); screenshot evidence and login always human.' },
       { badge: 'Shipped', dot: OK, title: '/map architecture + plans/ folder', desc: 'Cross‑repo map to the vault and persisted plans.' },
-      { badge: 'Now', dot: AM, title: 'v0.16.0 on npm', desc: 'Mobile QA (Expo/React Native): detects the app and enumerates simulators/emulators; the qa agent runs there via your MCP.' },
+      { badge: 'Shipped', dot: OK, title: 'Mobile QA (Expo/React Native)', desc: 'Detects the app and enumerates simulators/emulators; the qa agent runs there via your MCP.' },
+      { badge: 'Now', dot: AM, title: 'v0.17.0 on npm', desc: 'More editors: Zed, JetBrains, Gemini CLI, Codex, Trae and Kiro — setup guides + detection of their rule files.' },
       { badge: 'Next', dot: AC, title: 'Stable 1.0.0 release', desc: 'Final polish and the 1.0 publish.' },
       { badge: 'Exploring', dot: MU, title: 'V2: service registry, semantic search', desc: 'Registry with drift detection and vault search.' }
     ],

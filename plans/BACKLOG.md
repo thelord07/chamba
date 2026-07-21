@@ -90,8 +90,11 @@ Detalle en [tier3-skills-registry.md](tier3-skills-registry.md).
   `{name, description, scope?}`; matchea tarea↔description (index-first, cero LLM), devuelve las
   relevantes con cuerpo + el catálogo. Wired en `/ticket` y `/orq`. Vacío/opt-in.
 
-### 3. Más editores (examples/) — 🔜 próximo (0.17.0)
-- Guías de setup para Gemini CLI, Codex, Kiro, Zed, JetBrains, Trae. Como es MCP-first, "soportar" = un snippet de config. Barato, agranda el TAM.
+### 3. Más editores (examples/) — ✅ HECHO (0.17.0)
+Detalle en [tier3-more-editors.md](tier3-more-editors.md).
+- Guías de setup para Gemini CLI, Codex, Kiro, Zed, JetBrains, Trae + detección de sus archivos
+  de reglas (`GEMINI.md`, `.junie/guidelines.md`, `.kiro/steering`, `.rules`). MCP-first: "soportar"
+  = un snippet de config. Barato, agranda el TAM.
 
 ### 4. Calidad de release (proceso)
 - **Golden tests** del reviewer/plan (snapshot de veredictos heurísticos) → cambios de comportamiento visibles en el diff.
@@ -125,8 +128,8 @@ Encontrado dogfooding en **finalis**. El check "Git repo" corría `git rev-parse
 - ✅ **0.14.0** — Tier 3 #1: ticket design-aware (Figma).
 - ✅ **0.15.0** — Tier 3 #2: registry de skills/playbooks (index-first).
 - ✅ **0.16.0** — Tier 3 #0: QA móvil (React Native / Expo) + `chamba_qa_capabilities`.
+- ✅ **0.17.0** — Tier 3 #3: más editores (Gemini CLI, Codex, JetBrains, Trae, Zed, Kiro).
 
 ## Orden sugerido (lo que sigue)
-1. **0.17.0** — Tier 3 #3: más editores (examples/) — barato, MCP-first.
-2. **0.18.0** — Tier 3 #4: calidad de release (golden tests, doctor gate, `--yes`, checklist).
-3. **1.0.0** — pulido y estabilización cuando Tier 3 esté sólido.
+1. **0.18.0** — Tier 3 #4: calidad de release (golden tests, doctor gate, `--yes`, checklist).
+2. **1.0.0** — pulido y estabilización cuando Tier 3 esté sólido.

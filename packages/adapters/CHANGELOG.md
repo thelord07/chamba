@@ -1,5 +1,12 @@
 # @chamba/adapters
 
+## 0.17.0
+
+### Patch Changes
+
+- Updated dependencies
+  - @chamba/core@0.17.0
+
 ## 0.16.0
 
 ### Patch Changes

@@ -38,6 +38,23 @@ describe('detectRuleSources', () => {
     expect(editors).toContain('Agents');
   });
 
+  it('detects the newer editor conventions (Gemini, Junie, Kiro, Zed)', async () => {
+    const fs = new MemoryFilesystem({
+      '/ws/GEMINI.md': '# gemini',
+      '/ws/.junie/guidelines.md': '# junie',
+      '/ws/.kiro/steering/product.md': '# kiro steering',
+      '/ws/.rules': '# zed',
+    });
+
+    const sources = await detectRuleSources(fs, '/ws', ['.']);
+    const byEditor = new Map(sources.map((s) => [s.editor, s.path]));
+
+    expect(byEditor.get('Gemini CLI')).toBe('GEMINI.md');
+    expect(byEditor.get('JetBrains Junie')).toBe('.junie/guidelines.md');
+    expect(byEditor.get('Kiro')).toBe('.kiro/steering/product.md');
+    expect(byEditor.get('Zed')).toBe('.rules');
+  });
+
   it('lists rule files inside a rules directory (.md/.mdc only)', async () => {
     const fs = new MemoryFilesystem({
       '/ws/.cursor/rules/a.mdc': 'a',

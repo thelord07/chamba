@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "chamba": {
+      "command": "npx",
+      "args": ["-y", "@chamba/mcp"]
+    }
+  }
+}

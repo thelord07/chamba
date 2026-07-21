@@ -23,6 +23,10 @@ export const RULE_SOURCES: readonly RuleConvention[] = [
   { editor: 'Trae', path: '.trae/project_rules.md', kind: 'file' },
   { editor: 'GitHub Copilot', path: '.github/copilot-instructions.md', kind: 'file' },
   { editor: 'Cline', path: '.clinerules', kind: 'file' },
+  { editor: 'Gemini CLI', path: 'GEMINI.md', kind: 'file' },
+  { editor: 'JetBrains Junie', path: '.junie/guidelines.md', kind: 'file' },
+  { editor: 'Kiro', path: '.kiro/steering', kind: 'dir' },
+  { editor: 'Zed', path: '.rules', kind: 'file' },
   { editor: 'Agents', path: 'AGENTS.md', kind: 'file' },
 ];
 

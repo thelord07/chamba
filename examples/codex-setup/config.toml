@@ -1,0 +1,10 @@
+# ~/.codex/config.toml — Codex uses TOML, not JSON.
+# MCP servers go under [mcp_servers.<name>].
+
+[mcp_servers.chamba]
+command = "npx"
+args = ["-y", "@chamba/mcp"]
+
+# Optional: point chamba at your Obsidian vault.
+# [mcp_servers.chamba.env]
+# CHAMBA_OBSIDIAN_VAULT_PATH = "/Users/you/Obsidian/MyVault"

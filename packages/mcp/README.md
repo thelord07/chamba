@@ -2,7 +2,7 @@
 
 The **chamba MCP server** — adds orchestration, workspace context, git worktrees and
 Obsidian memory to any MCP-capable editor (Cursor, Claude Code, VS Code/Copilot,
-Windsurf, Cline, OpenCode).
+Windsurf, Cline, OpenCode, Zed, JetBrains, Gemini CLI, Codex, Trae, Kiro).
 
 **No API key.** chamba never calls an LLM — your editor's model does the reasoning
 and calls these tools.
@@ -22,6 +22,11 @@ and calls these tools.
 ```json
 { "servers": { "chamba": { "type": "stdio", "command": "npx", "args": ["-y", "@chamba/mcp"] } } }
 ```
+
+**More editors** (full guides in the repo's [`examples/`](https://github.com/thelord07/chamba/tree/main/examples)):
+Gemini CLI (`~/.gemini/settings.json`, `mcpServers`) · Codex (`~/.codex/config.toml`, TOML
+`[mcp_servers.chamba]`) · JetBrains AI Assistant (`mcpServers`) · Trae (`mcpServers`) · Zed
+(`~/.config/zed/settings.json`, key `context_servers`) · Kiro (`.kiro/settings/mcp.json`).
 
 Point at an Obsidian vault with `"env": { "CHAMBA_OBSIDIAN_VAULT_PATH": "/path/to/vault" }`.
 

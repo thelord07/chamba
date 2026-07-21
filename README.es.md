@@ -10,7 +10,8 @@
 
 > **Un MCP server que le agrega orquestación, contexto de workspace, git worktrees y
 > memoria con Obsidian a cualquier editor con IA** — Cursor, Claude Code, VS Code
-> (Copilot), Windsurf, Cline, OpenCode. Sin API key: el modelo de tu editor razona,
+> (Copilot), Windsurf, Cline, OpenCode, Zed, JetBrains, Gemini CLI, Codex, Trae, Kiro.
+> Sin API key: el modelo de tu editor razona,
 > chamba coordina.
 
 *"Chamba"* es la palabra latina para *trabajo*. Vos le pasás la chamba al modelo;
@@ -27,7 +28,8 @@ El modelo de tu editor hace el razonamiento y llama a las tools de chamba. Eso s
 
 - **Cero API keys.** Nada de `ANTHROPIC_API_KEY` ni `OPENAI_API_KEY`.
 - **Todos los editores con MCP, desde el día uno.** Un solo server stdio funciona en
-  Cursor, Claude Code, VS Code, Windsurf, Cline y OpenCode.
+  Cursor, Claude Code, VS Code, Windsurf, Cline, OpenCode, Zed, JetBrains, Gemini CLI,
+  Codex, Trae y Kiro.
 - **Consciente del workspace.** Escanea tu proyecto a un `.chamba/workspace.md`
   editable y usa ese contexto en los planes.
 - **Plan + review heurístico (sin LLM).** Detecta falta de tests, trabajo sin
@@ -74,6 +76,10 @@ Ojo: VS Code usa **`"servers"`**, no `"mcpServers"`:
 
 **Windsurf** — `~/.codeium/windsurf/mcp_config.json` ([guía](./examples/windsurf-setup)) ·
 **OpenCode** — `opencode.json` ([guía](./examples/opencode-setup)).
+
+**Más editores** — [Gemini CLI](./examples/gemini-cli-setup) · [Codex](./examples/codex-setup) (TOML) ·
+[JetBrains](./examples/jetbrains-setup) · [Trae](./examples/trae-setup) ·
+[Zed](./examples/zed-setup) (`context_servers`) · [Kiro](./examples/kiro-setup).
 
 Para conectar un vault de Obsidian, agregá `"env": { "CHAMBA_OBSIDIAN_VAULT_PATH": "/ruta/al/vault" }`.
 ¿No tenés uno? `chamba_workspace_init` crea un vault en la raíz del workspace (y siembra una
@@ -190,7 +196,8 @@ editor — y es honesto: *design-accurate / verificado contra la referencia*, no
 - ✅ Tickets design-aware (Figma `## Design` → tokens por MCP o screenshots)
 - ✅ Registro de skills/playbooks (`chamba_load_skills`, index-first, opt-in)
 - ✅ QA móvil para React Native / Expo (`chamba_qa_capabilities` → simuladores/emuladores)
-- ✅ **0.16.0 publicado en npm**
+- ✅ Más editores: Zed, JetBrains, Gemini CLI, Codex, Trae, Kiro (guías de setup + detección de reglas)
+- ✅ **0.17.0 publicado en npm**
 - 🔭 V2: búsqueda semántica del vault, MCP sampling, más bases de conocimiento
 
 Ver [`PLAN.md`](./PLAN.md) para el plan completo de fases.
