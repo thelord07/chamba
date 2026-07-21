@@ -68,7 +68,7 @@
 
 <script>
 const AC = 'var(--accent)', OK = 'var(--accent2)', AM = 'var(--amber)', MU = 'var(--muted)';
-const VERSION = '0.19.0';
+const VERSION = '0.20.0';
 
 const EDITORS = [
   { id: 'cursor', name: 'Cursor', file: '.cursor/mcp.json',
@@ -173,7 +173,7 @@ const CONTENT = {
     toolsSub: 'Cada herramienta es determinista y sin LLM. El modelo de tu editor decide cuándo llamarlas.',
     toolCol1: 'Herramienta', toolCol2: 'Entrada', toolCol3: 'Salida',
     tools: [
-      { name: 'workspace_init', in: '{ root?, createVault? }', out: 'Escanea y escribe .chamba/workspace.md; bootstrapea un vault si no hay' },
+      { name: 'workspace_init', in: '{ root?, createVault? }', out: 'Escanea y escribe .chamba/workspace.md; bootstrapea un vault global fuera del repo (~/.chamba/vault) si no hay' },
       { name: 'workspace_show', in: '{ }', out: 'Contenido de .chamba/workspace.md' },
       { name: 'workspace_reload', in: '{ }', out: 'Un diff contra un re‑escaneo (sin escribir)' },
       { name: 'load_context', in: '{ task, includeObsidian? }', out: 'Resumen del workspace + notas del vault + reglas de código' },
@@ -249,7 +249,8 @@ const CONTENT = {
       { badge: 'Listo', dot: OK, title: 'QA móvil (Expo/React Native)', desc: 'Detecta la app y enumera simuladores/emuladores; el agente qa corre ahí vía tu MCP.' },
       { badge: 'Listo', dot: OK, title: 'Más editores (Zed, JetBrains, Gemini, Codex, Trae, Kiro)', desc: 'Guías de setup + detección de sus reglas de código.' },
       { badge: 'Listo', dot: OK, title: 'Fuentes de diseño enlazables + arquitectura de UI', desc: 'Figma / mockups / prototipo enlazados; el planner pregunta la arquitectura una vez y la guarda.' },
-      { badge: 'Ahora', dot: AM, title: 'v0.19.0 en npm', desc: 'Calidad de release: golden tests del reviewer, doctor como gate en CI, instalación --yes, y checklist de release.' },
+      { badge: 'Listo', dot: OK, title: 'Calidad de release', desc: 'Golden tests del reviewer, doctor como gate en CI, instalación --yes, y checklist de release.' },
+      { badge: 'Ahora', dot: AM, title: 'v0.20.0 en npm', desc: 'Vault repo-safe: el bootstrap crea el vault fuera de tus repos (~/.chamba/vault) y no ensucia el proyecto.' },
       { badge: 'Siguiente', dot: AC, title: 'Release 1.0.0 estable', desc: 'Pulido final y publicación 1.0.' },
       { badge: 'Explorando', dot: MU, title: 'V2: registro de servicios, búsqueda semántica', desc: 'Registro con detección de drift y búsqueda del vault.' }
     ],
@@ -306,7 +307,7 @@ const CONTENT = {
     toolsSub: 'Every tool is deterministic and LLM‑free. Your editor’s model decides when to call them.',
     toolCol1: 'Tool', toolCol2: 'Input', toolCol3: 'Output',
     tools: [
-      { name: 'workspace_init', in: '{ root?, createVault? }', out: 'Scans and writes .chamba/workspace.md; bootstraps a vault if none' },
+      { name: 'workspace_init', in: '{ root?, createVault? }', out: 'Scans and writes .chamba/workspace.md; bootstraps a global vault outside the repo (~/.chamba/vault) if none' },
       { name: 'workspace_show', in: '{ }', out: 'Contents of .chamba/workspace.md' },
       { name: 'workspace_reload', in: '{ }', out: 'A diff vs a fresh re‑scan (no writes)' },
       { name: 'load_context', in: '{ task, includeObsidian? }', out: 'Workspace summary + vault notes + coding rules' },
@@ -382,7 +383,8 @@ const CONTENT = {
       { badge: 'Shipped', dot: OK, title: 'Mobile QA (Expo/React Native)', desc: 'Detects the app and enumerates simulators/emulators; the qa agent runs there via your MCP.' },
       { badge: 'Shipped', dot: OK, title: 'More editors (Zed, JetBrains, Gemini, Codex, Trae, Kiro)', desc: 'Setup guides + detection of their rule files.' },
       { badge: 'Shipped', dot: OK, title: 'Linkable design sources + UI architecture', desc: 'Linked Figma / mockups / prototype; the planner asks the architecture once and saves it.' },
-      { badge: 'Now', dot: AM, title: 'v0.19.0 on npm', desc: 'Release quality: golden reviewer tests, doctor as a CI gate, --yes installs, and a release checklist.' },
+      { badge: 'Shipped', dot: OK, title: 'Release quality', desc: 'Golden reviewer tests, doctor as a CI gate, --yes installs, and a release checklist.' },
+      { badge: 'Now', dot: AM, title: 'v0.20.0 on npm', desc: 'Repo-safe vault: bootstrap creates the vault outside your repos (~/.chamba/vault), never polluting the project.' },
       { badge: 'Next', dot: AC, title: 'Stable 1.0.0 release', desc: 'Final polish and the 1.0 publish.' },
       { badge: 'Exploring', dot: MU, title: 'V2: service registry, semantic search', desc: 'Registry with drift detection and vault search.' }
     ],

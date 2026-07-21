@@ -33,8 +33,20 @@ export function createNodeServices(): Services {
   };
 }
 
-/** Common directories to probe for an Obsidian vault, derived from home + cwd. */
+/**
+ * Common directories to probe for an Obsidian vault, derived from home + cwd. A real
+ * personal vault (Documents/Notes/Obsidian) wins over chamba's own global fallback at
+ * `~/.chamba/vault`, which is where `workspace_init` bootstraps one (outside any repo).
+ */
 export function obsidianSearchRoots(services: Services): string[] {
   const { homedir: home, cwd } = services;
-  return [cwd, `${home}/Documents`, `${home}/Notes`, `${home}/Obsidian`, `${home}/obsidian`, home];
+  return [
+    cwd,
+    `${home}/Documents`,
+    `${home}/Notes`,
+    `${home}/Obsidian`,
+    `${home}/obsidian`,
+    `${home}/.chamba/vault`,
+    home,
+  ];
 }

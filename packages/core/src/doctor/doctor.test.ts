@@ -107,6 +107,35 @@ describe('runDoctor', () => {
     expect(report.healthy).toBe(true);
   });
 
+  it('warns when the vault lives inside a git repo (notes could be committed)', async () => {
+    const fs = new MemoryFilesystem({
+      '/proj/.git/HEAD': 'ref: refs/heads/main\n',
+      '/proj/.chamba/workspace.md': '# Workspace\n',
+      '/proj/notes/.obsidian/app.json': '{}',
+      '/proj/notes/n.md': '# n\n',
+    });
+    const report = await runDoctor(input({ fs, obsidianVaultPath: '/proj/notes' }));
+    const vault = byId(report.checks, 'vault');
+    expect(vault.status).toBe('warn');
+    expect(vault.detail).toContain('inside a git repo');
+    expect(report.healthy).toBe(true); // warn doesn't break healthy
+  });
+
+  it('stays ok when an in-repo vault has its artifacts gitignored', async () => {
+    const fs = new MemoryFilesystem({
+      '/proj/.git/HEAD': 'ref: refs/heads/main\n',
+      // anchored patterns at the repo root (like chamba's own .gitignore)
+      '/proj/.gitignore':
+        '/.obsidian/\n/Workspace overview.md\n/proyectos/\n/plans/\n/.chamba/memory/\n',
+      '/proj/.chamba/workspace.md': '# Workspace\n',
+      '/proj/notes/.obsidian/app.json': '{}',
+    });
+    const report = await runDoctor(input({ fs, obsidianVaultPath: '/proj/notes' }));
+    const vault = byId(report.checks, 'vault');
+    expect(vault.status).toBe('ok');
+    expect(vault.detail).toContain('gitignored');
+  });
+
   it('warns when the workspace file and vault are missing', async () => {
     const report = await runDoctor(
       input({ fs: new MemoryFilesystem({}), obsidianVaultPath: undefined }),

@@ -115,6 +115,13 @@ Detalle en [tier3-release-quality.md](tier3-release-quality.md).
 
 ## 🐛 Fixes / mejoras encontradas
 
+### Vault sembrado dentro del repo — ✅ HECHO (0.20.0)
+Detalle en [repo-safe-vault.md](repo-safe-vault.md). Encontrado dogfooding en **asisten**.
+`workspace_init` sembraba el vault en la raíz del workspace; si era repo git, `.obsidian/` +
+notas + memoria quedaban commiteables. Fix: bootstrap a `~/.chamba/vault` (global, fuera de
+repos) + autodetección; backstop `ensureVaultGitignored` para vaults legacy dentro de un repo;
+`doctor` warnea si el vault vive dentro de un work tree git.
+
 ### Doctor: falso-positivo en workspaces multi-repo — ✅ HECHO (0.12.0)
 Encontrado dogfooding en **finalis**. El check "Git repo" corría `git rev-parse` sólo en el `cwd`; en un workspace multi-repo (el top-level es contenedor, los sub-repos son git) warneaba de más.
 - Fix: cuando el `cwd` no es work tree, usa `detectGitRepos` y reporta *"multi-repo workspace — N git repos"* (ok) en vez de ⚠; salta el check de worktrees en el contenedor.
@@ -140,6 +147,7 @@ Encontrado dogfooding en **finalis**. El check "Git repo" corría `git rev-parse
 - ✅ **0.17.0** — Tier 3 #3: más editores (Gemini CLI, Codex, JetBrains, Trae, Zed, Kiro).
 - ✅ **0.18.0** — Tier 3 #0.5: design sources enlazables + preferencia de arquitectura de UI.
 - ✅ **0.19.0** — Tier 3 #4: calidad de release (golden tests, doctor gate en CI, `--yes`, RELEASING.md).
+- ✅ **0.20.0** — fix: vault repo-safe (bootstrap a `~/.chamba/vault`, backstop gitignore, warning del doctor).
 
 ## Orden sugerido (lo que sigue)
 1. **1.0.0** — Tier 3 completo. Pulido y estabilización: revisar la superficie de tools, endurecer

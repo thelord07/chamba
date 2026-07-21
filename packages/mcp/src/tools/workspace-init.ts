@@ -1,4 +1,6 @@
 import {
+  ensureVaultGitignored,
+  findGitRoot,
   joinPath,
   ObsidianDetector,
   renderWorkspaceMarkdown,
@@ -20,8 +22,9 @@ const DESCRIPTION =
   'languages, framework, conventions, active projects, folder map). Respects ' +
   '.gitignore/.dockerignore and never reads node_modules or binaries. If the ' +
   'file already exists it is NOT overwritten — its current contents are ' +
-  'returned. When no Obsidian vault is available, it also bootstraps one at the ' +
-  'workspace root and seeds a "Workspace overview" note (disable with createVault: false).';
+  'returned. When no Obsidian vault is available, it bootstraps a GLOBAL vault outside ' +
+  'your repos (~/.chamba/vault) and seeds a "Workspace overview" note; a vault found ' +
+  'inside a git repo gets its artifacts gitignored (disable with createVault: false).';
 
 /** Register `chamba_workspace_init`: scan + write `.chamba/workspace.md` + bootstrap a vault. */
 export function registerWorkspaceInit(server: McpServer, logger: Logger, services: Services): void {
@@ -61,23 +64,37 @@ export function registerWorkspaceInit(server: McpServer, logger: Logger, service
         ? `\`${WORKSPACE_RELATIVE_PATH}\` already exists at ${wsPath}; not overwriting.`
         : `Created \`${WORKSPACE_RELATIVE_PATH}\` at ${wsPath}.`;
 
-      // vault — bootstrap one at the workspace root if none is available.
+      // vault — bootstrap a GLOBAL vault outside any repo when none is available, and
+      // gitignore any legacy vault that lives inside a git work tree (repo-safe).
       let vaultLine = 'Vault: skipped (createVault: false).';
       if (createVault !== false) {
         const detection = await new ObsidianDetector(services.fs).detect({
           explicitPath: services.obsidianVaultPath,
           searchRoots: obsidianSearchRoots(services),
         });
-        if (detection.found) {
-          vaultLine = `Vault: using the existing one at ${detection.path}; left it untouched.`;
+        if (detection.found && detection.path) {
+          const gitRoot = await findGitRoot(services.fs, detection.path);
+          if (gitRoot) {
+            const added = await ensureVaultGitignored(services.fs, gitRoot);
+            vaultLine =
+              `Vault: using ${detection.path} — it's inside a git repo (${gitRoot}), so ` +
+              (added.length > 0
+                ? `I gitignored its artifacts (${added.join(', ')}) so notes/memory aren't committed. `
+                : 'its artifacts are already gitignored. ') +
+              'Consider moving it outside the repo (e.g. ~/.chamba/vault).';
+          } else {
+            vaultLine = `Vault: using the existing one at ${detection.path}; left it untouched.`;
+          }
         } else {
+          const globalVault = joinPath(services.homedir, WORKSPACE_DIR, 'vault');
           const seeded = await new VaultInitializer(services.fs, services.clock).seed({
-            vaultPath: workspaceRoot,
+            vaultPath: globalVault,
             workspace,
           });
           vaultLine =
-            `Vault: none found — created one at the workspace root and seeded ` +
-            `\`${VAULT_OVERVIEW_FILE}\`. Add \`.obsidian/\` to .gitignore if you don't want it committed.`;
+            `Vault: none found — created a global vault at ${seeded.vaultPath} (outside your ` +
+            `repos) and seeded \`${VAULT_OVERVIEW_FILE}\`. It's autodetected; set ` +
+            `CHAMBA_OBSIDIAN_VAULT_PATH to point elsewhere.`;
           logger.info({ tool: TOOL_NAME, vault: seeded.vaultPath }, 'vault bootstrapped');
         }
       }

@@ -81,8 +81,9 @@ Note: VS Code uses **`"servers"`**, not `"mcpServers"`:
 [Zed](./examples/zed-setup) (`context_servers`) · [Kiro](./examples/kiro-setup).
 
 To wire up an Obsidian vault, add `"env": { "CHAMBA_OBSIDIAN_VAULT_PATH": "/path/to/vault" }`.
-Don't have one? `chamba_workspace_init` bootstraps a vault at the workspace root (and seeds
-a "Workspace overview" note) when it can't find an existing one — so memory works from day one.
+Don't have one? `chamba_workspace_init` bootstraps a **global vault outside your repos**
+(`~/.chamba/vault`, autodetected) and seeds a "Workspace overview" note when it can't find one —
+so memory works from day one without polluting the repo.
 
 Not sure everything's wired? Run `npx @chamba/mcp doctor` (or the `chamba_doctor` tool from
 your editor) for a pass/warn/fail health check of Node, git, the workspace, config, the vault,
@@ -92,7 +93,7 @@ the log directory and worktrees.
 
 | Tool | Input | Output |
 |---|---|---|
-| `chamba_workspace_init` | `{ root?, createVault? }` | Scans and writes `.chamba/workspace.md` (won't overwrite); detects the auth stack (Auth0/Firebase/Cognito/…) into an `## Auth` section; bootstraps + seeds a vault if none is found |
+| `chamba_workspace_init` | `{ root?, createVault? }` | Scans and writes `.chamba/workspace.md` (won't overwrite); detects the auth stack (Auth0/Firebase/Cognito/…) into an `## Auth` section; bootstraps a **global vault outside your repos** (`~/.chamba/vault`) if none is found, and gitignores a vault that lives inside a repo |
 | `chamba_workspace_show` | `{}` | Contents of `.chamba/workspace.md` |
 | `chamba_workspace_reload` | `{}` | A diff vs a fresh re-scan (no writes) |
 | `chamba_load_context` | `{ task, includeObsidian? }` | Workspace summary + relevant vault notes |
@@ -228,7 +229,8 @@ browser does — and it's honest about *design-accurate*, not "pixel-perfect".
 - ✅ More editors: Zed, JetBrains, Gemini CLI, Codex, Trae, Kiro (setup guides + rule detection)
 - ✅ Linkable design sources (`chamba_load_design`) + UI-architecture preference (`chamba_design_prefs`, `/design`)
 - ✅ Release quality: golden reviewer tests, `doctor` CI gate, `--yes` installs, `RELEASING.md`
-- ✅ **0.19.0 published on npm**
+- ✅ Repo-safe vault: bootstrap outside repos (`~/.chamba/vault`), gitignore backstop, `doctor` warning
+- ✅ **0.20.0 published on npm**
 - 🔭 V2: semantic vault search, MCP sampling, more knowledge bases
 
 See [`PLAN.md`](./PLAN.md) for the full phase plan.

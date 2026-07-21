@@ -5,6 +5,7 @@ import type { SystemResources } from '../ports/system.js';
 import { computeConcurrencyBudget } from '../resources/budget.js';
 import { joinPath } from '../util/path.js';
 import { ObsidianDetector } from '../workspace/obsidian-detector.js';
+import { findGitRoot, vaultGitignoreMissing } from '../workspace/vault-safety.js';
 import { WORKSPACE_DIR, WORKSPACE_RELATIVE_PATH } from '../workspace/workspace.js';
 import { detectGitRepos } from '../worktree/git-repo-detector.js';
 
@@ -242,10 +243,23 @@ async function checkVault(input: DoctorInput): Promise<DoctorCheck> {
   });
   if (detection.found && detection.path) {
     const source = input.obsidianVaultPath ? 'CHAMBA_OBSIDIAN_VAULT_PATH' : 'autodetected';
+    const notes = detection.noteCount ?? 0;
+    // A vault inside a git work tree risks committing personal notes/memory — but only
+    // warn when its artifacts aren't already gitignored.
+    const gitRoot = await findGitRoot(input.fs, detection.path);
+    if (gitRoot && (await vaultGitignoreMissing(input.fs, gitRoot)).length > 0) {
+      return {
+        ...base,
+        status: 'warn',
+        detail: `${detection.path} is inside a git repo (${gitRoot}) — notes/memory could be committed`,
+        hint: 'Move the vault out of the repo (e.g. ~/.chamba/vault) or gitignore its artifacts. workspace_init now bootstraps outside repos and gitignores in-repo vaults.',
+      };
+    }
+    const inRepo = gitRoot ? ', inside a git repo but gitignored' : '';
     return {
       ...base,
       status: 'ok',
-      detail: `${detection.path} (${source}, ${detection.noteCount ?? 0} notes)`,
+      detail: `${detection.path} (${source}, ${notes} notes${inRepo})`,
     };
   }
   return {

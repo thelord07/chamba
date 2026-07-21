@@ -1,5 +1,25 @@
 # @chamba/mcp
 
+## 0.20.0
+
+### Minor Changes
+
+- fix(vault): bootstrap the vault outside your repos (repo-safe)
+
+  `workspace_init` used to seed the Obsidian vault at the workspace root — so when that folder
+  was a git repo, `.obsidian/`, `Workspace overview.md`, `proyectos/`, `plans/` and
+  `.chamba/memory/` could get committed. Now it bootstraps a **global vault at `~/.chamba/vault`**
+  (outside any repo, autodetected via the search roots); a personal vault in Documents/Notes/
+  Obsidian still wins. If a vault is found **inside** a git work tree, its artifacts are
+  auto-gitignored as a backstop, and `doctor` warns when the active vault lives inside a repo.
+  New core helpers `findGitRoot` and `ensureVaultGitignored` (pure, no `git` process, no LLM).
+
+### Patch Changes
+
+- Updated dependencies
+  - @chamba/core@0.20.0
+  - @chamba/adapters@0.20.0
+
 ## 0.19.0
 
 ### Patch Changes

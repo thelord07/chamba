@@ -145,6 +145,13 @@ export type { RuleConvention, RuleExcerpt, RuleSource } from './workspace/rules.
 // Coding rules (multi-editor)
 export { detectRuleSources, RULE_SOURCES, readRuleExcerpts } from './workspace/rules.js';
 export { WorkspaceScanner } from './workspace/scanner.js';
+// Vault safety (keep the vault out of git repos)
+export {
+  ensureVaultGitignored,
+  findGitRoot,
+  VAULT_ARTIFACTS,
+  vaultGitignoreMissing,
+} from './workspace/vault-safety.js';
 export type {
   AuthFinding,
   MobileFinding,

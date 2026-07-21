@@ -114,7 +114,7 @@ describe('chamba MCP server', () => {
     await server.close();
   });
 
-  it('workspace_init bootstraps a vault at the root when none exists', async () => {
+  it('workspace_init bootstraps a GLOBAL vault outside the repo when none exists', async () => {
     const services = buildServices(
       { '/proj/package.json': JSON.stringify({ name: 'proj' }) },
       '/proj',
@@ -122,9 +122,29 @@ describe('chamba MCP server', () => {
     const { client, server } = await connect(services);
 
     const result = await client.callTool({ name: 'chamba_workspace_init', arguments: {} });
-    expect(textOf(result)).toContain('created one at the workspace root');
-    expect(await services.fs.exists('/proj/.obsidian/app.json')).toBe(true);
-    expect(await services.fs.exists('/proj/Workspace overview.md')).toBe(true);
+    expect(textOf(result)).toContain('created a global vault');
+    // Seeded under the home dir, outside the project — never in /proj.
+    expect(await services.fs.exists('/home/test/.chamba/vault/.obsidian/app.json')).toBe(true);
+    expect(await services.fs.exists('/home/test/.chamba/vault/Workspace overview.md')).toBe(true);
+    expect(await services.fs.exists('/proj/.obsidian/app.json')).toBe(false);
+
+    await server.close();
+  });
+
+  it('workspace_init gitignores a legacy vault found inside a git repo', async () => {
+    const services = buildServices(
+      {
+        '/proj/package.json': JSON.stringify({ name: 'proj' }),
+        '/proj/.git/HEAD': 'ref: refs/heads/main\n',
+        '/proj/.obsidian/app.json': '{}',
+      },
+      '/proj',
+    );
+    const { client, server } = await connect(services);
+
+    const result = await client.callTool({ name: 'chamba_workspace_init', arguments: {} });
+    expect(textOf(result)).toContain('gitignored its artifacts');
+    expect(await services.fs.readFile('/proj/.gitignore')).toContain('.obsidian/');
 
     await server.close();
   });
