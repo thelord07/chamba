@@ -1,5 +1,28 @@
 # @chamba/claude-extras
 
+## 0.18.0
+
+### Minor Changes
+
+- feat(design): linkable design sources + UI-architecture preference
+
+  Link a design once and chamba resolves it per ticket. A design source is a pointer in
+  `.chamba/design/<name>.md` that LINKS an external location (kept out of the repo): a Figma
+  URL, a folder of mockups/specs, and/or a standalone `.html`/`.zip` prototype (e.g. a Claude
+  Code export). New tool `chamba_load_design` returns the brief + Figma link + asset paths (no
+  LLM). New tool `chamba_design_prefs` gets/sets the UI-architecture preference (Atomic Design,
+  Feature-Sliced, …) — web and mobile separately — so the planner asks once and reuses it. The
+  planner/implementer/qa build and verify against the linked source and the saved architecture,
+  opening the standalone prototype as the behavioural target. New `/design` command links a
+  source and manages the preference. chamba links and lists; the editor's model + Figma MCP /
+  browser does the visual work.
+
+### Patch Changes
+
+- Updated dependencies
+  - @chamba/core@0.18.0
+  - @chamba/adapters@0.18.0
+
 ## 0.17.0
 
 ### Patch Changes

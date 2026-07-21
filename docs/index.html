@@ -68,7 +68,7 @@
 
 <script>
 const AC = 'var(--accent)', OK = 'var(--accent2)', AM = 'var(--amber)', MU = 'var(--muted)';
-const VERSION = '0.17.0';
+const VERSION = '0.18.0';
 
 const EDITORS = [
   { id: 'cursor', name: 'Cursor', file: '.cursor/mcp.json',
@@ -178,6 +178,8 @@ const CONTENT = {
       { name: 'workspace_reload', in: '{ }', out: 'Un diff contra un re‑escaneo (sin escribir)' },
       { name: 'load_context', in: '{ task, includeObsidian? }', out: 'Resumen del workspace + notas del vault + reglas de código' },
       { name: 'load_skills', in: '{ task, max? }', out: 'Playbooks relevantes de .chamba/skills (index-first, sin LLM)' },
+      { name: 'load_design', in: '{ task, max? }', out: 'Resuelve la fuente de diseño enlazada (Figma / mockups / prototipo .html·.zip) + la preferencia de arquitectura' },
+      { name: 'design_prefs', in: '{ web?, mobile? }', out: 'Lee/guarda la arquitectura de UI (Atomic Design, FSD…): el planner pregunta una vez y reusa' },
       { name: 'summarize_to_vault', in: '{ title, content, projectSlug? }', out: 'Escribe un resumen a la carpeta proyectos/' },
       { name: 'save_plan', in: '{ title, content, projectSlug? }', out: 'Guarda un plan en la carpeta plans/' },
       { name: 'vault_status', in: '{ }', out: 'Ruta del vault + las notas que chamba ve (diagnóstico)' },
@@ -245,7 +247,8 @@ const CONTENT = {
       { badge: 'Listo', dot: OK, title: 'QA de aceptación (/qa + agente qa)', desc: 'Valida los criterios contra la app corriendo — web (Playwright/co‑piloto) o móvil (React Native/Expo en simulador/emulador vía el MCP de tu editor); evidencia en screenshots y login siempre humano.' },
       { badge: 'Listo', dot: OK, title: '/map de arquitectura + carpeta plans/', desc: 'Mapa cross‑repo al vault y planes persistidos.' },
       { badge: 'Listo', dot: OK, title: 'QA móvil (Expo/React Native)', desc: 'Detecta la app y enumera simuladores/emuladores; el agente qa corre ahí vía tu MCP.' },
-      { badge: 'Ahora', dot: AM, title: 'v0.17.0 en npm', desc: 'Más editores: Zed, JetBrains, Gemini CLI, Codex, Trae y Kiro — guías de setup + detección de sus reglas de código.' },
+      { badge: 'Listo', dot: OK, title: 'Más editores (Zed, JetBrains, Gemini, Codex, Trae, Kiro)', desc: 'Guías de setup + detección de sus reglas de código.' },
+      { badge: 'Ahora', dot: AM, title: 'v0.18.0 en npm', desc: 'Fuentes de diseño enlazables (Figma / mockups / prototipo) + arquitectura de UI que se pregunta una vez y se guarda.' },
       { badge: 'Siguiente', dot: AC, title: 'Release 1.0.0 estable', desc: 'Pulido final y publicación 1.0.' },
       { badge: 'Explorando', dot: MU, title: 'V2: registro de servicios, búsqueda semántica', desc: 'Registro con detección de drift y búsqueda del vault.' }
     ],
@@ -307,6 +310,8 @@ const CONTENT = {
       { name: 'workspace_reload', in: '{ }', out: 'A diff vs a fresh re‑scan (no writes)' },
       { name: 'load_context', in: '{ task, includeObsidian? }', out: 'Workspace summary + vault notes + coding rules' },
       { name: 'load_skills', in: '{ task, max? }', out: 'Relevant playbooks from .chamba/skills (index-first, no LLM)' },
+      { name: 'load_design', in: '{ task, max? }', out: 'Resolves the linked design source (Figma / mockups / .html·.zip prototype) + the architecture preference' },
+      { name: 'design_prefs', in: '{ web?, mobile? }', out: 'Get/set the UI architecture (Atomic Design, FSD…): the planner asks once and reuses it' },
       { name: 'summarize_to_vault', in: '{ title, content, projectSlug? }', out: 'Writes a run summary to proyectos/' },
       { name: 'save_plan', in: '{ title, content, projectSlug? }', out: 'Saves a plan to plans/' },
       { name: 'vault_status', in: '{ }', out: 'Resolved vault path + the notes chamba can see' },
@@ -374,7 +379,8 @@ const CONTENT = {
       { badge: 'Shipped', dot: OK, title: 'Acceptance QA (/qa + qa agent)', desc: 'Validates criteria against the running app — web (Playwright/co‑pilot) or mobile (React Native/Expo on a simulator/emulator via your editor MCP); screenshot evidence and login always human.' },
       { badge: 'Shipped', dot: OK, title: '/map architecture + plans/ folder', desc: 'Cross‑repo map to the vault and persisted plans.' },
       { badge: 'Shipped', dot: OK, title: 'Mobile QA (Expo/React Native)', desc: 'Detects the app and enumerates simulators/emulators; the qa agent runs there via your MCP.' },
-      { badge: 'Now', dot: AM, title: 'v0.17.0 on npm', desc: 'More editors: Zed, JetBrains, Gemini CLI, Codex, Trae and Kiro — setup guides + detection of their rule files.' },
+      { badge: 'Shipped', dot: OK, title: 'More editors (Zed, JetBrains, Gemini, Codex, Trae, Kiro)', desc: 'Setup guides + detection of their rule files.' },
+      { badge: 'Now', dot: AM, title: 'v0.18.0 on npm', desc: 'Linkable design sources (Figma / mockups / prototype) + a UI architecture asked once and saved.' },
       { badge: 'Next', dot: AC, title: 'Stable 1.0.0 release', desc: 'Final polish and the 1.0 publish.' },
       { badge: 'Exploring', dot: MU, title: 'V2: service registry, semantic search', desc: 'Registry with drift detection and vault search.' }
     ],

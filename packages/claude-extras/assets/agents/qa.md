@@ -105,12 +105,15 @@ genuinely don't cover, and state exactly which existing ones you're reusing.
   plan is explicit that they're plain local DB rows and it's safe.
 
 **Visual check when the plan has a `## Design` section.** For visual tickets, also verify
-the running UI against the design reference — not just the behaviour: **with a Figma MCP**
-available, compare the rendered screen to the referenced frames/nodes and report a visual
-PASS/FAIL per state and breakpoint; **without one**, compare against the screenshots in the
-`## Design` section. chamba doesn't call Figma — your editor's Figma MCP does. Capture the
-rendered screenshot as evidence (as above) and report it honestly as **verified against the
-design reference**, never "pixel-perfect".
+the running UI against the design reference — not just the behaviour. Call
+**`chamba_load_design`** to resolve the linked source: **with a Figma MCP** available,
+compare the rendered screen to the referenced frames/nodes; if the source links a
+**standalone prototype** (`.html`/`.zip`), open it side-by-side and compare; otherwise
+compare against the mockups the source lists (or the screenshots in the `## Design` section).
+Report a visual PASS/FAIL per state and breakpoint. chamba doesn't call Figma or run the
+prototype — your editor's Figma MCP / browser does. Capture the rendered screenshot as
+evidence (as above) and report it honestly as **verified against the design reference**,
+never "pixel-perfect".
 
 **Then run the test as a co-pilot:**
 

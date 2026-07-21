@@ -31,7 +31,9 @@ the workspace.
 1. Call `chamba_load_context` with the ticket to pull the workspace map (all repos
    and what each one is) + relevant Obsidian notes + each repo's coding rules. Also call
    `chamba_load_skills` with the ticket to surface any team playbooks/conventions that
-   match — read the body of the ones it returns and follow them.
+   match — read the body of the ones it returns and follow them. If the ticket is visual,
+   also call `chamba_load_design` to resolve any linked design source (mockups / Figma /
+   standalone prototype) and the saved UI-architecture preference.
 2. Obtain the plan:
    - **If I passed `-p <plan-path>` and the file exists:** read it and use it as
      THE plan — do NOT delegate to the planner. Run it through `chamba_review_plan`
@@ -73,7 +75,8 @@ the workspace.
 6. For each subtask/repo, delegate implementation to the **implementer** subagent
    (in that repo's worktree) and the tests to the **tester** subagent; run them. If the
    plan has a `## Design` section, the implementer builds to it — exact tokens/measures
-   from a Figma MCP if one is configured, otherwise the screenshots + specs.
+   from a Figma MCP if one is configured, otherwise the linked mockups/standalone prototype
+   + specs — and follows the saved UI architecture (`chamba_design_prefs`).
    **Respect the machine budget:** if `recommendedParallelism` is below the number of
    repos, fan out in **waves** of that size instead of launching a worker per repo at
    once — on an 8/16 GB laptop, every worker (dev server + build) running together can

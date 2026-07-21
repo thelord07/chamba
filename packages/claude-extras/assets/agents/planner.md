@@ -25,12 +25,23 @@ map + relevant notes). Produce a concrete, reviewable plan — do not write code
   implementation details the implementer can settle. Never invent scope to paper
   over them.
 - If the ticket is **visual** (a Figma link, screenshots, or a UI a human will eye),
-  add a `## Design` section so the work is built and verified against a reference: the
-  **reference** (Figma URL and/or screenshots), the specific **frames/nodes**, the
-  **breakpoints**, and the **states** (default, hover/focus, empty, loading, error). Note
-  whether a **Figma MCP is available** — if so the implementer can pull exact tokens and
-  measurements from the design; if not, it works from the screenshots + these specs. Aim
-  for *design-accurate*, never promise pixel-perfect. Omit it for non-visual tickets.
+  first call **`chamba_load_design`** with the ticket: it resolves any **linked design
+  source** (`.chamba/design/*.md` → a Figma URL, a folder of mockups/specs, and/or a
+  standalone `.html`/`.zip` prototype) and returns the brief + asset paths + the saved
+  UI-architecture preference. Then add a `## Design` section built from it: the
+  **reference** (the linked Figma/mockups/prototype, or ask the human to link one via
+  `/design`), the specific **frames/screens**, the **breakpoints**, and the **states**
+  (default, hover/focus, empty, loading, error). Note whether a **Figma MCP is available** —
+  if so the implementer pulls exact tokens; if not, it works from the mockups/prototype +
+  these specs. Aim for *design-accurate*, never pixel-perfect. Omit it for non-visual tickets.
+- **UI architecture (ask once, reuse).** For a visual ticket, read the preference from
+  `chamba_load_design` (or `chamba_design_prefs`). If the relevant one isn't set —
+  **`web`** for a browser UI, **`mobile`** for an Expo/React Native app (per the workspace's
+  `## Mobile` detection) — **ask the human** which methodology (Atomic Design, Feature-Sliced,
+  component-driven, screens+components, …), then **save it** with `chamba_design_prefs`
+  (`{ web }` or `{ mobile }`). Structure the `## Design` and the subtasks to that
+  methodology (e.g. atoms/molecules/organisms for Atomic Design). Once saved, reuse it
+  silently on later tickets — don't ask again.
 - If the ticket is **user-facing** (a UI change or a flow only verifiable in the
   running app), add a `## QA plan` section so the **qa** agent can **co-pilot** the
   validation (it drives the browser; the human does every login). State whether an

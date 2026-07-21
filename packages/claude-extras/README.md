@@ -273,16 +273,45 @@ boots a device or runs Expo — your editor's mobile MCP or the terminal does. L
 human, as everywhere in QA. To drive devices automatically, add an Expo or device-control MCP
 (e.g. `mobile-mcp`) at user scope, same as the Playwright MCP above.
 
-## Design-aware tickets (Figma)
+## Design-aware tickets (Figma, mockups, prototypes)
 
-Same pattern as QA: **detect → use if present → degrade to screenshots**. For a visual
-ticket, the **planner** adds a `## Design` section (Figma link/screenshots, the frames/nodes,
-breakpoints, states). The **implementer** pulls exact tokens and measurements from a **Figma
-MCP** if one is configured, otherwise builds from the screenshots + specs. The **qa** agent
-adds a **visual check** — comparing the rendered UI to the design reference and reporting a
-visual PASS/FAIL. The heuristic reviewer warns `missing-design-capture` when a plan links
-Figma but never captures the design. chamba never calls Figma — your editor's Figma MCP does;
-it's honest about being **design-accurate / verified against the reference**, not "pixel-perfect".
+Same pattern as QA: **detect → use if present → degrade**. For a visual ticket, the **planner**
+adds a `## Design` section. The **implementer** pulls exact tokens/measurements from a **Figma
+MCP** if one is configured, otherwise builds from the mockups/specs; the **qa** agent adds a
+**visual check** against the reference. The heuristic reviewer warns `missing-design-capture`
+when a plan links Figma but never captures the design. chamba never calls Figma — your editor's
+Figma MCP does; it's honest about being **design-accurate**, not "pixel-perfect".
+
+### Linking a design source
+
+Instead of pasting a Figma link into every ticket, **link the source once** and chamba resolves
+it per ticket. A design source is a pointer in `.chamba/design/<name>.md` that links an
+**external** location — kept out of the repo so mockups/binaries never bloat it:
+
+```markdown
+---
+name: checkout-redesign
+description: New checkout flow — 3 screens
+figma: https://figma.com/file/abc        # any of these that apply
+folder: ~/Designs/checkout               # external folder of mockups + specs
+prototype: ~/Designs/checkout/app.html   # a standalone .html or .zip to open/run
+---
+The prompt your design tool gave you; key screens, states, breakpoints, tokens.
+```
+
+Link one fast with **`/design link checkout ~/Designs/checkout`** (a folder, a `.html`/`.zip`
+prototype, or a Figma URL — it detects which). Then `chamba_load_design` returns the brief, the
+Figma link, and the asset paths (mockups for the editor to open, the standalone prototype to
+run, specs inline). The **standalone/`.zip`** export (e.g. from Claude Code) is the best
+reference — the implementer and qa **open it** as the behavioural target.
+
+### UI architecture — asked once, reused
+
+The first visual ticket, the planner **asks which methodology** to build in (Atomic Design,
+Feature-Sliced, component-driven, or — for Expo/React Native — screens+components) and **saves
+it** with `chamba_design_prefs`. Web and mobile are stored separately (in
+`.chamba/design/conventions.json`), so an Expo app can use a different architecture than the web
+app. After that it's reused silently; change it with `/design prefs web=atomic mobile=screens`.
 
 ## Skills / playbooks
 

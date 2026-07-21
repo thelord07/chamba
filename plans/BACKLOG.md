@@ -69,6 +69,14 @@ Detalle en [resource-aware-parallelism.md](resource-aware-parallelism.md).
 
 ## 🔭 Tier 3 — en curso (0.14.0+)
 
+### 0.5. Design sources enlazables + preferencia de arquitectura — ✅ HECHO (0.18.0)
+Detalle en [design-sources.md](design-sources.md).
+- Registro `.chamba/design/*.md` que **enlaza** fuentes de diseño externas (carpeta de mockups,
+  Figma, prompt/spec, o el zip/standalone de Claude Code). Tool `chamba_load_design` (determinista)
+  las resuelve por ticket; `chamba_design_prefs` guarda la arquitectura de UI (Atomic Design / FSD /
+  … , web y móvil por separado): el planner pregunta una vez y reusa. Cablea planner/implementer/qa
+  + comando `/design`. chamba enlaza y lee; el modelo del editor hace lo visual.
+
 ### 0. QA móvil (React Native / Expo) — ✅ HECHO (0.16.0)
 Detalle en [mobile-qa-expo.md](mobile-qa-expo.md).
 - El scanner detecta RN/Expo (managed/bare, EAS, dev-client, e2e Detox/Maestro/Appium) → sección
@@ -129,7 +137,8 @@ Encontrado dogfooding en **finalis**. El check "Git repo" corría `git rev-parse
 - ✅ **0.15.0** — Tier 3 #2: registry de skills/playbooks (index-first).
 - ✅ **0.16.0** — Tier 3 #0: QA móvil (React Native / Expo) + `chamba_qa_capabilities`.
 - ✅ **0.17.0** — Tier 3 #3: más editores (Gemini CLI, Codex, JetBrains, Trae, Zed, Kiro).
+- ✅ **0.18.0** — Tier 3 #0.5: design sources enlazables + preferencia de arquitectura de UI.
 
 ## Orden sugerido (lo que sigue)
-1. **0.18.0** — Tier 3 #4: calidad de release (golden tests, doctor gate, `--yes`, checklist).
+1. **0.19.0** — Tier 3 #4: calidad de release (golden tests, doctor gate, `--yes`, checklist).
 2. **1.0.0** — pulido y estabilización cuando Tier 3 esté sólido.

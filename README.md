@@ -97,6 +97,8 @@ the log directory and worktrees.
 | `chamba_workspace_reload` | `{}` | A diff vs a fresh re-scan (no writes) |
 | `chamba_load_context` | `{ task, includeObsidian? }` | Workspace summary + relevant vault notes |
 | `chamba_load_skills` | `{ task, max? }` | Relevant team playbooks from `.chamba/skills/*.md` (index-first, no LLM) + the full catalog. Ships empty, opt-in |
+| `chamba_load_design` | `{ task, max? }` | Resolves the linked design source for a ticket (no LLM): a Figma URL, a folder of mockups/specs, or a standalone `.html`/`.zip` prototype declared in `.chamba/design/*.md` — returns the brief + asset paths + the saved UI-architecture preference |
+| `chamba_design_prefs` | `{ web?, mobile? }` | Get/set the UI-architecture preference (Atomic Design, Feature-Sliced, …) so the planner asks once and reuses it. Web and mobile separate. No LLM |
 | `chamba_summarize_to_vault` | `{ title, content, projectSlug? }` | Writes a run summary to `proyectos/` — grouped per project (git remote) + a per-folder `INDEX.md` for cheap recall |
 | `chamba_save_plan` | `{ title, content, projectSlug? }` | Saves a plan to `plans/` — same per-project grouping + index |
 | `chamba_vault_status` | `{}` | Resolved vault path + the notes chamba can see (diagnostic) |
@@ -173,11 +175,16 @@ seeds only additively, and captures a numbered screenshot per criterion (PASS an
 into a per-run evidence folder kept outside every git repo. Run it inside `/ticket` or on
 its own with `/qa`.
 
-**Design-aware for visual tickets.** Same detect→use→degrade pattern: the planner captures
-the design in a `## Design` section, the implementer pulls exact tokens/measurements from a
-**Figma MCP** if one is configured (else it works from screenshots), and the qa agent does a
-**visual check** against the reference. chamba never calls Figma — your editor's MCP does —
-and it's honest about being *design-accurate / verified against the reference*, not "pixel-perfect".
+**Design-aware for visual tickets.** Link your design once — `/design link checkout
+~/Designs/checkout` writes a `.chamba/design/*.md` pointer to an **external** folder of
+mockups, a Figma URL, or the standalone `.html`/`.zip` prototype your design tool exports
+(kept out of the repo). Then `chamba_load_design` resolves it per ticket: the planner captures
+it in a `## Design` section, the implementer builds to the Figma tokens (if a **Figma MCP** is
+configured) or the mockups/prototype, and the qa agent does a **visual check** against the same
+reference. The first visual ticket, the planner **asks which UI architecture** you want (Atomic
+Design, Feature-Sliced, …) and **saves it** (`chamba_design_prefs`, web + mobile separately) — it
+reuses that silently after. chamba never calls Figma or runs the prototype — your editor's MCP /
+browser does — and it's honest about *design-accurate*, not "pixel-perfect".
 
 ## Packages
 
@@ -219,7 +226,8 @@ and it's honest about being *design-accurate / verified against the reference*, 
 - ✅ Skills/playbooks registry (`chamba_load_skills`, index-first, opt-in)
 - ✅ Mobile QA for React Native / Expo (`chamba_qa_capabilities` → simulators/emulators)
 - ✅ More editors: Zed, JetBrains, Gemini CLI, Codex, Trae, Kiro (setup guides + rule detection)
-- ✅ **0.17.0 published on npm**
+- ✅ Linkable design sources (`chamba_load_design`) + UI-architecture preference (`chamba_design_prefs`, `/design`)
+- ✅ **0.18.0 published on npm**
 - 🔭 V2: semantic vault search, MCP sampling, more knowledge bases
 
 See [`PLAN.md`](./PLAN.md) for the full phase plan.

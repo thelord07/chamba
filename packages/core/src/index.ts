@@ -34,6 +34,25 @@ export type {
   WorktreeLayout,
 } from './config/worktrees.js';
 export { DEFAULT_WORKTREE_CONFIG, resolveWorktreeConfig } from './config/worktrees.js';
+// Design sources (linked mockups/Figma/prototype + UI-architecture prefs, no LLM)
+export type {
+  Design,
+  DesignAsset,
+  DesignAssetKind,
+  DesignConventions,
+  DesignRef,
+} from './design/design.js';
+export {
+  CONVENTIONS_FILE,
+  collectDesignRefs,
+  DESIGN_DIR,
+  KNOWN_ARCHITECTURES,
+  loadDesignConventions,
+  parseDesignFrontmatter,
+  rankDesigns,
+  readDesign,
+  saveDesignConventions,
+} from './design/design-registry.js';
 // Doctor (environment health check)
 export type { CheckStatus, DoctorCheck, DoctorInput, DoctorReport } from './doctor/doctor.js';
 export { renderDoctorReport, runDoctor } from './doctor/doctor.js';
