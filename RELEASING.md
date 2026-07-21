@@ -45,11 +45,15 @@ check fails (warnings are allowed).
    git commit -am "chore(release): x.y.z — <summary>"
    ```
 6. **Push `main`.** If your SSH key has a passphrase and you're non-interactive, push over
-   HTTPS with `gh` as the credential helper:
+   HTTPS with `gh` as the credential helper. Reset the helper list first (leading empty
+   `credential.helper=`) so a stale keychain credential doesn't shadow the gh token:
    ```bash
-   git -c credential.helper='!gh auth git-credential' \
+   git -c credential.helper= -c credential.helper='!gh auth git-credential' \
      push https://github.com/thelord07/chamba.git HEAD:main
    ```
+   **If the commit touches `.github/workflows/`**, an OAuth token (what `gh` uses over HTTPS)
+   needs the **`workflow`** scope, or the push is rejected. Either push over **SSH** (exempt
+   from this restriction) or run `gh auth refresh -h github.com -s workflow` once, then retry.
 7. **Publish**: `pnpm changeset publish` — publishes to npm and creates the local git tags.
 8. **Push the tags** (same HTTPS trick if needed):
    ```bash
