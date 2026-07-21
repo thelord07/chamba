@@ -51,7 +51,7 @@ describe('vault-index', () => {
       path: 'p.md',
       description: 'x'.repeat(300),
     });
-    expect(parseIndexNote(md)[0].description.length).toBeLessThanOrEqual(140);
+    expect(parseIndexNote(md)[0]?.description.length ?? 0).toBeLessThanOrEqual(140);
   });
 
   it('sanitizes titles containing brackets so parsing stays robust', () => {
@@ -59,6 +59,6 @@ describe('vault-index', () => {
       renderIndexNote('p', [{ title: 'A [beta] (wip)', path: 'a.md', description: 'd' }]),
     );
     expect(parsed).toHaveLength(1);
-    expect(parsed[0].path).toBe('a.md');
+    expect(parsed[0]?.path).toBe('a.md');
   });
 });

@@ -205,7 +205,8 @@ editor — y es honesto: *design-accurate*, no "pixel perfect".
 - ✅ QA móvil para React Native / Expo (`chamba_qa_capabilities` → simuladores/emuladores)
 - ✅ Más editores: Zed, JetBrains, Gemini CLI, Codex, Trae, Kiro (guías de setup + detección de reglas)
 - ✅ Fuentes de diseño enlazables (`chamba_load_design`) + preferencia de arquitectura (`chamba_design_prefs`, `/design`)
-- ✅ **0.18.0 publicado en npm**
+- ✅ Calidad de release: golden tests del reviewer, `doctor` como gate en CI, instalación `--yes`, `RELEASING.md`
+- ✅ **0.19.0 publicado en npm**
 - 🔭 V2: búsqueda semántica del vault, MCP sampling, más bases de conocimiento
 
 Ver [`PLAN.md`](./PLAN.md) para el plan completo de fases.

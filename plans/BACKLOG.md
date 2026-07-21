@@ -104,11 +104,12 @@ Detalle en [tier3-more-editors.md](tier3-more-editors.md).
   de reglas (`GEMINI.md`, `.junie/guidelines.md`, `.kiro/steering`, `.rules`). MCP-first: "soportar"
   = un snippet de config. Barato, agranda el TAM.
 
-### 4. Calidad de release (proceso)
+### 4. Calidad de release (proceso) — ✅ HECHO (0.19.0)
+Detalle en [tier3-release-quality.md](tier3-release-quality.md).
 - **Golden tests** del reviewer/plan (snapshot de veredictos heurísticos) → cambios de comportamiento visibles en el diff.
-- **`doctor` como gate** pre-release + en CI.
-- Modo **no-interactivo `--yes`** en instalador/wizard (adopción en CI/scripts).
-- Doc de **checklist de release**.
+- **`doctor` como gate** en CI (el CLI ya sale con código 1 si `!healthy`).
+- Modo **no-interactivo `--yes`** en el instalador (alias de `--defaults`/no-TTY, para CI/scripts).
+- Doc de **checklist de release** (`RELEASING.md`).
 
 ---
 
@@ -138,7 +139,8 @@ Encontrado dogfooding en **finalis**. El check "Git repo" corría `git rev-parse
 - ✅ **0.16.0** — Tier 3 #0: QA móvil (React Native / Expo) + `chamba_qa_capabilities`.
 - ✅ **0.17.0** — Tier 3 #3: más editores (Gemini CLI, Codex, JetBrains, Trae, Zed, Kiro).
 - ✅ **0.18.0** — Tier 3 #0.5: design sources enlazables + preferencia de arquitectura de UI.
+- ✅ **0.19.0** — Tier 3 #4: calidad de release (golden tests, doctor gate en CI, `--yes`, RELEASING.md).
 
 ## Orden sugerido (lo que sigue)
-1. **0.19.0** — Tier 3 #4: calidad de release (golden tests, doctor gate, `--yes`, checklist).
-2. **1.0.0** — pulido y estabilización cuando Tier 3 esté sólido.
+1. **1.0.0** — Tier 3 completo. Pulido y estabilización: revisar la superficie de tools, endurecer
+   docs, y taggear el primer estable.

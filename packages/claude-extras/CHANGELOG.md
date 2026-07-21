@@ -1,5 +1,25 @@
 # @chamba/claude-extras
 
+## 0.19.0
+
+### Minor Changes
+
+- feat(quality): release-quality pass — golden reviewer baseline, doctor CI gate, --yes, RELEASING
+
+  Harden the release process on the way to 1.0.0. The installer gains a `--yes` flag (alias of
+  `--defaults` / non-TTY) for non-interactive installs in CI and scripts, via a testable
+  `isNonInteractive` helper. A golden test freezes the heuristic reviewer's verdicts across a
+  corpus of representative plans, so any change to `validatePlan` shows up as a snapshot diff.
+  CI now runs the built `doctor` as a smoke gate (it already exits non-zero when unhealthy), and
+  two pre-existing `tsc --noEmit` errors are fixed so the Typecheck gate is green. Adds a
+  `RELEASING.md` checklist documenting the manual and automated release paths and their gotchas.
+
+### Patch Changes
+
+- Updated dependencies
+  - @chamba/core@0.19.0
+  - @chamba/adapters@0.19.0
+
 ## 0.18.0
 
 ### Minor Changes

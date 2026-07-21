@@ -5,6 +5,7 @@ import { NodeFilesystem } from '@chamba/adapters';
 import { joinPath } from '@chamba/core';
 import { runConfigCommand } from './config-cli.js';
 import { ConfigStore } from './config-store.js';
+import { isNonInteractive } from './install-flags.js';
 import { CATEGORIES, Installer, type InstallResult } from './installer.js';
 import { SnapshotStore } from './snapshot-store.js';
 import { runWizard } from './wizard.js';
@@ -107,7 +108,7 @@ async function main(): Promise<void> {
   }
 
   process.stderr.write(
-    `Unknown command "${command}". Usage: chamba-install [install|uninstall|apply|rollback|config <sub>] [--force] [--version]\n`,
+    `Unknown command "${command}". Usage: chamba-install [install|uninstall|apply|rollback|config <sub>] [--force] [--yes] [--version]\n`,
   );
   process.exitCode = 1;
 }
@@ -162,16 +163,15 @@ async function runRollback(installer: Installer, rest: string[]): Promise<void> 
 
 /**
  * On first install, offer the config wizard — but never block the install. With
- * `--defaults` or a non-TTY stdin (CI), skip it silently and let the compiled
- * defaults apply. If the user cancels (Ctrl+C), install proceeds with defaults.
+ * `--yes` / `--defaults` or a non-TTY stdin (CI), skip it silently and let the
+ * compiled defaults apply. If the user cancels (Ctrl+C), install proceeds with defaults.
  */
 async function maybeRunWizard(rest: string[]): Promise<void> {
   const fs = new NodeFilesystem();
   const configPath = joinPath(homedir(), '.chamba/config.json');
   if (await fs.exists(configPath)) return; // already configured
 
-  const nonInteractive = rest.includes('--defaults') || !process.stdin.isTTY;
-  if (nonInteractive) return;
+  if (isNonInteractive(rest, Boolean(process.stdin.isTTY))) return;
 
   const config = await runWizard();
   if (!config) {

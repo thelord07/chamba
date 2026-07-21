@@ -32,3 +32,8 @@ jobs:
 
       - name: Test
         run: pnpm -r test
+
+      # Smoke gate: the built MCP binary starts and the environment is healthy.
+      # `doctor` exits non-zero when a check fails (warnings are allowed).
+      - name: Doctor
+        run: node packages/mcp/dist/main.js doctor

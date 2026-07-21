@@ -227,7 +227,8 @@ browser does — and it's honest about *design-accurate*, not "pixel-perfect".
 - ✅ Mobile QA for React Native / Expo (`chamba_qa_capabilities` → simulators/emulators)
 - ✅ More editors: Zed, JetBrains, Gemini CLI, Codex, Trae, Kiro (setup guides + rule detection)
 - ✅ Linkable design sources (`chamba_load_design`) + UI-architecture preference (`chamba_design_prefs`, `/design`)
-- ✅ **0.18.0 published on npm**
+- ✅ Release quality: golden reviewer tests, `doctor` CI gate, `--yes` installs, `RELEASING.md`
+- ✅ **0.19.0 published on npm**
 - 🔭 V2: semantic vault search, MCP sampling, more knowledge bases
 
 See [`PLAN.md`](./PLAN.md) for the full phase plan.
