@@ -243,6 +243,7 @@ browser does — and it's honest about *design-accurate*, not "pixel-perfect".
 - ✅ Repo-safe vault: bootstrap outside repos (`~/.chamba/vault`), gitignore backstop, `doctor` warning
 - ✅ **0.20.0 published on npm**
 - ✅ Read-only `/triage`: pre-diagnosis + fix plan without executing (`chamba_triage_ticket` completeness check, `diagnostician` agent)
+- ✅ **0.21.0 published on npm**
 - 🔭 V2: semantic vault search, MCP sampling, more knowledge bases
 
 See [`PLAN.md`](./PLAN.md) for the full phase plan.
