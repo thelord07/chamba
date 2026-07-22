@@ -223,6 +223,7 @@ editor — y es honesto: *design-accurate*, no "pixel perfect".
 - ✅ **0.20.0 publicado en npm**
 - ✅ `/triage` read-only: pre-diagnóstico + plan de fix sin ejecutar (`chamba_triage_ticket` chequeo de completitud, agente `diagnostician`)
 - ✅ **0.21.0 publicado en npm**
+- ✅ **1.0.0 — primer estable:** versión real en el handshake MCP, superficie de 24 tools + docs pulidas, primer tag estable
 - 🔭 V2: búsqueda semántica del vault, MCP sampling, más bases de conocimiento
 
 Ver [`PLAN.md`](./PLAN.md) para el plan completo de fases.

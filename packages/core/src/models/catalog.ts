@@ -4,9 +4,12 @@ import type { Effort } from '../config/roles.js';
 // `effort` maps to each provider's native vocabulary. chamba never calls these
 // models — this is declarative metadata the editor's model consumes.
 //
-// TODO(catalog): these are moving targets — re-verify before each release.
-// In particular: whether `gpt-5.5-mini` accepts `xhigh`, and whether
-// `gemini-3.1-pro-preview` is still the current flagship Pro id.
+// Re-verify before each release — these are moving targets. Verified at 1.0.0:
+// the Anthropic tier (chamba's recommended defaults) is current — Opus 4.8 / 4.7,
+// Sonnet 4.6, Haiku 4.5, and Fable 5 (~$10/$50 per 1M, ~2× Opus 4.8, 30-day retention).
+// Still unconfirmed, with conservative fallbacks already in place: whether
+// `gpt-5.5-mini` accepts `xhigh`, and whether `gemini-3.1-pro-preview` is still the
+// current flagship Pro id.
 
 export type ModelProvider = 'anthropic' | 'openai' | 'google' | 'ollama';
 

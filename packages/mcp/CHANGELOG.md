@@ -1,5 +1,26 @@
 # @chamba/mcp
 
+## 1.0.0
+
+### Major Changes
+
+- 1.0.0 — first stable release
+
+  Polish and stabilization, no new features:
+
+  - The MCP server now reports its **real published version** in the handshake
+    (was a hardcoded `0.0.0`), via a shared `readPackageVersion()`.
+  - Tool surface reviewed — all 24 tools carry a consistent `title` + description.
+  - Docs hardened: the landing tools grid is now 24/24 (adds `chamba_doctor`), and
+    the model catalog was re-verified for the release.
+  - Added an MCP-level behavioral test for `chamba_triage_ticket` and a
+    server-version handshake test.
+
+### Patch Changes
+
+- @chamba/adapters@1.0.0
+- @chamba/core@1.0.0
+
 ## 0.21.0
 
 ### Minor Changes

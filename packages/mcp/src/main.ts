@@ -1,21 +1,9 @@
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
 import { renderDoctorReport, runDoctor } from '@chamba/core';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { createLogger } from './logging.js';
 import { createServer } from './server.js';
 import { createNodeServices, obsidianSearchRoots } from './services.js';
-
-/** Read this package's version from its package.json, next to the built file. */
-function readPackageVersion(): string {
-  try {
-    const pkgPath = fileURLToPath(new URL('../package.json', import.meta.url));
-    const pkg = JSON.parse(readFileSync(pkgPath, 'utf8')) as { version?: string };
-    return pkg.version ?? 'unknown';
-  } catch {
-    return 'unknown';
-  }
-}
+import { readPackageVersion } from './version.js';
 
 /**
  * Entry point for the chamba MCP server.

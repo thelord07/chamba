@@ -3,7 +3,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { pino } from 'pino';
 import { describe, expect, it } from 'vitest';
-import { createServer } from './server.js';
+import { createServer, SERVER_VERSION } from './server.js';
 import type { Services } from './services.js';
 
 // Silent logger: tests must not write to stdout (it's the MCP channel).
@@ -71,6 +71,20 @@ describe('chamba MCP server', () => {
       'chamba_workspace_reload',
       'chamba_workspace_show',
     ]);
+
+    await server.close();
+  });
+
+  it('reports its real published version in the handshake (not 0.0.0)', async () => {
+    // SERVER_VERSION is read from package.json, so the MCP handshake advertises
+    // the actual published version instead of a hardcoded placeholder.
+    expect(SERVER_VERSION).toMatch(/^\d+\.\d+\.\d+/);
+    expect(SERVER_VERSION).not.toBe('0.0.0');
+
+    const { client, server } = await connect(buildServices({}, '/proj'));
+    const info = client.getServerVersion();
+    expect(info?.name).toBe('chamba');
+    expect(info?.version).toBe(SERVER_VERSION);
 
     await server.close();
   });

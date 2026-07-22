@@ -148,7 +148,12 @@ Encontrado dogfooding en **finalis**. El check "Git repo" corría `git rev-parse
 - ✅ **0.18.0** — Tier 3 #0.5: design sources enlazables + preferencia de arquitectura de UI.
 - ✅ **0.19.0** — Tier 3 #4: calidad de release (golden tests, doctor gate en CI, `--yes`, RELEASING.md).
 - ✅ **0.20.0** — fix: vault repo-safe (bootstrap a `~/.chamba/vault`, backstop gitignore, warning del doctor).
+- ✅ **0.20.1** — sync del README de npm (lista de tools completa).
+- ✅ **0.21.0** — `/triage` read-only: pre-diagnóstico + plan de fix sin ejecutar (`chamba_triage_ticket` sin LLM, agente `diagnostician`).
+- ✅ **1.0.0** — primer estable: el server MCP reporta su versión real en el handshake, superficie de 24 tools revisada, docs endurecidas (grid de la landing 24/24), catálogo de modelos re-verificado. Sin features nuevas.
 
 ## Orden sugerido (lo que sigue)
-1. **1.0.0** — Tier 3 completo. Pulido y estabilización: revisar la superficie de tools, endurecer
-   docs, y taggear el primer estable.
+1. ✅ **1.0.0** — Tier 3 completo. Pulido y estabilización: superficie de tools revisada, docs
+   endurecidas, y primer tag estable. **Hecho.**
+2. **Post-1.0 / V2** (parkeado): service registry + drift detection, búsqueda semántica del vault,
+   MCP sampling. Sin fecha — se retoma cuando haya tracción.

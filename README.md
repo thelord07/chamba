@@ -244,6 +244,7 @@ browser does — and it's honest about *design-accurate*, not "pixel-perfect".
 - ✅ **0.20.0 published on npm**
 - ✅ Read-only `/triage`: pre-diagnosis + fix plan without executing (`chamba_triage_ticket` completeness check, `diagnostician` agent)
 - ✅ **0.21.0 published on npm**
+- ✅ **1.0.0 — first stable:** real MCP handshake version, 24-tool surface + docs polish, first stable tag
 - 🔭 V2: semantic vault search, MCP sampling, more knowledge bases
 
 See [`PLAN.md`](./PLAN.md) for the full phase plan.

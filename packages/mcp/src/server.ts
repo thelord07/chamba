@@ -25,9 +25,11 @@ import { registerVaultStatus } from './tools/vault-status.js';
 import { registerWorkspaceInit } from './tools/workspace-init.js';
 import { registerWorkspaceReload } from './tools/workspace-reload.js';
 import { registerWorkspaceShow } from './tools/workspace-show.js';
+import { readPackageVersion } from './version.js';
 
 export const SERVER_NAME = 'chamba';
-export const SERVER_VERSION = '0.0.0';
+/** The real published version, read from package.json — reported in the MCP handshake. */
+export const SERVER_VERSION = readPackageVersion();
 
 /**
  * Build the chamba MCP server with every tool registered.

@@ -68,7 +68,7 @@
 
 <script>
 const AC = 'var(--accent)', OK = 'var(--accent2)', AM = 'var(--amber)', MU = 'var(--muted)';
-const VERSION = '0.21.0';
+const VERSION = '1.0.0';
 
 const EDITORS = [
   { id: 'cursor', name: 'Cursor', file: '.cursor/mcp.json',
@@ -192,6 +192,7 @@ const CONTENT = {
       { name: 'list_worktrees', in: '{ }', out: 'Los worktrees del repo' },
       { name: 'cleanup_worktree', in: '{ branch }', out: 'Borra el dir, conserva la rama' },
       { name: 'cleanup_worktrees', in: '{ ticket, repos? }', out: 'Borra los worktrees de un ticket, conserva las ramas' },
+      { name: 'doctor', in: '{ }', out: 'Chequeo de salud del entorno (sin LLM): Node, sistema, git multi‑repo, workspace, config, vault, worktrees → ok/warn/fail' },
       { name: 'resource_budget', in: '{ requested?, perWorkerMemMB? }', out: 'Paralelismo seguro según RAM/CPU en vivo (sin LLM)' },
       { name: 'qa_capabilities', in: '{ }', out: 'Web vs móvil (RN/Expo) + simuladores/emuladores disponibles para la QA (read-only, sin LLM)' },
       { name: 'remember', in: '{ key, content, tags? }', out: 'Persiste una memoria en markdown' },
@@ -237,7 +238,7 @@ const CONTENT = {
     ],
     rmKicker: 'Roadmap + Changelog',
     rmTitle: 'Construido en público, fase por fase',
-    rmSub: `Siempre al día: cada fase se cierra en abierto. Hoy en v${VERSION} — el flujo /ticket con QA, worktrees multi‑repo, config por agente y memoria en Obsidian ya están. Falta el 1.0.0 estable.`,
+    rmSub: `Siempre al día: cada fase se cierra en abierto. Hoy en v${VERSION} — el primer estable: el flujo /ticket con QA, /triage read‑only, worktrees multi‑repo, config por agente y memoria en Obsidian, todo pulido y publicado.`,
     rmLink: 'Ver el plan completo (PLAN.md)',
     timeline: [
       { badge: 'Listo', dot: OK, title: 'Servidor MCP + escáner de workspace', desc: 'Servidor stdio y escaneo del proyecto a workspace.md.' },
@@ -252,8 +253,8 @@ const CONTENT = {
       { badge: 'Listo', dot: OK, title: 'Fuentes de diseño enlazables + arquitectura de UI', desc: 'Figma / mockups / prototipo enlazados; el planner pregunta la arquitectura una vez y la guarda.' },
       { badge: 'Listo', dot: OK, title: 'Calidad de release', desc: 'Golden tests del reviewer, doctor como gate en CI, instalación --yes, y checklist de release.' },
       { badge: 'Listo', dot: OK, title: 'Vault repo-safe (v0.20)', desc: 'El bootstrap crea el vault fuera de tus repos (~/.chamba/vault) y no ensucia el proyecto.' },
-      { badge: 'Ahora', dot: AM, title: '/triage read-only en npm', desc: 'Pre-diagnóstico sin ejecutar: chequea qué le falta al ticket (chamba_triage_ticket, sin LLM) y el agente diagnostician investiga y propone el fix — worktrees y edición apagados. Se pasa a /ticket -p para ejecutar.' },
-      { badge: 'Siguiente', dot: AC, title: 'Release 1.0.0 estable', desc: 'Pulido final y publicación 1.0.' },
+      { badge: 'Listo', dot: OK, title: '/triage read-only (v0.21)', desc: 'Pre-diagnóstico sin ejecutar: chequea qué le falta al ticket (chamba_triage_ticket, sin LLM) y el agente diagnostician investiga y propone el fix — worktrees y edición apagados. Se pasa a /ticket -p para ejecutar.' },
+      { badge: 'Ahora', dot: AM, title: 'v1.0.0 estable en npm', desc: 'Primer release estable: el server MCP reporta su versión real en el handshake, superficie de 24 tools revisada, docs endurecidas. Sin features nuevas — pulido y estabilización.' },
       { badge: 'Explorando', dot: MU, title: 'V2: registro de servicios, búsqueda semántica', desc: 'Registro con detección de drift y búsqueda del vault.' }
     ],
     ctaTitle: 'Pon a tu editor a trabajar la chamba',
@@ -328,6 +329,7 @@ const CONTENT = {
       { name: 'list_worktrees', in: '{ }', out: 'The repo’s worktrees' },
       { name: 'cleanup_worktree', in: '{ branch }', out: 'Removes the dir, keeps the branch' },
       { name: 'cleanup_worktrees', in: '{ ticket, repos? }', out: 'Removes a ticket’s worktrees, keeps branches' },
+      { name: 'doctor', in: '{ }', out: 'Environment health check (no LLM): Node, system, git (multi‑repo aware), workspace, config, vault, worktrees → ok/warn/fail' },
       { name: 'resource_budget', in: '{ requested?, perWorkerMemMB? }', out: 'Safe parallelism from live RAM/CPU (no LLM)' },
       { name: 'qa_capabilities', in: '{ }', out: 'Web vs mobile (RN/Expo) + available simulators/emulators for QA (read-only, no LLM)' },
       { name: 'remember', in: '{ key, content, tags? }', out: 'Persists a markdown memory' },
@@ -373,7 +375,7 @@ const CONTENT = {
     ],
     rmKicker: 'Roadmap + Changelog',
     rmTitle: 'Built in public, phase by phase',
-    rmSub: `Always current: each phase ships in the open. Now at v${VERSION} — the /ticket flow with QA, multi‑repo worktrees, per‑agent config and Obsidian memory are all in. The stable 1.0.0 is next.`,
+    rmSub: `Always current: each phase ships in the open. Now at v${VERSION} — the first stable: the /ticket flow with QA, read‑only /triage, multi‑repo worktrees, per‑agent config and Obsidian memory, all polished and published.`,
     rmLink: 'See the full plan (PLAN.md)',
     timeline: [
       { badge: 'Shipped', dot: OK, title: 'MCP server + workspace scanner', desc: 'Stdio server and project scan into workspace.md.' },
@@ -388,8 +390,8 @@ const CONTENT = {
       { badge: 'Shipped', dot: OK, title: 'Linkable design sources + UI architecture', desc: 'Linked Figma / mockups / prototype; the planner asks the architecture once and saves it.' },
       { badge: 'Shipped', dot: OK, title: 'Release quality', desc: 'Golden reviewer tests, doctor as a CI gate, --yes installs, and a release checklist.' },
       { badge: 'Shipped', dot: OK, title: 'Repo-safe vault (v0.20)', desc: 'Bootstrap creates the vault outside your repos (~/.chamba/vault), never polluting the project.' },
-      { badge: 'Now', dot: AM, title: 'Read-only /triage on npm', desc: 'Pre-diagnosis without executing: it checks what the ticket is missing (chamba_triage_ticket, no LLM) and the diagnostician agent investigates and proposes the fix — worktrees and edits off. Hands off to /ticket -p to run it.' },
-      { badge: 'Next', dot: AC, title: 'Stable 1.0.0 release', desc: 'Final polish and the 1.0 publish.' },
+      { badge: 'Shipped', dot: OK, title: 'Read-only /triage (v0.21)', desc: 'Pre-diagnosis without executing: it checks what the ticket is missing (chamba_triage_ticket, no LLM) and the diagnostician agent investigates and proposes the fix — worktrees and edits off. Hands off to /ticket -p to run it.' },
+      { badge: 'Now', dot: AM, title: 'v1.0.0 stable on npm', desc: 'First stable release: the MCP server reports its real version in the handshake, the 24-tool surface reviewed, docs hardened. No new features — polish and stabilization.' },
       { badge: 'Exploring', dot: MU, title: 'V2: service registry, semantic search', desc: 'Registry with drift detection and vault search.' }
     ],
     ctaTitle: 'Put your editor to work — la chamba',
