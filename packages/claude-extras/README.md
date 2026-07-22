@@ -35,8 +35,8 @@ Snapshots dedup by content and the newest 5 (plus any pinned) are kept.
 
 It installs into `~/.claude/`:
 
-- **Slash commands**: `/ticket`, `/workspace`, `/map`, `/qa`, `/worktrees`, `/orq`, `/recall`, `/vault`
-- **Subagents**: `planner`, `implementer`, `reviewer`, `tester`, `qa`
+- **Slash commands**: `/ticket`, `/triage`, `/workspace`, `/map`, `/qa`, `/design`, `/worktrees`, `/orq`, `/recall`, `/vault`
+- **Subagents**: `planner`, `implementer`, `reviewer`, `tester`, `qa`, `diagnostician`
 - **Hooks**: warn on destructive commands, validate worktree edits
 
 …and registers the `chamba` MCP server in `~/.claude.json`. It never overwrites your
@@ -207,6 +207,37 @@ model + effort you configured above.
 > **Security:** `copyEnvFiles` copies secrets into the worktree directories. Add your
 > `worktrees.root` (e.g. `WORKTREES/`) to `.gitignore` so they're never committed. It's
 > off by default.
+
+## Read-only pre-diagnosis with `/triage`
+
+`/triage` is the **front half of `/ticket` with the back half off**: it investigates and
+proposes a fix, but **never touches code** — no worktrees, no edits, no commits. Use it for
+support cases and bug reports, to write a **pre-diagnosis into the ticket**, or to check
+whether the ticket even has enough info to work on.
+
+```
+/triage BUG-42            # investigate BUG-42, output a diagnosis to paste in
+/triage BUG-42 api web    # focus the investigation on the api + web repos
+```
+
+It runs `chamba_load_context` → **`chamba_triage_ticket`** (a heuristic, **no-LLM**
+completeness check that flags what the ticket is missing: reproduction, expected-vs-actual,
+environment, scope, acceptance criteria, severity — with the exact questions to ask back) →
+the **diagnostician** subagent, which investigates read-only and produces a root-cause
+hypothesis with `file:line` evidence, the blast radius, a reproduction, a **proposed fix
+plan (not executed)**, and a severity + confidence. If the fix plan is concrete it's checked
+with `chamba_review_plan`.
+
+The output is one **paste-ready markdown block** for the ticket. When you ask, `/triage`
+saves the proposed fix with `chamba_save_plan`, so the handoff to execution is one command:
+
+```
+/ticket -p <the-saved-plan> BUG-42     # now actually implement the fix
+```
+
+`/triage` diagnoses and writes; `/ticket` executes. The heuristic + the diagnostician are
+honest about hypotheses vs. confirmed causes, and — like every chamba agent — nothing is
+deleted or run without you.
 
 ## Bootstrap the architecture map with `/map`
 

@@ -41,8 +41,9 @@ If none is set, `chamba_workspace_init` bootstraps a global vault at `~/.chamba/
 URL / mockups folder / standalone `.html`·`.zip` prototype and set the UI-architecture
 preference (Atomic Design, Feature-Sliced, …). No LLM.
 
-**Planning + review:** `chamba_generate_plan` · `chamba_review_plan` (heuristic, no LLM) ·
-`chamba_save_plan`
+**Triage + planning + review:** `chamba_triage_ticket` (heuristic ticket-completeness
+check, no LLM — powers `/triage`) · `chamba_generate_plan` · `chamba_review_plan`
+(heuristic, no LLM) · `chamba_save_plan`
 
 **Worktrees (parallel work):** `chamba_create_worktree` · `chamba_create_worktrees` ·
 `chamba_list_worktrees` · `chamba_cleanup_worktree` · `chamba_cleanup_worktrees`

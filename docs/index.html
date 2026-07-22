@@ -68,7 +68,7 @@
 
 <script>
 const AC = 'var(--accent)', OK = 'var(--accent2)', AM = 'var(--amber)', MU = 'var(--muted)';
-const VERSION = '0.20.1';
+const VERSION = '0.21.0';
 
 const EDITORS = [
   { id: 'cursor', name: 'Cursor', file: '.cursor/mcp.json',
@@ -183,6 +183,7 @@ const CONTENT = {
       { name: 'summarize_to_vault', in: '{ title, content, projectSlug? }', out: 'Escribe un resumen a la carpeta proyectos/' },
       { name: 'save_plan', in: '{ title, content, projectSlug? }', out: 'Guarda un plan en la carpeta plans/' },
       { name: 'vault_status', in: '{ }', out: 'Ruta del vault + las notas que chamba ve (diagnóstico)' },
+      { name: 'triage_ticket', in: '{ ticket }', out: 'Chequeo de completitud del ticket (sin LLM): qué le falta (repro, esperado/actual, entorno, alcance, criterios, severidad) + las preguntas para pedir. Potencia /triage' },
       { name: 'generate_plan', in: '{ task, context? }', out: 'Plantilla de plan estructurado' },
       { name: 'review_plan', in: '{ plan, task, context? }', out: '{ approved, issues, riskFlags } — sin LLM' },
       { name: 'get_agent_config', in: '{ role }', out: '{ model, effort, hint } para un rol — sin LLM' },
@@ -250,7 +251,8 @@ const CONTENT = {
       { badge: 'Listo', dot: OK, title: 'Más editores (Zed, JetBrains, Gemini, Codex, Trae, Kiro)', desc: 'Guías de setup + detección de sus reglas de código.' },
       { badge: 'Listo', dot: OK, title: 'Fuentes de diseño enlazables + arquitectura de UI', desc: 'Figma / mockups / prototipo enlazados; el planner pregunta la arquitectura una vez y la guarda.' },
       { badge: 'Listo', dot: OK, title: 'Calidad de release', desc: 'Golden tests del reviewer, doctor como gate en CI, instalación --yes, y checklist de release.' },
-      { badge: 'Ahora', dot: AM, title: 'v0.20.0 en npm', desc: 'Vault repo-safe: el bootstrap crea el vault fuera de tus repos (~/.chamba/vault) y no ensucia el proyecto.' },
+      { badge: 'Listo', dot: OK, title: 'Vault repo-safe (v0.20)', desc: 'El bootstrap crea el vault fuera de tus repos (~/.chamba/vault) y no ensucia el proyecto.' },
+      { badge: 'Ahora', dot: AM, title: '/triage read-only en npm', desc: 'Pre-diagnóstico sin ejecutar: chequea qué le falta al ticket (chamba_triage_ticket, sin LLM) y el agente diagnostician investiga y propone el fix — worktrees y edición apagados. Se pasa a /ticket -p para ejecutar.' },
       { badge: 'Siguiente', dot: AC, title: 'Release 1.0.0 estable', desc: 'Pulido final y publicación 1.0.' },
       { badge: 'Explorando', dot: MU, title: 'V2: registro de servicios, búsqueda semántica', desc: 'Registro con detección de drift y búsqueda del vault.' }
     ],
@@ -317,6 +319,7 @@ const CONTENT = {
       { name: 'summarize_to_vault', in: '{ title, content, projectSlug? }', out: 'Writes a run summary to proyectos/' },
       { name: 'save_plan', in: '{ title, content, projectSlug? }', out: 'Saves a plan to plans/' },
       { name: 'vault_status', in: '{ }', out: 'Resolved vault path + the notes chamba can see' },
+      { name: 'triage_ticket', in: '{ ticket }', out: 'Ticket-completeness check (no LLM): what it is missing (repro, expected/actual, environment, scope, criteria, severity) + the questions to ask back. Powers /triage' },
       { name: 'generate_plan', in: '{ task, context? }', out: 'A structured plan template' },
       { name: 'review_plan', in: '{ plan, task, context? }', out: '{ approved, issues, riskFlags } — no LLM' },
       { name: 'get_agent_config', in: '{ role }', out: '{ model, effort, hint } for a role — no LLM' },
@@ -384,7 +387,8 @@ const CONTENT = {
       { badge: 'Shipped', dot: OK, title: 'More editors (Zed, JetBrains, Gemini, Codex, Trae, Kiro)', desc: 'Setup guides + detection of their rule files.' },
       { badge: 'Shipped', dot: OK, title: 'Linkable design sources + UI architecture', desc: 'Linked Figma / mockups / prototype; the planner asks the architecture once and saves it.' },
       { badge: 'Shipped', dot: OK, title: 'Release quality', desc: 'Golden reviewer tests, doctor as a CI gate, --yes installs, and a release checklist.' },
-      { badge: 'Now', dot: AM, title: 'v0.20.0 on npm', desc: 'Repo-safe vault: bootstrap creates the vault outside your repos (~/.chamba/vault), never polluting the project.' },
+      { badge: 'Shipped', dot: OK, title: 'Repo-safe vault (v0.20)', desc: 'Bootstrap creates the vault outside your repos (~/.chamba/vault), never polluting the project.' },
+      { badge: 'Now', dot: AM, title: 'Read-only /triage on npm', desc: 'Pre-diagnosis without executing: it checks what the ticket is missing (chamba_triage_ticket, no LLM) and the diagnostician agent investigates and proposes the fix — worktrees and edits off. Hands off to /ticket -p to run it.' },
       { badge: 'Next', dot: AC, title: 'Stable 1.0.0 release', desc: 'Final polish and the 1.0 publish.' },
       { badge: 'Exploring', dot: MU, title: 'V2: service registry, semantic search', desc: 'Registry with drift detection and vault search.' }
     ],

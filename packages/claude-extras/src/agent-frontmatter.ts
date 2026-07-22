@@ -2,9 +2,9 @@ import { type AgentConfig, type AgentRole, type Effort, getModel, modelCaveat } 
 
 /**
  * Which shipped subagent asset file maps to which config role. These subagents
- * exist as files; the remaining roles (orchestrator, summarizer, researcher) are
- * reachable via `chamba_get_agent_config` and the `chamba-config` CLI, not as
- * `~/.claude/agents/*.md`. The orchestrator is the main session.
+ * exist as files; the remaining roles (orchestrator, summarizer) are reachable via
+ * `chamba_get_agent_config` and the `chamba-config` CLI, not as `~/.claude/agents/*.md`.
+ * The orchestrator is the main session. `researcher` is shipped as `diagnostician.md`.
  */
 export const AGENT_ROLE_BY_FILE: Record<string, AgentRole> = {
   'planner.md': 'planner',
@@ -12,6 +12,8 @@ export const AGENT_ROLE_BY_FILE: Record<string, AgentRole> = {
   'reviewer.md': 'reviewer',
   'tester.md': 'tester',
   'qa.md': 'qa',
+  // The read-only /triage investigator reuses the researcher tier (investigate + synthesize).
+  'diagnostician.md': 'researcher',
 };
 
 /**

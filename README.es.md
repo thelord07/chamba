@@ -107,6 +107,7 @@ el directorio de logs y los worktrees.
 | `chamba_doctor` | `{}` | Chequeo de salud del entorno (sin LLM): Node, sistema (RAM/CPU), git (consciente de multi-repo), workspace, config, vault, logs, worktrees → pass/warn/fail. También `npx @chamba/mcp doctor` |
 | `chamba_resource_budget` | `{ requested?, perWorkerMemMB? }` | Paralelismo seguro para **esta** máquina (sin LLM): lee RAM/CPU/carga en vivo → cuántos worktrees/workers correr a la vez. Consultalo antes de un fan-out multi-repo |
 | `chamba_qa_capabilities` | `{}` | Con qué correr la QA de aceptación (sin LLM): web vs móvil (React Native / Expo), tooling E2E, y los simuladores iOS / emuladores Android realmente disponibles (read-only `xcrun simctl` / `adb` / `emulator` — lista, nunca bootea). El agente qa elige su modo con esto |
+| `chamba_triage_ticket` | `{ ticket }` | Chequeo heurístico de completitud de un ticket de soporte/bug (sin LLM): `{ present, missing, questions, enoughToStart, score }` — marca si tiene reproducción, esperado-vs-actual, entorno, alcance, criterios de aceptación, severidad, con las preguntas para pedir de vuelta. Potencia `/triage` |
 | `chamba_generate_plan` | `{ task, context? }` | Un template de plan para completar |
 | `chamba_review_plan` | `{ plan, task, context? }` | `{ approved, issues, suggestions, riskFlags }` — sin LLM |
 | `chamba_create_worktree` | `{ taskSlug, workerId, baseBranch? }` | Un git worktree aislado |
@@ -145,8 +146,8 @@ Cursor/VS Code ya tienen todo vía MCP. En **Claude Code** podés además agrega
 commands, subagents y hooks:
 
 ```bash
-npx @chamba/claude-extras install     # /ticket, /workspace, /map, /qa, /worktrees … +
-                                      # agentes planner/implementer/reviewer/tester/qa + 2 hooks
+npx @chamba/claude-extras install     # /ticket, /triage, /workspace, /map, /qa, /design … +
+                                      # agentes planner/implementer/reviewer/tester/qa/diagnostician + 2 hooks
 npx @chamba/claude-extras uninstall
 ```
 
@@ -162,6 +163,17 @@ o cambiás todo el dial de costo/calidad de una con `config preset <budget|balan
 chamba sigue sin llamar a ningún modelo: esto solo le dice al modelo de tu editor cómo
 delegar. Otros editores leen la misma config vía `chamba_get_agent_config`. Ver el
 [README de claude-extras](./packages/claude-extras/README.md#configuration-per-agent-model--effort).
+
+**Triage read-only antes de comprometerte a un fix.** `/triage BUG-42` es la mitad
+delantera de `/ticket` con la trasera apagada: investiga y propone un fix pero **nunca
+toca código** — sin worktrees, ediciones ni commits. Corre un chequeo heurístico de
+completitud sin LLM (`chamba_triage_ticket`) que marca qué le falta al ticket —
+reproducción, esperado-vs-actual, entorno, alcance, criterios de aceptación, severidad —
+con las preguntas exactas para pedir de vuelta, y después el agente `diagnostician`
+investiga y devuelve una hipótesis de causa raíz (con evidencia `archivo:línea`), el blast
+radius, una reproducción y un **plan de fix propuesto** en un bloque listo para pegar en el
+ticket. Cuando estás listo, le pasa el plan guardado a `/ticket -p` para ejecutarlo. Ideal
+para casos de soporte y pre-diagnóstico.
 
 **QA de aceptación, como co-piloto.** Cuando un ticket es user-facing, el agente `qa`
 valida los criterios de aceptación contra la app *corriendo* — maneja un navegador real
@@ -209,6 +221,7 @@ editor — y es honesto: *design-accurate*, no "pixel perfect".
 - ✅ Calidad de release: golden tests del reviewer, `doctor` como gate en CI, instalación `--yes`, `RELEASING.md`
 - ✅ Vault repo-safe: bootstrap fuera de repos (`~/.chamba/vault`), backstop gitignore, warning del doctor
 - ✅ **0.20.0 publicado en npm**
+- ✅ `/triage` read-only: pre-diagnóstico + plan de fix sin ejecutar (`chamba_triage_ticket` chequeo de completitud, agente `diagnostician`)
 - 🔭 V2: búsqueda semántica del vault, MCP sampling, más bases de conocimiento
 
 Ver [`PLAN.md`](./PLAN.md) para el plan completo de fases.

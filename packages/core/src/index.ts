@@ -130,9 +130,20 @@ export {
 } from './skills/skill-registry.js';
 export type { ProcessHandler, RecordedCall } from './testing/fake-process.js';
 export { FakeProcess } from './testing/fake-process.js';
-
 // Testing utilities
 export { MemoryFilesystem } from './testing/memory-filesystem.js';
+// Triage (ticket-completeness heuristic for /triage, no LLM)
+export type {
+  CompletenessCheck,
+  TicketCompleteness,
+  TicketCompletenessInput,
+  TicketSignal,
+} from './triage/ticket-completeness.js';
+export {
+  checkTicketCompleteness,
+  renderTicketCompleteness,
+  TICKET_SIGNALS,
+} from './triage/ticket-completeness.js';
 // Path helpers
 export { basename, dirname, extname, joinPath } from './util/path.js';
 export type { BuiltContext, ContextBuildInput, RelevantNote } from './workspace/context-builder.js';

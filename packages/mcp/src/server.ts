@@ -20,6 +20,7 @@ import { registerResourceBudget } from './tools/resource-budget.js';
 import { registerReviewPlan } from './tools/review-plan.js';
 import { registerSavePlan } from './tools/save-plan.js';
 import { registerSummarizeToVault } from './tools/summarize-to-vault.js';
+import { registerTriageTicket } from './tools/triage-ticket.js';
 import { registerVaultStatus } from './tools/vault-status.js';
 import { registerWorkspaceInit } from './tools/workspace-init.js';
 import { registerWorkspaceReload } from './tools/workspace-reload.js';
@@ -52,6 +53,7 @@ export function createServer(logger: Logger, services: Services = createNodeServ
   registerQaCapabilities(server, logger, services);
   registerGeneratePlan(server, logger, services);
   registerReviewPlan(server, logger, services);
+  registerTriageTicket(server, logger, services);
   registerSavePlan(server, logger, services);
   registerCreateWorktree(server, logger, services);
   registerListWorktrees(server, logger, services);

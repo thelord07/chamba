@@ -1,5 +1,30 @@
 # @chamba/mcp
 
+## 0.21.0
+
+### Minor Changes
+
+- feat(triage): read-only `/triage` — pre-diagnosis + fix plan without executing
+
+  Adds a read-only counterpart to `/ticket`: investigate a support/bug ticket and
+  produce a diagnosis plus a proposed fix, without ever touching code (no worktrees,
+  edits or commits). The output is a paste-ready block for the ticket, and the saved
+  fix plan can be handed to `/ticket -p` to execute.
+
+  - **core:** `checkTicketCompleteness` — a heuristic, no-LLM completeness check that
+    flags what a ticket is missing (reproduction, expected-vs-actual, environment,
+    scope, acceptance criteria, severity) with the exact questions to ask back.
+  - **mcp:** new `chamba_triage_ticket` tool.
+  - **claude-extras:** new `/triage` command + `diagnostician` subagent (mapped to the
+    `researcher` tier); investigates read-only, gives a root-cause hypothesis with
+    `file:line` evidence, blast radius, reproduction, a proposed fix, and severity +
+    confidence. Nothing is deleted or run without you.
+
+### Patch Changes
+
+- @chamba/adapters@0.21.0
+- @chamba/core@0.21.0
+
 ## 0.20.1
 
 ### Patch Changes
