@@ -1,5 +1,20 @@
 # @chamba/mcp
 
+## 0.20.1
+
+### Patch Changes
+
+- docs(mcp): complete the npm README tools list
+
+  The `@chamba/mcp` README's tools list had been frozen at ~0.10 — it was missing the tools
+  added since (`chamba_load_design`, `chamba_design_prefs`, `chamba_qa_capabilities`,
+  `chamba_resource_budget`, `chamba_load_skills`, `chamba_doctor`, `chamba_vault_status`,
+  `chamba_save_plan`, `chamba_get_agent_config`, the multi-worktree tools). Rewrote it grouped
+  by area and noted the repo-safe vault bootstrap, so the npm package page reflects reality.
+
+  - @chamba/adapters@0.20.1
+  - @chamba/core@0.20.1
+
 ## 0.20.0
 
 ### Minor Changes
