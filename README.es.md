@@ -240,4 +240,4 @@ Ver [`PLAN.md`](./PLAN.md) para el plan completo de fases.
 
 ## Licencia
 
-MIT — ver [`LICENSE`](./LICENSE). Hecho con cariño en LATAM.
+MIT — ver [`LICENSE`](./LICENSE). Hecho con cariño en Colombia.

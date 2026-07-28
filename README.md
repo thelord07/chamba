@@ -277,4 +277,4 @@ See [`CONTRIBUTING.md`](./CONTRIBUTING.md). Issues and PRs welcome.
 
 ## License
 
-MIT — see [`LICENSE`](./LICENSE). Built with cariño in LATAM.
+MIT — see [`LICENSE`](./LICENSE). Built with cariño in Colombia.
