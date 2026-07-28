@@ -155,7 +155,7 @@ const CONTENT = {
         { tag: 'QA', title: 'QA en el navegador', body: 'El agente qa valida los criterios contra la app corriendo: maneja un navegador real vía Playwright MCP en Claude Code o el navegador integrado de Cursor. Sin tooling de browser, levanta la app desde el worktree y te copilotea criterio por criterio. Co‑piloto, no autopiloto: cada login lo hacés vos, reusa los usuarios que ya existen en vez de crear cuentas de más, y deja una screenshot por criterio (PASS y FAIL) como evidencia fuera de todo repo git. Reporta PASS/FAIL y nunca commitea ni borra datos.' },
         { tag: 'Figma', title: 'Design-aware', body: 'Para tickets visuales: el planner captura el diseño (link Figma o screenshots), el implementer saca tokens y medidas exactas de un Figma MCP si está configurado (si no, de screenshots), y el qa hace un check visual contra la referencia. chamba no llama a Figma; lo hace el MCP de tu editor. Honesto: design‑accurate, no «pixel perfect».' }
       ],
-      note: 'Fable 5 es premium y NO forma parte de los planes de suscripción de Claude: usarlo es una decisión de costo y acceso de quien lo corre.'
+      note: 'Fable 5 es opt‑in: en la API es premium (~2× Opus 5, con retención de datos 30 días), pero viene incluido en el plan Claude Max (hasta 50% del límite semanal, Claude Code ≥ 2.1.170). Para la mayoría del trabajo, Opus 5 lo iguala a mitad del precio de API.'
     },
     whyKicker: 'Por qué chamba',
     whyTitle: 'Coordinación real, sin un LLM extra',
@@ -293,7 +293,7 @@ const CONTENT = {
         { tag: 'QA', title: 'Browser QA', body: 'The qa agent validates acceptance criteria against the running app: it drives a real browser via a Playwright MCP in Claude Code or Cursor’s built‑in browser. With no browser tooling, it runs the app from the worktree and co‑pilots each criterion with you. Co‑pilot, not autopilot: every login is your step, it reuses the users that already exist instead of creating throwaway accounts, and drops a screenshot per criterion (PASS and FAIL) as evidence kept outside every git repo. Reports PASS/FAIL and never commits or deletes data.' },
         { tag: 'Figma', title: 'Design-aware', body: 'For visual tickets: the planner captures the design (Figma link or screenshots), the implementer pulls exact tokens and measurements from a Figma MCP if one is configured (else from screenshots), and the qa agent runs a visual check against the reference. chamba never calls Figma; your editor’s MCP does. Honest: design‑accurate, not “pixel‑perfect”.' }
       ],
-      note: 'Fable 5 is premium and NOT part of consumer Claude subscription plans: using it is a cost and access decision for whoever runs it.'
+      note: 'Fable 5 is opt‑in: on the API it is premium (~2× Opus 5, 30‑day data retention), but it is included on the Claude Max plan (up to 50% of the weekly limit, Claude Code ≥ 2.1.170). For most work, Opus 5 matches it at half the API price.'
     },
     whyKicker: 'Why chamba',
     whyTitle: 'Real coordination, no extra LLM',
