@@ -14,7 +14,7 @@ describe('loadConfig', () => {
 
   it('returns compiled defaults when no files exist', async () => {
     const { config, sources } = await loadConfig(fs, { globalPath: GLOBAL, projectPath: PROJECT });
-    expect(config.orchestrator.model).toBe('claude-opus-4-8');
+    expect(config.orchestrator.model).toBe('claude-opus-5');
     expect(sources.find((s) => s.kind === 'global')?.status).toBe('missing');
   });
 
@@ -49,7 +49,7 @@ describe('loadConfig', () => {
   it('degrades to defaults and warns on corrupt JSON', async () => {
     await fs.writeFile(GLOBAL, 'NOT JSON');
     const { config, sources } = await loadConfig(fs, { globalPath: GLOBAL });
-    expect(config.orchestrator.model).toBe('claude-opus-4-8');
+    expect(config.orchestrator.model).toBe('claude-opus-5');
     const global = sources.find((s) => s.kind === 'global');
     expect(global?.status).toBe('invalid');
     expect(global?.error).toContain('invalid JSON');
@@ -61,7 +61,7 @@ describe('loadConfig', () => {
       JSON.stringify({ version: 1, overrides: { tester: { model: 'bogus' } } }),
     );
     const { config, sources } = await loadConfig(fs, { globalPath: GLOBAL });
-    expect(config.tester.model).toBe('claude-sonnet-4-6');
+    expect(config.tester.model).toBe('claude-sonnet-5');
     expect(sources.find((s) => s.kind === 'global')?.status).toBe('invalid');
   });
 });

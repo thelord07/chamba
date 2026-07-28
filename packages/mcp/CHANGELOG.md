@@ -1,5 +1,31 @@
 # @chamba/mcp
 
+## 1.1.0
+
+### Minor Changes
+
+- feat(models): Opus 5 + Sonnet 5, retuned defaults for token savings
+
+  Adds the newest Anthropic models to the catalog and retunes the recommended
+  reparto around them — better quality at the same or lower cost. chamba still
+  never calls a model; this only tells the editor's model how to delegate.
+
+  - **catalog:** add `claude-opus-5` ($5/$25 — near Fable 5 quality at half its
+    price) and `claude-sonnet-5` (intro $2/$10 through 2026-08-31). Opus 4.8/4.7
+    and Sonnet 4.6 kept as legacy. Fable 5 caveat updated: included on the Claude
+    Max plan (up to 50% of the weekly limit, Claude Code ≥ 2.1.170).
+  - **defaults:** reasoning roles (orchestrator, planner, reviewer, qa, researcher)
+    → Opus 5 at `high`; implementer/tester → Sonnet 5; summarizer stays Haiku 4.5.
+    Planner moves from `extreme` to `high` (Opus 5's default) — the token-savings
+    sweet spot; the `quality` preset still cranks the planner to `max`.
+  - **presets:** budget/balanced use Sonnet 5, quality uses Opus 5 for the brain.
+  - **docs:** per-role defaults table, Fable-on-Max note, landing + READMEs.
+
+### Patch Changes
+
+- @chamba/adapters@1.1.0
+- @chamba/core@1.1.0
+
 ## 1.0.0
 
 ### Major Changes

@@ -47,12 +47,13 @@ describe('chamba_get_agent_config', () => {
     );
     expect(planner).toMatchObject({
       role: 'planner',
-      model: 'claude-opus-4-8',
-      effort: 'extreme',
+      model: 'claude-opus-5',
+      effort: 'high',
       reasoning_priority: 'thoroughness',
       provider: 'anthropic',
     });
-    expect(planner.hint).toContain('maximum effort');
+    expect(planner.hint).toContain('high effort');
+    expect(planner.hint).toContain('deep reasoning');
 
     const summarizer = structured(
       await client.callTool({ name: 'chamba_get_agent_config', arguments: { role: 'summarizer' } }),
@@ -116,7 +117,7 @@ describe('chamba_get_agent_config', () => {
       arguments: { role: 'orchestrator' },
     });
     const s = structured(result);
-    expect(s.model).toBe('claude-opus-4-8');
+    expect(s.model).toBe('claude-opus-5');
     expect(s.warning).toContain('Ignored invalid config');
 
     await server.close();

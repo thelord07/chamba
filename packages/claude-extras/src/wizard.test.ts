@@ -16,7 +16,7 @@ describe('buildConfigFromAnswers', () => {
 
   it('falls back to the compiled default for roles without an answer', () => {
     const config = buildConfigFromAnswers([]);
-    expect(config.defaults?.planner?.model).toBe('claude-opus-4-8');
+    expect(config.defaults?.planner?.model).toBe('claude-opus-5');
     expect(config.defaults?.summarizer?.model).toBe('claude-haiku-4-5');
   });
 });

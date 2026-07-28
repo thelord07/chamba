@@ -68,7 +68,7 @@ describe('cmdPreset', () => {
     expect(msg).toContain('budget');
     const file = JSON.parse(await fs.readFile(GLOBAL));
     expect(file.defaults.implementer.model).toBe('claude-haiku-4-5');
-    expect(file.defaults.planner.model).toBe('claude-sonnet-4-6');
+    expect(file.defaults.planner.model).toBe('claude-sonnet-5');
   });
 
   it('rejects an unknown preset', async () => {

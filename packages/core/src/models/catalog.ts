@@ -4,12 +4,13 @@ import type { Effort } from '../config/roles.js';
 // `effort` maps to each provider's native vocabulary. chamba never calls these
 // models — this is declarative metadata the editor's model consumes.
 //
-// Re-verify before each release — these are moving targets. Verified at 1.0.0:
-// the Anthropic tier (chamba's recommended defaults) is current — Opus 4.8 / 4.7,
-// Sonnet 4.6, Haiku 4.5, and Fable 5 (~$10/$50 per 1M, ~2× Opus 4.8, 30-day retention).
-// Still unconfirmed, with conservative fallbacks already in place: whether
-// `gpt-5.5-mini` accepts `xhigh`, and whether `gemini-3.1-pro-preview` is still the
-// current flagship Pro id.
+// Re-verify before each release — these are moving targets. Verified at 1.1.0 against
+// Anthropic's models docs: Opus 5 (`claude-opus-5`, $5/$25, ~½ Fable's price, near-equal
+// quality — the new reasoning default), Sonnet 5 (`claude-sonnet-5`, $3/$15; intro $2/$10
+// through 2026-08-31), Haiku 4.5, and Fable 5 ($10/$50, included on the Claude Max plan up
+// to 50% of the weekly limit, Claude Code ≥ 2.1.170). Opus 4.8/4.7 + Sonnet 4.6 kept as
+// legacy. Still unconfirmed, with conservative fallbacks in place: whether `gpt-5.5-mini`
+// accepts `xhigh`, and whether `gemini-3.1-pro-preview` is still the current flagship Pro id.
 
 export type ModelProvider = 'anthropic' | 'openai' | 'google' | 'ollama';
 
@@ -80,10 +81,12 @@ const NO_EFFORT: Record<Effort, string | null> = {
 
 export const MODEL_CATALOG: readonly ModelInfo[] = [
   {
-    id: 'claude-opus-4-8',
+    id: 'claude-opus-5',
     provider: 'anthropic',
-    label: 'Claude Opus 4.8',
-    description: 'Flagship reasoning. Best for critical decomposition and planning.',
+    label: 'Claude Opus 5',
+    description:
+      'Flagship agentic coding + reasoning. Near Fable 5 quality at half its price; ' +
+      'same price as Opus 4.8. The recommended default for the reasoning roles.',
     supports_thinking: true,
     effortMap: ANTHROPIC_EFFORT,
   },
@@ -97,15 +100,36 @@ export const MODEL_CATALOG: readonly ModelInfo[] = [
       "Anthropic's most capable model for demanding long-horizon reasoning. Opt-in, premium.",
     supports_thinking: true,
     effortMap: ANTHROPIC_EFFORT,
-    pricing_note: '~$10/$50 per 1M tokens — roughly 2× Opus 4.8 (verify per release).',
+    pricing_note:
+      'API pay-as-you-go ~$10/$50 per 1M (~2× Opus 5). On the Claude Max plan it is ' +
+      'included — counts toward your weekly limit (up to 50% on Fable 5), Claude Code ' +
+      '≥ 2.1.170. For most work Opus 5 matches it at half the API price.',
     requires_data_retention: true,
     can_refuse: true,
+  },
+  {
+    id: 'claude-opus-4-8',
+    provider: 'anthropic',
+    label: 'Claude Opus 4.8',
+    description: 'Previous-gen flagship reasoning. Superseded by Opus 5 at the same price.',
+    supports_thinking: true,
+    effortMap: ANTHROPIC_EFFORT,
   },
   {
     id: 'claude-opus-4-7',
     provider: 'anthropic',
     label: 'Claude Opus 4.7',
-    description: 'Previous-gen reasoning, still strong. Good for review and research.',
+    description: 'Older Opus reasoning, still strong. Good for review and research.',
+    supports_thinking: true,
+    effortMap: ANTHROPIC_EFFORT,
+  },
+  {
+    id: 'claude-sonnet-5',
+    provider: 'anthropic',
+    label: 'Claude Sonnet 5',
+    description:
+      'Best speed/intelligence balance — ideal for implementation. Intro pricing ' +
+      '$2/$10 per 1M through 2026-08-31, then $3/$15.',
     supports_thinking: true,
     effortMap: ANTHROPIC_EFFORT,
   },
@@ -113,7 +137,7 @@ export const MODEL_CATALOG: readonly ModelInfo[] = [
     id: 'claude-sonnet-4-6',
     provider: 'anthropic',
     label: 'Claude Sonnet 4.6',
-    description: 'Balanced and fast. Ideal for implementation against clear specs.',
+    description: 'Previous-gen Sonnet. Balanced and fast; superseded by Sonnet 5.',
     supports_thinking: true,
     effortMap: ANTHROPIC_EFFORT,
   },

@@ -159,9 +159,12 @@ so `npx @chamba/claude-extras rollback` can undo them. Then: `/orq add a health 
 
 **Per-agent config.** First install runs a wizard to pick a model + effort per role
 (orchestrator, planner, reviewer, implementer, tester, qa, summarizer, researcher), with
-efficient defaults pre-set — powerful models for reasoning, fast/cheap ones for
-mechanical work. Reconfigure with `npx @chamba/claude-extras config <show|set|wizard|…>`,
-or flip the whole cost/quality dial at once with `config preset <budget|balanced|quality|fast>`.
+efficient defaults pre-set and tuned for token savings: **Opus 5** for the reasoning roles
+(Fable-grade quality at half the API price, same price as Opus 4.8) and **Sonnet 5** for
+execution (intro $2/$10 through Aug 2026). **Fable 5** stays opt-in — and it's included on
+the Claude Max plan (up to 50% of the weekly limit, Claude Code ≥ 2.1.170). Reconfigure with
+`npx @chamba/claude-extras config <show|set|wizard|…>`, or flip the whole cost/quality dial
+at once with `config preset <budget|balanced|quality|fast>`.
 chamba still never calls a model: this only tells your editor's model how to delegate.
 Other editors read the same config via `chamba_get_agent_config`. See the
 [claude-extras README](./packages/claude-extras/README.md#configuration-per-agent-model--effort).
@@ -245,6 +248,7 @@ browser does — and it's honest about *design-accurate*, not "pixel-perfect".
 - ✅ Read-only `/triage`: pre-diagnosis + fix plan without executing (`chamba_triage_ticket` completeness check, `diagnostician` agent)
 - ✅ **0.21.0 published on npm**
 - ✅ **1.0.0 — first stable:** real MCP handshake version, 24-tool surface + docs polish, first stable tag
+- ✅ **1.1.0 — Opus 5 + Sonnet 5:** new default reparto (Opus 5 reasoning at ½ Fable's price, Sonnet 5 execution), token-savings tuning, Fable-on-Max caveat
 - 🔭 V2: semantic vault search, MCP sampling, more knowledge bases
 
 See [`PLAN.md`](./PLAN.md) for the full phase plan.

@@ -157,9 +157,12 @@ así `npx @chamba/claude-extras rollback` los deshace. Después: `/orq agrega un
 
 **Config por agente.** El primer install corre un wizard para elegir modelo + esfuerzo
 por rol (orchestrator, planner, reviewer, implementer, tester, qa, summarizer, researcher),
-con defaults eficientes pre-configurados — modelos potentes para razonar, rápidos y
-baratos para lo mecánico. Reconfigurás con `npx @chamba/claude-extras config <show|set|wizard|…>`,
-o cambiás todo el dial de costo/calidad de una con `config preset <budget|balanced|quality|fast>`.
+con defaults eficientes pre-configurados y tuneados para ahorrar tokens: **Opus 5** para los
+roles de razonamiento (calidad de Fable 5 a mitad del precio de API, mismo precio que Opus 4.8)
+y **Sonnet 5** para ejecución (intro $2/$10 hasta ago-2026). **Fable 5** queda opt-in — y viene
+incluido en el plan Claude Max (hasta 50% del límite semanal, Claude Code ≥ 2.1.170). Reconfigurás
+con `npx @chamba/claude-extras config <show|set|wizard|…>`, o cambiás todo el dial de
+costo/calidad de una con `config preset <budget|balanced|quality|fast>`.
 chamba sigue sin llamar a ningún modelo: esto solo le dice al modelo de tu editor cómo
 delegar. Otros editores leen la misma config vía `chamba_get_agent_config`. Ver el
 [README de claude-extras](./packages/claude-extras/README.md#configuration-per-agent-model--effort).
@@ -224,6 +227,7 @@ editor — y es honesto: *design-accurate*, no "pixel perfect".
 - ✅ `/triage` read-only: pre-diagnóstico + plan de fix sin ejecutar (`chamba_triage_ticket` chequeo de completitud, agente `diagnostician`)
 - ✅ **0.21.0 publicado en npm**
 - ✅ **1.0.0 — primer estable:** versión real en el handshake MCP, superficie de 24 tools + docs pulidas, primer tag estable
+- ✅ **1.1.0 — Opus 5 + Sonnet 5:** nuevo reparto de defaults (Opus 5 para razonar a ½ del precio de Fable, Sonnet 5 para ejecutar), tuning de ahorro de tokens, caveat de Fable-en-Max
 - 🔭 V2: búsqueda semántica del vault, MCP sampling, más bases de conocimiento
 
 Ver [`PLAN.md`](./PLAN.md) para el plan completo de fases.

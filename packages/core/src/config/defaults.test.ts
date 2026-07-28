@@ -25,10 +25,11 @@ describe('DEFAULT_CONFIG', () => {
 
   it('uses the documented reparto for the brain and the cheap roles', () => {
     expect(DEFAULT_CONFIG.defaults.planner).toEqual({
-      model: 'claude-opus-4-8',
-      effort: 'extreme',
+      model: 'claude-opus-5',
+      effort: 'high',
       reasoning_priority: 'thoroughness',
     });
+    expect(DEFAULT_CONFIG.defaults.implementer.model).toBe('claude-sonnet-5');
     expect(DEFAULT_CONFIG.defaults.summarizer.model).toBe('claude-haiku-4-5');
   });
 });

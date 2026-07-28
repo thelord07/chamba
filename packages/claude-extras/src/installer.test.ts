@@ -94,12 +94,12 @@ describe('Installer.applyConfig', () => {
     ]);
 
     const impl = await fs.readFile('/home/.claude/agents/implementer.md');
-    expect(impl).toContain('model: claude-sonnet-4-6');
+    expect(impl).toContain('model: claude-sonnet-5');
     expect(impl).toContain('effort: medium');
 
     const planner = await fs.readFile('/home/.claude/agents/planner.md');
-    expect(planner).toContain('model: claude-opus-4-8');
-    expect(planner).toContain('effort: max');
+    expect(planner).toContain('model: claude-opus-5');
+    expect(planner).toContain('effort: high');
 
     const second = await installer.applyConfig();
     expect(second.regenerated).toEqual([]);

@@ -47,7 +47,7 @@ Then, in Claude Code: `/orq add a health check endpoint`
 ## Configuration: per-agent model + effort
 
 chamba lets you pick which **model** and **effort** each **role** uses
-(orchestrator, planner, reviewer, implementer, tester, summarizer, researcher).
+(orchestrator, planner, reviewer, implementer, tester, qa, summarizer, researcher).
 
 > **chamba never calls these models.** This config is declarative metadata. For
 > Claude Code it's written into each subagent's frontmatter (`model:` + `effort:`)
@@ -61,22 +61,29 @@ fast/cheap ones.** These ship pre-configured — you only change what you want.
 
 | Role | Default model | Effort | Why |
 |---|---|---|---|
-| **orchestrator** | `claude-opus-4-8` | high | The brain: decomposes, plans, decides. Worth the tokens. |
-| **planner** | `claude-opus-4-8` | extreme | Max reasoning when planning is delegated. Invoked rarely. |
-| **reviewer** | `claude-opus-4-7` | high | Critical audit; deep reasoning, doesn't need the very latest model. |
-| **implementer** | `claude-sonnet-4-6` | medium | Executes clear specs; speed matters, medium reasoning is enough. |
-| **tester** | `claude-sonnet-4-6` | medium | Tests over already-implemented code; same profile. |
-| **qa** | `claude-opus-4-7` | high | Acceptance QA: reasons about criteria and drives the running app. |
+| **orchestrator** | `claude-opus-5` | high | The brain: decomposes, plans, decides. Near-Fable quality at Opus price. |
+| **planner** | `claude-opus-5` | high | Planning delegated; Opus 5 at `high` — the token-savings sweet spot (bump to `quality` for `max`). |
+| **reviewer** | `claude-opus-5` | high | Critical audit; deep reasoning on the strongest Opus. |
+| **implementer** | `claude-sonnet-5` | medium | Executes clear specs; faster + cheaper (intro $2/$10) and stronger than 4.6. |
+| **tester** | `claude-sonnet-5` | medium | Tests over already-implemented code; same profile. |
+| **qa** | `claude-opus-5` | high | Acceptance QA: reasons about criteria and drives the running app. |
 | **summarizer** | `claude-haiku-4-5` | low | Summaries are mechanical; a fast, cheap model is perfect. |
-| **researcher** | `claude-opus-4-7` | high | Research + synthesis; high reasoning, doesn't need Opus 4.8. |
+| **researcher** | `claude-opus-5` | high | Research + synthesis (also the `/triage` diagnostician). |
+
+Since **Opus 5** matches Fable 5's quality at half the API price (and the same price as
+Opus 4.8), it's the default for every reasoning role. **Sonnet 5** handles execution — at
+intro pricing it's cheaper *and* stronger than Sonnet 4.6. The old Opus 4.8/4.7 and Sonnet
+4.6 stay in the catalog if you want to pin them.
 
 **Claude Fable 5** (`claude-fable-5`) is in the catalog as an **opt-in premium** model —
-assign it to a role by hand; it's never a default. Two caveats chamba surfaces (wizard,
-config hint, subagent frontmatter): it costs **~2× Opus 4.8** and **requires 30-day data
-retention** (zero-retention orgs get a 400 on every request). Also note its recommended
-`xhigh` setting **isn't reachable on Claude Code** — chamba's `extreme` maps to `max`
-there (it maps to `xhigh` only on the OpenAI path), so a Fable 5 role runs at `high` or
-`max`, never `xhigh`.
+assign it to a role by hand; it's never a default (Opus 5 matches it for most work at half
+the API price). chamba surfaces its caveats (wizard, config hint, subagent frontmatter):
+API pay-as-you-go is **~2× Opus 5** and it **requires 30-day data retention** (zero-retention
+orgs get a 400 on every request). On the **Claude Max plan** it's **included** — it counts
+toward your weekly limit (up to 50% of it on Fable 5) and needs **Claude Code ≥ 2.1.170**.
+Also note its recommended `xhigh` setting **isn't reachable on Claude Code** — chamba's
+`extreme` maps to `max` there (it maps to `xhigh` only on the OpenAI path), so a Fable 5 role
+runs at `high` or `max`, never `xhigh`.
 
 ### The wizard
 

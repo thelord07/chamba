@@ -14,15 +14,14 @@ export type PresetName = 'budget' | 'balanced' | 'quality' | 'fast';
 export const PRESET_NAMES: readonly PresetName[] = ['budget', 'balanced', 'quality', 'fast'];
 
 export const PRESET_DESCRIPTIONS: Record<PresetName, string> = {
-  budget: 'Lowest cost — cheap models everywhere, enough reasoning to stay usable.',
-  balanced: 'Mid-range — Sonnet across the board, more effort on the reasoning roles.',
-  quality: 'Maximum reasoning — Opus for the brain (the recommended defaults).',
+  budget: 'Lowest cost — Sonnet 5 for reasoning, Haiku for execution.',
+  balanced: 'Mid-range — Sonnet 5 across the board, more effort on the reasoning roles.',
+  quality: 'Maximum reasoning — Opus 5 for the brain, Sonnet 5 for execution, planner at max.',
   fast: 'Lowest latency — fast models, low effort, speed-first on every role.',
 };
 
-const OPUS = 'claude-opus-4-8';
-const OPUS_PREV = 'claude-opus-4-7';
-const SONNET = 'claude-sonnet-4-6';
+const OPUS = 'claude-opus-5';
+const SONNET = 'claude-sonnet-5';
 const HAIKU = 'claude-haiku-4-5';
 
 /** Full role→config map for each preset. Every preset covers all `AGENT_ROLES`. */
@@ -50,12 +49,12 @@ export const PRESETS: Record<PresetName, Record<AgentRole, AgentConfig>> = {
   quality: {
     orchestrator: { model: OPUS, effort: 'high', reasoning_priority: 'thoroughness' },
     planner: { model: OPUS, effort: 'extreme', reasoning_priority: 'thoroughness' },
-    reviewer: { model: OPUS_PREV, effort: 'high', reasoning_priority: 'thoroughness' },
+    reviewer: { model: OPUS, effort: 'high', reasoning_priority: 'thoroughness' },
     implementer: { model: SONNET, effort: 'medium', reasoning_priority: 'balanced' },
     tester: { model: SONNET, effort: 'medium', reasoning_priority: 'balanced' },
-    qa: { model: OPUS_PREV, effort: 'high', reasoning_priority: 'thoroughness' },
+    qa: { model: OPUS, effort: 'high', reasoning_priority: 'thoroughness' },
     summarizer: { model: HAIKU, effort: 'low', reasoning_priority: 'speed' },
-    researcher: { model: OPUS_PREV, effort: 'high', reasoning_priority: 'thoroughness' },
+    researcher: { model: OPUS, effort: 'high', reasoning_priority: 'thoroughness' },
   },
   fast: {
     orchestrator: { model: SONNET, effort: 'low', reasoning_priority: 'speed' },

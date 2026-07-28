@@ -39,8 +39,8 @@ describe('model catalog', () => {
   });
 
   it('exposes Fable 5 as an opt-in premium model, not the default', () => {
-    // Opus 4.8 stays first so it remains the visual/default entry.
-    expect(MODEL_CATALOG[0]?.id).toBe('claude-opus-4-8');
+    // Opus 5 is first so it's the visual/default entry (the recommended reasoning model).
+    expect(MODEL_CATALOG[0]?.id).toBe('claude-opus-5');
     const fable = mustGet('claude-fable-5');
     expect(fable.provider).toBe('anthropic');
     expect(fable.requires_data_retention).toBe(true);

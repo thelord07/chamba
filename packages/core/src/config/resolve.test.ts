@@ -7,15 +7,21 @@ const resolved = DEFAULT_CONFIG.defaults as ResolvedConfig;
 
 describe('resolveRole', () => {
   it('returns the config for a role', () => {
-    expect(resolveRole(resolved, 'planner').effort).toBe('extreme');
+    expect(resolveRole(resolved, 'planner').effort).toBe('high');
+    expect(resolveRole(resolved, 'planner').model).toBe('claude-opus-5');
   });
 });
 
 describe('buildHint', () => {
   it('mentions the model, the role and maps extreme to maximum', () => {
-    const hint = buildHint('planner', resolved.planner);
+    // Use an explicit `extreme` config (no default role runs at extreme anymore).
+    const hint = buildHint('planner', {
+      model: 'claude-opus-5',
+      effort: 'extreme',
+      reasoning_priority: 'thoroughness',
+    });
     expect(hint).toContain('planner');
-    expect(hint).toContain('claude-opus-4-8');
+    expect(hint).toContain('claude-opus-5');
     expect(hint).toContain('maximum effort');
     expect(hint).toContain('deep reasoning');
   });

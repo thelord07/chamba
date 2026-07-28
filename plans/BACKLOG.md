@@ -115,6 +115,38 @@ Detalle en [tier3-release-quality.md](tier3-release-quality.md).
 
 ## 🐛 Fixes / mejoras encontradas
 
+### `config apply` ignora el override por-proyecto (Claude Code) — 🔜 PENDIENTE
+Encontrado dogfooding pidiendo `planner → fable` sólo para un repo. El sistema de config
+resuelve `defaults ← global ← project` (y `chamba_get_agent_config` **sí** lee
+`./.chamba/config.json` en vivo, así que Cursor y la sesión principal lo toman). Pero los
+**subagentes de Claude Code** corren del `model:` horneado por `config apply`, y `apply`
+(`installer.resolveConfig`) pasa **sólo** `globalConfigPath` a `loadConfig` — nunca el
+project path — y escribe en `~/.claude/agents/` (user scope, global). Resultado: un override
+por-proyecto del planner **no llega** al subagente planner de Claude Code; hay que ponerlo
+global.
+- **Fix propuesto:**
+  1. `config apply` (y `config show`) leen también `<cwd>/.chamba/config.json` cuando se
+     corre dentro de un repo, pasando `projectPath` a `loadConfig`.
+  2. Poder escribir subagentes **project-scoped** en `.claude/agents/` del repo (flag tipo
+     `config apply --project`) para que un override por-repo no se filtre a los demás.
+  3. Documentar el matiz en el README de claude-extras (hoy sugiere que el override por
+     proyecto aplica siempre; sólo aplica vía `get_agent_config` en vivo, no al subagente
+     horneado).
+- Toca: `packages/claude-extras/src/installer.ts` (`resolveConfig`/`applyConfig`),
+  `config-cli.ts`, README. Cero LLM, editor-agnóstico.
+
+### Evidencia de QA: sólo por prompt, no configurable ni multi-editor — 🔜 PENDIENTE
+La ubicación de los pantallazos de QA vive **sólo** en el prompt del agente (`qa.md`): regla
+determinista fuera de todo repo (`<workspace>/.chamba/qa-evidence/` o
+`~/.chamba/qa-evidence/<slug>/`) + backstop de auto-gitignore. Huecos: (a) no es
+**overridable** (no hay `CHAMBA_QA_EVIDENCE_PATH` ni campo en config, a diferencia de la
+vault); (b) es **sólo Claude Code** — Cursor/otros usan el MCP pero no ven ese prompt, así
+que a su modelo nadie le dice dónde guardar.
+- **Fix propuesto:** tool `chamba_qa_evidence_path` (sin LLM) que resuelve+devuelve el root
+  aplicando esa regla, honrando un override (`CHAMBA_QA_EVIDENCE_PATH` o `.chamba/config.json`),
+  creando y gitignoreando la carpeta. El agente `qa` lo llama en vez de razonar el path →
+  determinista, overridable y visible para todos los editores. Gemelo de `chamba_vault_status`.
+
 ### Vault sembrado dentro del repo — ✅ HECHO (0.20.0)
 Detalle en [repo-safe-vault.md](repo-safe-vault.md). Encontrado dogfooding en **asisten**.
 `workspace_init` sembraba el vault en la raíz del workspace; si era repo git, `.obsidian/` +

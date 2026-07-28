@@ -1,5 +1,12 @@
 # @chamba/claude-extras
 
+## 1.1.0
+
+### Patch Changes
+
+- @chamba/adapters@1.1.0
+- @chamba/core@1.1.0
+
 ## 1.0.0
 
 ### Patch Changes

@@ -37,7 +37,7 @@ describe('ConfigStore', () => {
 
     const file = JSON.parse(await fs.readFile(PATH));
     expect(file.defaults.implementer.model).toBe('claude-haiku-4-5');
-    expect(file.defaults.orchestrator.model).toBe('claude-sonnet-4-6');
+    expect(file.defaults.orchestrator.model).toBe('claude-sonnet-5');
     expect(file.overrides.reviewer.effort).toBe('low');
   });
 
@@ -46,7 +46,7 @@ describe('ConfigStore', () => {
     const store = new ConfigStore(fs, PATH);
     await store.reset();
     const file = JSON.parse(await fs.readFile(PATH));
-    expect(file.defaults.planner.effort).toBe('extreme');
+    expect(file.defaults.planner.effort).toBe('high');
   });
 
   it('read throws a ConfigError on corrupt JSON', async () => {
