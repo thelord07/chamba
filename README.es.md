@@ -104,7 +104,7 @@ el directorio de logs y los worktrees.
 | `chamba_summarize_to_vault` | `{ title, content, projectSlug? }` | Escribe un resumen a `proyectos/` — agrupado por proyecto (git remote) + un `INDEX.md` por carpeta para recall barato |
 | `chamba_save_plan` | `{ title, content, projectSlug? }` | Guarda un plan en `plans/` — mismo agrupamiento por proyecto + índice |
 | `chamba_vault_status` | `{}` | Ruta del vault resuelta + las notas que chamba ve (diagnóstico) |
-| `chamba_doctor` | `{}` | Chequeo de salud del entorno (sin LLM): Node, sistema (RAM/CPU), git (consciente de multi-repo), workspace, config, vault, logs, worktrees → pass/warn/fail. También `npx @chamba/mcp doctor` |
+| `chamba_doctor` | `{}` | Chequeo de salud del entorno (sin LLM): Node, sistema (RAM/CPU), git (consciente de multi-repo), workspace, config, vault, registro MCP (avisa si chamba está duplicado/inconsistente entre configs), logs, worktrees → pass/warn/fail. También `npx @chamba/mcp doctor` |
 | `chamba_resource_budget` | `{ requested?, perWorkerMemMB? }` | Paralelismo seguro para **esta** máquina (sin LLM): lee RAM/CPU/carga en vivo → cuántos worktrees/workers correr a la vez. Consultalo antes de un fan-out multi-repo |
 | `chamba_qa_capabilities` | `{}` | Con qué correr la QA de aceptación (sin LLM): web vs móvil (React Native / Expo), tooling E2E, y los simuladores iOS / emuladores Android realmente disponibles (read-only `xcrun simctl` / `adb` / `emulator` — lista, nunca bootea). El agente qa elige su modo con esto |
 | `chamba_triage_ticket` | `{ ticket }` | Chequeo heurístico de completitud de un ticket de soporte/bug (sin LLM): `{ present, missing, questions, enoughToStart, score }` — marca si tiene reproducción, esperado-vs-actual, entorno, alcance, criterios de aceptación, severidad, con las preguntas para pedir de vuelta. Potencia `/triage` |
@@ -153,7 +153,9 @@ npx @chamba/claude-extras uninstall
 
 Idempotente, no sobrescribe tus archivos (`--force` para forzar), preserva otros MCP
 servers en `~/.claude.json`. `--force` y `uninstall` hacen snapshot del estado actual antes,
-así `npx @chamba/claude-extras rollback` los deshace. Después: `/orq agrega un endpoint de health check`.
+así `npx @chamba/claude-extras rollback` los deshace. Agregá `--global` para instalar
+`@chamba/mcp` global y lanzar el binario `chamba-mcp` en vez de `npx` — una conexión más
+estable que no se cae por un spawn con suerte. Después: `/orq agrega un endpoint de health check`.
 
 **Config por agente.** El primer install corre un wizard para elegir modelo + esfuerzo
 por rol (orchestrator, planner, reviewer, implementer, tester, qa, summarizer, researcher),
@@ -228,6 +230,7 @@ editor — y es honesto: *design-accurate*, no "pixel perfect".
 - ✅ **0.21.0 publicado en npm**
 - ✅ **1.0.0 — primer estable:** versión real en el handshake MCP, superficie de 24 tools + docs pulidas, primer tag estable
 - ✅ **1.1.0 — Opus 5 + Sonnet 5:** nuevo reparto de defaults (Opus 5 para razonar a ½ del precio de Fable, Sonnet 5 para ejecutar), tuning de ahorro de tokens, caveat de Fable-en-Max
+- ✅ **1.2.0 — conexión confiable:** `install --global` (lanza el binario `chamba-mcp`, sin npx en cada arranque) + check de registro MCP en `doctor` (avisa de duplicados/inconsistencias)
 - 🔭 V2: búsqueda semántica del vault, MCP sampling, más bases de conocimiento
 
 Ver [`PLAN.md`](./PLAN.md) para el plan completo de fases.

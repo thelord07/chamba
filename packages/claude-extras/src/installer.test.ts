@@ -78,6 +78,23 @@ describe('Installer.install', () => {
     expect(config.mcpServers.other).toEqual({ command: 'x' });
     expect(config.mcpServers.chamba).toBeDefined();
   });
+
+  it('registers the global chamba-mcp binary with { global: true }', async () => {
+    const { fs, installer } = build({ '/home/.claude.json': '{}' });
+    const result = await installer.install({ global: true });
+    expect(result.mcpAdded).toBe(true);
+    const config = JSON.parse(await fs.readFile('/home/.claude.json'));
+    expect(config.mcpServers.chamba).toEqual({ command: 'chamba-mcp' });
+  });
+
+  it('{ global: true } upgrades an existing npx entry to the binary', async () => {
+    const { fs, installer } = build({ '/home/.claude.json': '{}' });
+    await installer.install(); // writes the npx launcher
+    const second = await installer.install({ global: true }); // switch to the binary
+    expect(second.mcpAdded).toBe(true);
+    const config = JSON.parse(await fs.readFile('/home/.claude.json'));
+    expect(config.mcpServers.chamba).toEqual({ command: 'chamba-mcp' });
+  });
 });
 
 describe('Installer.applyConfig', () => {

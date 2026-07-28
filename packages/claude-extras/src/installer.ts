@@ -21,7 +21,10 @@ export const CATEGORIES = [
 ] as const;
 
 export const MCP_SERVER_NAME = 'chamba';
+/** Default launcher: zero-install, resolves @chamba/mcp via npx on every spawn. */
 export const MCP_SERVER_ENTRY = { command: 'npx', args: ['-y', '@chamba/mcp'] };
+/** `--global` launcher: the globally-installed `chamba-mcp` binary — no npx per spawn. */
+export const MCP_SERVER_ENTRY_GLOBAL = { command: 'chamba-mcp' };
 
 export interface InstallerOptions {
   fs: FilesystemPort;
@@ -78,7 +81,7 @@ export class Installer {
     );
   }
 
-  async install(options: { force?: boolean } = {}): Promise<InstallResult> {
+  async install(options: { force?: boolean; global?: boolean } = {}): Promise<InstallResult> {
     const claudeDetected = await this.detectClaudeCode();
     // Only --force is destructive (it overwrites); snapshot before clobbering.
     if (options.force) await this.snapshot('install --force');
@@ -105,7 +108,7 @@ export class Installer {
       }
     }
 
-    const { mcpAdded, mcpAlreadyPresent } = await this.addMcpServer();
+    const { mcpAdded, mcpAlreadyPresent } = await this.addMcpServer(options.global);
     return { installed, skipped, counts, mcpAdded, mcpAlreadyPresent, claudeDetected };
   }
 
@@ -254,13 +257,30 @@ export class Installer {
     }
   }
 
-  private async addMcpServer(): Promise<{ mcpAdded: boolean; mcpAlreadyPresent: boolean }> {
+  private async addMcpServer(
+    global = false,
+  ): Promise<{ mcpAdded: boolean; mcpAlreadyPresent: boolean }> {
     const config = await this.readClaudeJson();
     const servers = asRecord(config.mcpServers) ?? {};
-    if (MCP_SERVER_NAME in servers) {
+    const entry = global ? MCP_SERVER_ENTRY_GLOBAL : MCP_SERVER_ENTRY;
+    const existing = servers[MCP_SERVER_NAME];
+
+    if (existing !== undefined) {
+      // Already registered. With --global, upgrade the entry when it differs (e.g.
+      // switching the npx launcher to the global binary); otherwise leave it be.
+      if (global && JSON.stringify(existing) !== JSON.stringify(entry)) {
+        servers[MCP_SERVER_NAME] = entry;
+        config.mcpServers = servers;
+        await this.opts.fs.writeFile(
+          this.opts.claudeJsonPath,
+          `${JSON.stringify(config, null, 2)}\n`,
+        );
+        return { mcpAdded: true, mcpAlreadyPresent: false };
+      }
       return { mcpAdded: false, mcpAlreadyPresent: true };
     }
-    servers[MCP_SERVER_NAME] = MCP_SERVER_ENTRY;
+
+    servers[MCP_SERVER_NAME] = entry;
     config.mcpServers = servers;
     await this.opts.fs.writeFile(this.opts.claudeJsonPath, `${JSON.stringify(config, null, 2)}\n`);
     return { mcpAdded: true, mcpAlreadyPresent: false };

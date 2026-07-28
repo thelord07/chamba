@@ -136,6 +136,48 @@ describe('runDoctor', () => {
     expect(vault.detail).toContain('gitignored');
   });
 
+  it('warns when chamba is registered inconsistently across MCP configs', async () => {
+    const fs = new MemoryFilesystem({
+      '/proj/.chamba/workspace.md': '# Workspace\n',
+      // global launches via npx with no vault; project uses the binary + a vault
+      '/home/test/.claude.json': JSON.stringify({
+        mcpServers: { chamba: { command: 'npx', args: ['-y', '@chamba/mcp'] } },
+      }),
+      '/proj/.mcp.json': JSON.stringify({
+        mcpServers: {
+          chamba: { command: 'chamba-mcp', env: { CHAMBA_OBSIDIAN_VAULT_PATH: '/vault' } },
+        },
+      }),
+    });
+    const report = await runDoctor(input({ fs }));
+    const mcp = byId(report.checks, 'mcp');
+    expect(mcp.status).toBe('warn');
+    expect(mcp.detail).toContain('2 configs');
+    expect(report.healthy).toBe(true); // warn doesn't break healthy
+  });
+
+  it('is ok with a single chamba registration', async () => {
+    const fs = new MemoryFilesystem({
+      '/proj/.chamba/workspace.md': '# Workspace\n',
+      '/proj/.mcp.json': JSON.stringify({ mcpServers: { chamba: { command: 'chamba-mcp' } } }),
+    });
+    const report = await runDoctor(input({ fs }));
+    const mcp = byId(report.checks, 'mcp');
+    expect(mcp.status).toBe('ok');
+    expect(mcp.detail).toContain('chamba-mcp');
+  });
+
+  it('stays ok when the same chamba registration appears in two configs', async () => {
+    const entry = { mcpServers: { chamba: { command: 'npx', args: ['-y', '@chamba/mcp'] } } };
+    const fs = new MemoryFilesystem({
+      '/proj/.chamba/workspace.md': '# Workspace\n',
+      '/home/test/.claude.json': JSON.stringify(entry),
+      '/proj/.mcp.json': JSON.stringify(entry),
+    });
+    const report = await runDoctor(input({ fs }));
+    expect(byId(report.checks, 'mcp').status).toBe('ok');
+  });
+
   it('warns when the workspace file and vault are missing', async () => {
     const report = await runDoctor(
       input({ fs: new MemoryFilesystem({}), obsidianVaultPath: undefined }),

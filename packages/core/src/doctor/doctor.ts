@@ -71,6 +71,7 @@ export async function runDoctor(input: DoctorInput): Promise<DoctorReport> {
   checks.push(await checkWorkspace(input));
   checks.push(await checkConfig(input));
   checks.push(await checkVault(input));
+  checks.push(await checkMcpRegistration(input));
   checks.push(await checkLogDir(input));
   // The worktree list only makes sense inside a single repo's work tree, not on
   // a multi-repo container (where each child, not the root, is the git repo).
@@ -268,6 +269,104 @@ async function checkVault(input: DoctorInput): Promise<DoctorCheck> {
     detail: 'no vault connected',
     hint: 'Set CHAMBA_OBSIDIAN_VAULT_PATH, or run chamba_workspace_init to bootstrap one. Memory tools degrade cleanly without it.',
   };
+}
+
+/** One chamba registration found in an editor's MCP config. */
+interface McpRegistration {
+  /** Config file it was found in. */
+  source: string;
+  /** Launch command, e.g. `npx -y @chamba/mcp` or `chamba-mcp`. */
+  command: string;
+  /** CHAMBA_OBSIDIAN_VAULT_PATH from its env block, if set. */
+  vault?: string;
+}
+
+/**
+ * Is chamba wired into the editor, and wired **consistently**? Reads the common
+ * editor MCP configs and looks for a `chamba` server. The failure this catches is
+ * the real footgun: the same server registered in several places (e.g. a global
+ * `~/.claude.json` and a project `.mcp.json`) with a *different* launch command or
+ * vault env — the editor silently picks one, and it may not be the one you expect.
+ * Absence isn't a problem (the doctor can't always see the editor's config), so 0
+ * or 1 registration is `ok`; only an inconsistent duplicate warns.
+ */
+async function checkMcpRegistration(input: DoctorInput): Promise<DoctorCheck> {
+  const base = { id: 'mcp', name: 'MCP registration' };
+  const candidates: Array<{ path: string; key: 'mcpServers' | 'servers' }> = [
+    { path: joinPath(input.homedir, '.claude.json'), key: 'mcpServers' },
+    { path: joinPath(input.cwd, '.mcp.json'), key: 'mcpServers' },
+    { path: joinPath(input.cwd, '.cursor/mcp.json'), key: 'mcpServers' },
+    { path: joinPath(input.homedir, '.cursor/mcp.json'), key: 'mcpServers' },
+    { path: joinPath(input.cwd, '.vscode/mcp.json'), key: 'servers' },
+  ];
+
+  const regs: McpRegistration[] = [];
+  for (const { path, key } of candidates) {
+    const found = await readMcpEntry(input.fs, path, key);
+    if (found) regs.push({ source: path, ...found });
+  }
+
+  if (regs.length === 0) {
+    return {
+      ...base,
+      status: 'ok',
+      detail: 'no editor MCP config found here — your editor registers and launches chamba',
+    };
+  }
+
+  const where = regs.map((r) => shortHome(r.source, input.homedir)).join(', ');
+  const commands = new Set(regs.map((r) => r.command));
+  const vaults = new Set(regs.map((r) => r.vault ?? '(unset)'));
+
+  if (regs.length > 1 && (commands.size > 1 || vaults.size > 1)) {
+    return {
+      ...base,
+      status: 'warn',
+      detail: `registered in ${regs.length} configs with differing setup (${where}) — the editor picks one, and it may not be the one you expect`,
+      hint: 'Keep a single chamba entry (prefer the project .mcp.json / .cursor/mcp.json) and remove the duplicate, or make them identical — same command and CHAMBA_OBSIDIAN_VAULT_PATH.',
+    };
+  }
+
+  const first = regs[0];
+  const place =
+    regs.length === 1
+      ? shortHome(first?.source ?? '', input.homedir)
+      : `${regs.length} configs (consistent)`;
+  const vaultNote = first?.vault ? `, vault ${first.vault}` : '';
+  return { ...base, status: 'ok', detail: `${first?.command ?? '?'} — ${place}${vaultNote}` };
+}
+
+/** Extract chamba's launch command + vault env from one editor MCP config, or null. */
+async function readMcpEntry(
+  fs: FilesystemPort,
+  path: string,
+  key: 'mcpServers' | 'servers',
+): Promise<{ command: string; vault?: string } | null> {
+  try {
+    if (!(await fs.exists(path))) return null;
+    const raw = JSON.parse(await fs.readFile(path)) as Record<string, unknown>;
+    const servers = raw[key];
+    if (typeof servers !== 'object' || servers === null) return null;
+    const chamba = (servers as Record<string, unknown>).chamba;
+    if (typeof chamba !== 'object' || chamba === null) return null;
+    const c = chamba as { command?: unknown; args?: unknown; env?: unknown };
+    const cmd = typeof c.command === 'string' ? c.command : '?';
+    const args = Array.isArray(c.args)
+      ? c.args.filter((a): a is string => typeof a === 'string')
+      : [];
+    const command = args.length > 0 ? `${cmd} ${args.join(' ')}` : cmd;
+    const env =
+      typeof c.env === 'object' && c.env !== null ? (c.env as Record<string, unknown>) : {};
+    const rawVault = env.CHAMBA_OBSIDIAN_VAULT_PATH;
+    return { command, vault: typeof rawVault === 'string' ? rawVault : undefined };
+  } catch {
+    return null;
+  }
+}
+
+/** Replace a leading home dir with `~` for compact display. */
+function shortHome(path: string, home: string): string {
+  return home && path.startsWith(home) ? `~${path.slice(home.length)}` : path;
 }
 
 async function checkLogDir(input: DoctorInput): Promise<DoctorCheck> {

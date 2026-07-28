@@ -11,11 +11,19 @@ slash commands, subagents and hooks on top of the chamba MCP server.
 
 ```bash
 npx @chamba/claude-extras install      # add commands, agents, hooks + register MCP
+npx @chamba/claude-extras install --global  # + npm i -g @chamba/mcp; launch the binary, not npx
 npx @chamba/claude-extras install --force   # overwrite existing files
 npx @chamba/claude-extras uninstall    # remove them
 npx @chamba/claude-extras rollback     # undo the last --force / uninstall
 npx @chamba/claude-extras --version    # print the installed version
 ```
+
+**`--global` — a more reliable launch.** By default the MCP server is registered as
+`npx -y @chamba/mcp`, which re-resolves the package from npm on **every** spawn (each editor
+start and reconnect). If npm is slow or a reconnect races, that spawn can fail and the editor
+shows chamba as *disconnected*. `install --global` runs `npm i -g @chamba/mcp` (pinned to this
+version) and registers `{ "command": "chamba-mcp" }` instead — no per-launch npm, much steadier.
+If the global install can't run (permissions), it falls back to the npx launcher and tells you.
 
 Check the MCP server's version the same way: `npx @chamba/mcp --version`.
 
@@ -43,6 +51,20 @@ It installs into `~/.claude/`:
 existing files and preserves any other MCP servers.
 
 Then, in Claude Code: `/orq add a health check endpoint`
+
+## Troubleshooting: chamba shows as "disconnected"
+
+chamba is a stdio MCP server — **your editor** spawns it and owns the connection; chamba can't
+reconnect itself. If it shows disconnected (e.g. after a `/compact` triggers a reconnect):
+
+1. In Claude Code, run **`/mcp`** → select `chamba` → **Reconnect**. If that doesn't take,
+   **restart** the editor (it re-reads the MCP config and relaunches the server).
+2. It's usually a transient `npx` spawn failure. Make it reliable: **`install --global`**
+   (above) registers the `chamba-mcp` binary so no npm resolution happens on each launch.
+3. Check the wiring with **`npx @chamba/mcp doctor`** — its **MCP registration** check warns when
+   `chamba` is registered in more than one config (e.g. a global `~/.claude.json` *and* a project
+   `.mcp.json`) with a different command or `CHAMBA_OBSIDIAN_VAULT_PATH`; the editor silently picks
+   one, which may not be the one you meant. Keep a single entry (prefer the project one).
 
 ## Configuration: per-agent model + effort
 

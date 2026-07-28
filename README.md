@@ -103,7 +103,7 @@ the log directory and worktrees.
 | `chamba_summarize_to_vault` | `{ title, content, projectSlug? }` | Writes a run summary to `proyectos/` — grouped per project (git remote) + a per-folder `INDEX.md` for cheap recall |
 | `chamba_save_plan` | `{ title, content, projectSlug? }` | Saves a plan to `plans/` — same per-project grouping + index |
 | `chamba_vault_status` | `{}` | Resolved vault path + the notes chamba can see (diagnostic) |
-| `chamba_doctor` | `{}` | Environment health check (no LLM): Node, system (RAM/CPU), git (multi-repo aware), workspace, config, vault, logs, worktrees → pass/warn/fail. Also `npx @chamba/mcp doctor` |
+| `chamba_doctor` | `{}` | Environment health check (no LLM): Node, system (RAM/CPU), git (multi-repo aware), workspace, config, vault, MCP registration (warns on duplicate/inconsistent chamba entries), logs, worktrees → pass/warn/fail. Also `npx @chamba/mcp doctor` |
 | `chamba_resource_budget` | `{ requested?, perWorkerMemMB? }` | Safe parallelism for **this** machine (no LLM): reads live RAM/CPU/load → how many worktrees/workers to run at once. Consult it before a multi-repo fan-out |
 | `chamba_qa_capabilities` | `{}` | What acceptance QA can run against (no LLM): web vs mobile (React Native / Expo), E2E tooling, and the iOS simulators / Android emulators actually available (read-only `xcrun simctl` / `adb` / `emulator` — lists, never boots). The qa agent picks its mode from this |
 | `chamba_triage_ticket` | `{ ticket }` | Heuristic completeness check for a support/bug ticket (no LLM): `{ present, missing, questions, enoughToStart, score }` — flags whether it has reproduction, expected-vs-actual, environment, scope, acceptance criteria, severity, with the questions to ask back. Powers `/triage` |
@@ -155,7 +155,9 @@ npx @chamba/claude-extras uninstall
 
 Idempotent, never overwrites your files (`--force` to force), preserves other MCP
 servers in `~/.claude.json`. `--force` and `uninstall` snapshot the current state first,
-so `npx @chamba/claude-extras rollback` can undo them. Then: `/orq add a health check endpoint`.
+so `npx @chamba/claude-extras rollback` can undo them. Add `--global` to install
+`@chamba/mcp` globally and launch the `chamba-mcp` binary instead of `npx` — a steadier
+connection that won't drop on a flaky spawn. Then: `/orq add a health check endpoint`.
 
 **Per-agent config.** First install runs a wizard to pick a model + effort per role
 (orchestrator, planner, reviewer, implementer, tester, qa, summarizer, researcher), with
@@ -249,6 +251,7 @@ browser does — and it's honest about *design-accurate*, not "pixel-perfect".
 - ✅ **0.21.0 published on npm**
 - ✅ **1.0.0 — first stable:** real MCP handshake version, 24-tool surface + docs polish, first stable tag
 - ✅ **1.1.0 — Opus 5 + Sonnet 5:** new default reparto (Opus 5 reasoning at ½ Fable's price, Sonnet 5 execution), token-savings tuning, Fable-on-Max caveat
+- ✅ **1.2.0 — reliable connection:** `install --global` (launch the `chamba-mcp` binary, no npx per spawn) + a `doctor` MCP-registration check (warns on duplicate/inconsistent entries)
 - 🔭 V2: semantic vault search, MCP sampling, more knowledge bases
 
 See [`PLAN.md`](./PLAN.md) for the full phase plan.

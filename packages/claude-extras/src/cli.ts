@@ -1,3 +1,4 @@
+import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
@@ -27,10 +28,11 @@ function buildInstaller(): Installer {
   });
 }
 
-function summarize(result: InstallResult): string {
+function summarize(result: InstallResult, global = false): string {
   const part = (dir: string) => `${result.counts[dir] ?? 0} ${labelFor(dir)}`;
+  const launcher = global ? ' (launches the global `chamba-mcp` binary — no npx per spawn)' : '';
   const mcpSentence = result.mcpAdded
-    ? 'Added chamba MCP server to ~/.claude.json'
+    ? `Registered chamba MCP server in ~/.claude.json${launcher}`
     : result.mcpAlreadyPresent
       ? 'chamba MCP server already present in ~/.claude.json'
       : 'Could not add chamba MCP server to ~/.claude.json';
@@ -101,16 +103,47 @@ async function main(): Promise<void> {
 
   if (command === undefined || command === 'install') {
     const force = rest.includes('--force');
+    const wantGlobal = rest.includes('--global');
     await maybeRunWizard(rest);
-    const result = await installer.install({ force });
-    process.stdout.write(`${summarize(result)}\n`);
+    // --global launches the installed `chamba-mcp` binary instead of `npx -y` on
+    // every spawn — faster and far more reliable (no per-launch registry hit). If
+    // the global install fails, fall back to the npx launcher so chamba still works.
+    let useGlobal = false;
+    if (wantGlobal) {
+      useGlobal = installGlobalBinary();
+      if (!useGlobal) {
+        process.stdout.write(
+          'Could not install @chamba/mcp globally — registering the npx launcher instead.\n' +
+            'Install it yourself (`npm i -g @chamba/mcp`) and re-run with --global for a faster, more reliable launch.\n',
+        );
+      }
+    }
+    const result = await installer.install({ force, global: useGlobal });
+    process.stdout.write(`${summarize(result, useGlobal)}\n`);
     return;
   }
 
   process.stderr.write(
-    `Unknown command "${command}". Usage: chamba-install [install|uninstall|apply|rollback|config <sub>] [--force] [--yes] [--version]\n`,
+    `Unknown command "${command}". Usage: chamba-install [install|uninstall|apply|rollback|config <sub>] [--force] [--global] [--yes] [--version]\n`,
   );
   process.exitCode = 1;
+}
+
+/**
+ * Install `@chamba/mcp` globally (pinned to this package's version) so the editor
+ * can launch the `chamba-mcp` binary directly. Returns false if npm isn't available
+ * or the install fails — the caller then falls back to the npx launcher.
+ */
+function installGlobalBinary(): boolean {
+  const version = readPackageVersion();
+  const spec = version === 'unknown' ? '@chamba/mcp' : `@chamba/mcp@${version}`;
+  process.stdout.write(`Installing ${spec} globally (npm i -g)…\n`);
+  try {
+    const res = spawnSync('npm', ['install', '-g', spec], { stdio: 'inherit' });
+    return res.status === 0;
+  } catch {
+    return false;
+  }
 }
 
 /**

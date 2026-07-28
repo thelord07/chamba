@@ -1,5 +1,33 @@
 # @chamba/mcp
 
+## 1.2.0
+
+### Minor Changes
+
+- feat(reliability): steadier MCP connection — `install --global` + a doctor registration check
+
+  chamba is a stdio MCP server: the editor spawns it and owns the connection, so
+  chamba can't reconnect itself. This makes that connection far less likely to drop,
+  and self-diagnoses the most common config footgun.
+
+  - **`install --global`** (claude-extras): runs `npm i -g @chamba/mcp` (pinned to
+    the installed version) and registers `{ "command": "chamba-mcp" }` instead of
+    `npx -y @chamba/mcp`. No npm resolution on every editor start/reconnect — the #1
+    cause of transient "disconnected". Falls back to the npx launcher if the global
+    install can't run, and upgrades an existing npx entry when re-run with `--global`.
+  - **doctor "MCP registration" check** (core): reads the editor MCP configs
+    (`~/.claude.json`, `.mcp.json`, `.cursor/mcp.json`, `.vscode/mcp.json`) and warns
+    when `chamba` is registered in more than one with a different launch command or
+    `CHAMBA_OBSIDIAN_VAULT_PATH` — the editor silently picks one, which may not be the
+    one you meant. Absence or a single/consistent registration is `ok`.
+  - **docs:** a "chamba shows disconnected" troubleshooting section (/mcp reconnect,
+    --global), plus updated doctor descriptions and READMEs.
+
+### Patch Changes
+
+- @chamba/adapters@1.2.0
+- @chamba/core@1.2.0
+
 ## 1.1.0
 
 ### Minor Changes
