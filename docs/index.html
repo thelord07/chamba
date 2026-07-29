@@ -68,7 +68,7 @@
 
 <script>
 const AC = 'var(--accent)', OK = 'var(--accent2)', AM = 'var(--amber)', MU = 'var(--muted)';
-const VERSION = '1.2.0';
+const VERSION = '1.3.0';
 
 const EDITORS = [
   { id: 'cursor', name: 'Cursor', file: '.cursor/mcp.json',
@@ -256,7 +256,8 @@ const CONTENT = {
       { badge: 'Listo', dot: OK, title: '/triage read-only (v0.21)', desc: 'Pre-diagnóstico sin ejecutar: chequea qué le falta al ticket (chamba_triage_ticket, sin LLM) y el agente diagnostician investiga y propone el fix — worktrees y edición apagados. Se pasa a /ticket -p para ejecutar.' },
       { badge: 'Listo', dot: OK, title: 'v1.0.0 estable en npm', desc: 'Primer release estable: el server MCP reporta su versión real en el handshake, superficie de 24 tools revisada, docs endurecidas.' },
       { badge: 'Listo', dot: OK, title: 'v1.1.0 — Opus 5 + Sonnet 5', desc: 'Nuevo reparto por defecto: Opus 5 para razonar (calidad de Fable a mitad de precio) y Sonnet 5 para ejecutar (intro $2/$10). Tuning de ahorro de tokens y caveat de Fable incluido en el plan Max.' },
-      { badge: 'Ahora', dot: AM, title: 'v1.2.0 — conexión confiable', desc: 'install --global lanza el binario chamba-mcp en vez de npx en cada arranque (adiós desconexiones por spawn). Y el doctor ahora avisa si chamba quedó registrado duplicado/inconsistente entre configs.' },
+      { badge: 'Listo', dot: OK, title: 'v1.2.0 — conexión confiable', desc: 'install --global lanza el binario chamba-mcp en vez de npx en cada arranque (adiós desconexiones por spawn). Y el doctor ahora avisa si chamba quedó registrado duplicado/inconsistente entre configs.' },
+      { badge: 'Ahora', dot: AM, title: 'v1.3.0 — extras de OpenCode', desc: '@chamba/opencode-extras instala los mismos /comandos y subagentes en OpenCode (traducidos a su formato) y registra el MCP. Un solo comando, misma fuente que Claude Code.' },
       { badge: 'Explorando', dot: MU, title: 'V2: registro de servicios, búsqueda semántica', desc: 'Registro con detección de drift y búsqueda del vault.' }
     ],
     ctaTitle: 'Pon a tu editor a trabajar la chamba',
@@ -395,7 +396,8 @@ const CONTENT = {
       { badge: 'Shipped', dot: OK, title: 'Read-only /triage (v0.21)', desc: 'Pre-diagnosis without executing: it checks what the ticket is missing (chamba_triage_ticket, no LLM) and the diagnostician agent investigates and proposes the fix — worktrees and edits off. Hands off to /ticket -p to run it.' },
       { badge: 'Shipped', dot: OK, title: 'v1.0.0 stable on npm', desc: 'First stable release: the MCP server reports its real version in the handshake, the 24-tool surface reviewed, docs hardened.' },
       { badge: 'Shipped', dot: OK, title: 'v1.1.0 — Opus 5 + Sonnet 5', desc: 'New default reparto: Opus 5 for the reasoning roles (Fable-grade quality at half the price) and Sonnet 5 for execution (intro $2/$10). Token-savings tuning and a Fable-included-on-Max caveat.' },
-      { badge: 'Now', dot: AM, title: 'v1.2.0 — reliable connection', desc: 'install --global launches the chamba-mcp binary instead of npx on every spawn (no more disconnects from a flaky launch). And doctor now warns if chamba is registered inconsistently across configs.' },
+      { badge: 'Shipped', dot: OK, title: 'v1.2.0 — reliable connection', desc: 'install --global launches the chamba-mcp binary instead of npx on every spawn (no more disconnects from a flaky launch). And doctor now warns if chamba is registered inconsistently across configs.' },
+      { badge: 'Now', dot: AM, title: 'v1.3.0 — OpenCode extras', desc: '@chamba/opencode-extras installs the same /commands and subagents into OpenCode (translated to its format) and registers the MCP server. One command, same source as Claude Code.' },
       { badge: 'Exploring', dot: MU, title: 'V2: service registry, semantic search', desc: 'Registry with drift detection and vault search.' }
     ],
     ctaTitle: 'Put your editor to work — la chamba',

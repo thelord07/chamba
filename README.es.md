@@ -140,10 +140,16 @@ El modelo del editor razona y llama a las tools de chamba:
 Resultado en el chat de tu editor. Las ramas quedan abiertas para que las revises.
 ```
 
-## Extras para Claude Code (opcional)
+## Extras por editor (opcional)
 
-Cursor/VS Code ya tienen todo vía MCP. En **Claude Code** podés además agregar slash
-commands, subagents y hooks:
+Cursor/VS Code ya tienen todo vía MCP. En **Claude Code** y **OpenCode** podés además
+instalar los slash commands y subagentes (mismos prompts, una sola fuente):
+
+```bash
+npx @chamba/opencode-extras install   # OpenCode: /ticket, /triage, /qa … + subagentes + MCP
+```
+
+En **Claude Code** además tenés hooks:
 
 ```bash
 npx @chamba/claude-extras install     # /ticket, /triage, /workspace, /map, /qa, /design … +
@@ -231,6 +237,7 @@ editor — y es honesto: *design-accurate*, no "pixel perfect".
 - ✅ **1.0.0 — primer estable:** versión real en el handshake MCP, superficie de 24 tools + docs pulidas, primer tag estable
 - ✅ **1.1.0 — Opus 5 + Sonnet 5:** nuevo reparto de defaults (Opus 5 para razonar a ½ del precio de Fable, Sonnet 5 para ejecutar), tuning de ahorro de tokens, caveat de Fable-en-Max
 - ✅ **1.2.0 — conexión confiable:** `install --global` (lanza el binario `chamba-mcp`, sin npx en cada arranque) + check de registro MCP en `doctor` (avisa de duplicados/inconsistencias)
+- ✅ **1.3.0 — extras de OpenCode:** `@chamba/opencode-extras` instala los mismos slash commands + subagentes en OpenCode (traducidos a su formato) y registra el MCP
 - 🔭 V2: búsqueda semántica del vault, MCP sampling, más bases de conocimiento
 
 Ver [`PLAN.md`](./PLAN.md) para el plan completo de fases.

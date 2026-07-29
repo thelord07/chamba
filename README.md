@@ -142,10 +142,16 @@ Result in your editor's chat. Branches stay open for you to review & merge.
 **chamba contributes:** workspace context, plan validation, worktree isolation,
 vault memory. **The model contributes:** reasoning, decisions, code.
 
-## Claude Code extras (optional)
+## Editor extras (optional)
 
-Cursor/VS Code/etc. get everything via MCP. On **Claude Code** you can also add
-slash commands, subagents and hooks:
+Cursor/VS Code/etc. get everything via MCP. On **Claude Code** and **OpenCode** you can
+also install the slash commands and subagents (same prompts, one source):
+
+```bash
+npx @chamba/opencode-extras install   # OpenCode: /ticket, /triage, /qa … + subagents + MCP
+```
+
+On **Claude Code** you additionally get hooks:
 
 ```bash
 npx @chamba/claude-extras install     # /ticket, /triage, /workspace, /map, /qa, /design … +
@@ -211,6 +217,7 @@ browser does — and it's honest about *design-accurate*, not "pixel-perfect".
 | `@chamba/core` | Pure logic (workspace, plan, worktree, obsidian, memory). No Node APIs directly |
 | `@chamba/adapters` | Node implementations of the ports (filesystem, process, clock) |
 | `@chamba/claude-extras` | Optional Claude Code installer (commands, subagents, hooks) |
+| `@chamba/opencode-extras` | Optional OpenCode installer (the same commands + subagents) |
 
 ## How chamba compares
 
@@ -252,6 +259,7 @@ browser does — and it's honest about *design-accurate*, not "pixel-perfect".
 - ✅ **1.0.0 — first stable:** real MCP handshake version, 24-tool surface + docs polish, first stable tag
 - ✅ **1.1.0 — Opus 5 + Sonnet 5:** new default reparto (Opus 5 reasoning at ½ Fable's price, Sonnet 5 execution), token-savings tuning, Fable-on-Max caveat
 - ✅ **1.2.0 — reliable connection:** `install --global` (launch the `chamba-mcp` binary, no npx per spawn) + a `doctor` MCP-registration check (warns on duplicate/inconsistent entries)
+- ✅ **1.3.0 — OpenCode extras:** `@chamba/opencode-extras` installs the same slash commands + subagents into OpenCode (translated to its format) and registers the MCP server
 - 🔭 V2: semantic vault search, MCP sampling, more knowledge bases
 
 See [`PLAN.md`](./PLAN.md) for the full phase plan.

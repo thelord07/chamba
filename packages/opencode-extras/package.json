@@ -1,25 +1,21 @@
 {
-  "name": "@chamba/adapters",
+  "name": "@chamba/opencode-extras",
   "version": "1.3.0",
-  "description": "Node implementations of @chamba/core ports (filesystem, process, clock)",
+  "description": "Optional OpenCode extras for chamba: slash commands + subagents installer",
   "license": "MIT",
   "type": "module",
-  "main": "./dist/index.js",
-  "module": "./dist/index.js",
-  "types": "./dist/index.d.ts",
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
-    }
+  "bin": {
+    "chamba-opencode": "./bin/chamba-opencode"
   },
   "files": [
-    "dist"
+    "dist",
+    "bin",
+    "assets"
   ],
   "repository": {
     "type": "git",
     "url": "git+https://github.com/thelord07/chamba.git",
-    "directory": "packages/adapters"
+    "directory": "packages/opencode-extras"
   },
   "homepage": "https://github.com/thelord07/chamba#readme",
   "bugs": {
@@ -27,16 +23,18 @@
   },
   "keywords": [
     "chamba",
+    "opencode",
     "mcp",
-    "adapters",
-    "node"
+    "slash-commands",
+    "subagents"
   ],
   "scripts": {
-    "build": "tsup src/index.ts --format esm --dts --clean",
-    "test": "vitest run --passWithNoTests",
+    "build": "node scripts/copy-assets.mjs && tsup src/cli.ts --format esm --clean",
+    "test": "node scripts/copy-assets.mjs && vitest run",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@chamba/adapters": "workspace:*",
     "@chamba/core": "workspace:*"
   },
   "devDependencies": {

@@ -36,3 +36,6 @@ npm-debug.log*
 /Workspace overview.md
 /proyectos/
 /plans/*/
+
+# opencode-extras copies command/agent bodies from claude-extras at build time (single source there)
+packages/opencode-extras/assets/
