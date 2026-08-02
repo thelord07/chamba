@@ -148,13 +148,13 @@ Cursor/VS Code/etc. get everything via MCP. On **Claude Code** and **OpenCode** 
 also install the slash commands and subagents (same prompts, one source):
 
 ```bash
-npx @chamba/opencode-extras install   # OpenCode: /ticket, /triage, /qa … + subagents + MCP
+npx @chamba/opencode-extras@latest install   # OpenCode: /ticket, /triage, /qa … + subagents + MCP
 ```
 
 On **Claude Code** you additionally get hooks:
 
 ```bash
-npx @chamba/claude-extras install     # /ticket, /triage, /workspace, /map, /qa, /design … +
+npx @chamba/claude-extras@latest install     # /ticket, /triage, /workspace, /map, /qa, /design … +
                                       # planner/implementer/reviewer/tester/qa/diagnostician agents + 2 hooks
 npx @chamba/claude-extras uninstall
 ```

@@ -10,9 +10,9 @@ slash commands, subagents and hooks on top of the chamba MCP server.
 ## Usage
 
 ```bash
-npx @chamba/claude-extras install      # add commands, agents, hooks + register MCP
-npx @chamba/claude-extras install --global  # + npm i -g @chamba/mcp; launch the binary, not npx
-npx @chamba/claude-extras install --force   # overwrite existing files
+npx @chamba/claude-extras@latest install      # add commands, agents, hooks + register MCP
+npx @chamba/claude-extras@latest install --global  # + npm i -g @chamba/mcp; launch the binary, not npx
+npx @chamba/claude-extras@latest install --force   # overwrite existing files
 npx @chamba/claude-extras uninstall    # remove them
 npx @chamba/claude-extras rollback     # undo the last --force / uninstall
 npx @chamba/claude-extras --version    # print the installed version

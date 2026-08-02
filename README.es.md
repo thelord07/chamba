@@ -146,13 +146,13 @@ Cursor/VS Code ya tienen todo vía MCP. En **Claude Code** y **OpenCode** podés
 instalar los slash commands y subagentes (mismos prompts, una sola fuente):
 
 ```bash
-npx @chamba/opencode-extras install   # OpenCode: /ticket, /triage, /qa … + subagentes + MCP
+npx @chamba/opencode-extras@latest install   # OpenCode: /ticket, /triage, /qa … + subagentes + MCP
 ```
 
 En **Claude Code** además tenés hooks:
 
 ```bash
-npx @chamba/claude-extras install     # /ticket, /triage, /workspace, /map, /qa, /design … +
+npx @chamba/claude-extras@latest install     # /ticket, /triage, /workspace, /map, /qa, /design … +
                                       # agentes planner/implementer/reviewer/tester/qa/diagnostician + 2 hooks
 npx @chamba/claude-extras uninstall
 ```

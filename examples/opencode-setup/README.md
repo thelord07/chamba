@@ -37,9 +37,9 @@ The MCP tools work on their own, but OpenCode also supports custom **commands** 
 installed too. One command does it (and registers the MCP server for you):
 
 ```bash
-npx @chamba/opencode-extras install
+npx @chamba/opencode-extras@latest install
 # or, for a steadier launch (installs @chamba/mcp globally, no npx per spawn):
-npx @chamba/opencode-extras install --global
+npx @chamba/opencode-extras@latest install --global
 ```
 
 It writes the commands to `~/.config/opencode/commands/`, the subagents to

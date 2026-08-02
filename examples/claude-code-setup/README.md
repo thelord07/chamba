@@ -29,7 +29,7 @@ Cursor/VS Code users get everything via MCP. On Claude Code you can also add sla
 commands, subagents and hooks:
 
 ```bash
-npx @chamba/claude-extras install
+npx @chamba/claude-extras@latest install
 ```
 
 This adds `/orq`, `/workspace`, `/worktrees`, `/recall`, the

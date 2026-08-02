@@ -10,9 +10,9 @@ slash commands and subagents on top of the chamba MCP server.
 ## Usage
 
 ```bash
-npx @chamba/opencode-extras install          # commands + subagents + register the MCP server
-npx @chamba/opencode-extras install --global  # + npm i -g @chamba/mcp; launch the binary, not npx
-npx @chamba/opencode-extras install --force   # overwrite existing files
+npx @chamba/opencode-extras@latest install          # commands + subagents + register the MCP server
+npx @chamba/opencode-extras@latest install --global  # + npm i -g @chamba/mcp; launch the binary, not npx
+npx @chamba/opencode-extras@latest install --force   # overwrite existing files
 npx @chamba/opencode-extras uninstall         # remove them
 npx @chamba/opencode-extras --version
 ```
