@@ -144,10 +144,11 @@ vault memory. **The model contributes:** reasoning, decisions, code.
 
 ## Editor extras (optional)
 
-Cursor/VS Code/etc. get everything via MCP. On **Claude Code** and **OpenCode** you can
+Every MCP editor gets the tools. On **Claude Code**, **Cursor** and **OpenCode** you can
 also install the slash commands and subagents (same prompts, one source):
 
 ```bash
+npx @chamba/cursor-extras@latest install     # Cursor:   /ticket, /triage, /qa … + subagents + MCP
 npx @chamba/opencode-extras@latest install   # OpenCode: /ticket, /triage, /qa … + subagents + MCP
 ```
 
@@ -218,6 +219,7 @@ browser does — and it's honest about *design-accurate*, not "pixel-perfect".
 | `@chamba/adapters` | Node implementations of the ports (filesystem, process, clock) |
 | `@chamba/claude-extras` | Optional Claude Code installer (commands, subagents, hooks) |
 | `@chamba/opencode-extras` | Optional OpenCode installer (the same commands + subagents) |
+| `@chamba/cursor-extras` | Optional Cursor installer (the same commands + subagents) |
 
 ## How chamba compares
 
@@ -260,6 +262,7 @@ browser does — and it's honest about *design-accurate*, not "pixel-perfect".
 - ✅ **1.1.0 — Opus 5 + Sonnet 5:** new default reparto (Opus 5 reasoning at ½ Fable's price, Sonnet 5 execution), token-savings tuning, Fable-on-Max caveat
 - ✅ **1.2.0 — reliable connection:** `install --global` (launch the `chamba-mcp` binary, no npx per spawn) + a `doctor` MCP-registration check (warns on duplicate/inconsistent entries)
 - ✅ **1.3.0 — OpenCode extras:** `@chamba/opencode-extras` installs the same slash commands + subagents into OpenCode (translated to its format) and registers the MCP server
+- ✅ **1.4.0 — Cursor extras:** `@chamba/cursor-extras` installs the same commands + subagents into Cursor (`.cursor/commands` + `.cursor/agents`, model from your reparto) and registers the MCP server
 - 🔭 V2: semantic vault search, MCP sampling, more knowledge bases
 
 See [`PLAN.md`](./PLAN.md) for the full phase plan.

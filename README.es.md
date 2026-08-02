@@ -142,10 +142,11 @@ Resultado en el chat de tu editor. Las ramas quedan abiertas para que las revise
 
 ## Extras por editor (opcional)
 
-Cursor/VS Code ya tienen todo vía MCP. En **Claude Code** y **OpenCode** podés además
+Todo editor MCP tiene las tools. En **Claude Code**, **Cursor** y **OpenCode** podés además
 instalar los slash commands y subagentes (mismos prompts, una sola fuente):
 
 ```bash
+npx @chamba/cursor-extras@latest install     # Cursor:   /ticket, /triage, /qa … + subagentes + MCP
 npx @chamba/opencode-extras@latest install   # OpenCode: /ticket, /triage, /qa … + subagentes + MCP
 ```
 
@@ -238,6 +239,7 @@ editor — y es honesto: *design-accurate*, no "pixel perfect".
 - ✅ **1.1.0 — Opus 5 + Sonnet 5:** nuevo reparto de defaults (Opus 5 para razonar a ½ del precio de Fable, Sonnet 5 para ejecutar), tuning de ahorro de tokens, caveat de Fable-en-Max
 - ✅ **1.2.0 — conexión confiable:** `install --global` (lanza el binario `chamba-mcp`, sin npx en cada arranque) + check de registro MCP en `doctor` (avisa de duplicados/inconsistencias)
 - ✅ **1.3.0 — extras de OpenCode:** `@chamba/opencode-extras` instala los mismos slash commands + subagentes en OpenCode (traducidos a su formato) y registra el MCP
+- ✅ **1.4.0 — extras de Cursor:** `@chamba/cursor-extras` instala los mismos comandos + subagentes en Cursor (`.cursor/commands` + `.cursor/agents`, modelo de tu reparto) y registra el MCP
 - 🔭 V2: búsqueda semántica del vault, MCP sampling, más bases de conocimiento
 
 Ver [`PLAN.md`](./PLAN.md) para el plan completo de fases.

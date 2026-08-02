@@ -1,5 +1,11 @@
 # @chamba/adapters
 
+## 1.4.0
+
+### Patch Changes
+
+- @chamba/core@1.4.0
+
 ## 1.3.0
 
 ### Patch Changes

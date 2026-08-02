@@ -1,21 +1,21 @@
 {
-  "name": "@chamba/mcp",
+  "name": "@chamba/cursor-extras",
   "version": "1.4.0",
-  "description": "chamba MCP server — orchestration, workspace, worktree and Obsidian tools for any MCP-capable editor",
+  "description": "Optional Cursor extras for chamba: slash commands + subagents installer",
   "license": "MIT",
   "type": "module",
-  "main": "./dist/main.js",
   "bin": {
-    "chamba-mcp": "./bin/chamba-mcp"
+    "chamba-cursor": "./bin/chamba-cursor"
   },
   "files": [
     "dist",
-    "bin"
+    "bin",
+    "assets"
   ],
   "repository": {
     "type": "git",
     "url": "git+https://github.com/thelord07/chamba.git",
-    "directory": "packages/mcp"
+    "directory": "packages/cursor-extras"
   },
   "homepage": "https://github.com/thelord07/chamba#readme",
   "bugs": {
@@ -23,26 +23,19 @@
   },
   "keywords": [
     "chamba",
-    "mcp",
-    "model-context-protocol",
-    "ai",
     "cursor",
-    "claude-code",
-    "obsidian",
-    "git-worktree",
-    "orchestrator"
+    "mcp",
+    "slash-commands",
+    "subagents"
   ],
   "scripts": {
-    "build": "tsup src/main.ts --format esm --clean",
-    "test": "vitest run",
+    "build": "node scripts/copy-assets.mjs && tsup src/cli.ts --format esm --clean",
+    "test": "node scripts/copy-assets.mjs && vitest run",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@chamba/adapters": "workspace:*",
-    "@chamba/core": "workspace:*",
-    "@modelcontextprotocol/sdk": "^1.12.0",
-    "pino": "^9.0.0",
-    "zod": "^3.23.0"
+    "@chamba/core": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

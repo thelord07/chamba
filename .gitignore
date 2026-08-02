@@ -39,3 +39,6 @@ npm-debug.log*
 
 # opencode-extras copies command/agent bodies from claude-extras at build time (single source there)
 packages/opencode-extras/assets/
+
+# cursor-extras copies command/agent bodies from claude-extras at build time (single source there)
+packages/cursor-extras/assets/
