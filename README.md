@@ -210,6 +210,16 @@ Design, Feature-Sliced, …) and **saves it** (`chamba_design_prefs`, web + mobi
 reuses that silently after. chamba never calls Figma or runs the prototype — your editor's MCP /
 browser does — and it's honest about *design-accurate*, not "pixel-perfect".
 
+## Run chamba on several machines
+
+chamba has no server — what two machines share is the **vault** (context, memory, plans).
+Sync the vault folder (Syncthing for real-time; iCloud or a private git repo work too) and
+point every machine's `CHAMBA_OBSIDIAN_VAULT_PATH` at it — globally (`~/.chamba/vault`) or
+per-project (the env in a project `.mcp.json` / `.cursor/mcp.json`, or a `.obsidian/` at the
+project root, which chamba detects `cwd`-first). Then run chamba in parallel across machines:
+no single-machine RAM ceiling, less waiting. **Guide:
+[examples/multi-machine-vault](./examples/multi-machine-vault).**
+
 ## Packages
 
 | Package | What it is |

@@ -209,6 +209,16 @@ primer ticket visual, el planner **te pregunta la arquitectura** (Atomic Design,
 después. chamba nunca llama a Figma ni corre el prototipo — lo hace el MCP / browser de tu
 editor — y es honesto: *design-accurate*, no "pixel perfect".
 
+## chamba en varias máquinas
+
+chamba no tiene servidor — lo que dos máquinas comparten es el **vault** (contexto, memoria,
+planes). Sincronizás la carpeta del vault (Syncthing para tiempo real; iCloud o un repo git
+privado también sirven) y apuntás el `CHAMBA_OBSIDIAN_VAULT_PATH` de cada máquina ahí —
+global (`~/.chamba/vault`) o por-proyecto (el env en un `.mcp.json` / `.cursor/mcp.json` del
+proyecto, o un `.obsidian/` en la raíz, que chamba detecta probando el `cwd` primero). Después
+corrés chamba en paralelo entre máquinas: sin techo de RAM de una sola, menos espera. **Guía:
+[examples/multi-machine-vault](./examples/multi-machine-vault).**
+
 ## Roadmap
 
 - ✅ MCP server + scanner de workspace
