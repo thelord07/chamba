@@ -38,7 +38,9 @@ chamba (the tool) handles the supervising, validating and plumbing around it.
 - **Plan + heuristic review.** A programmatic reviewer (no LLM) flags missing tests,
   unassigned work, sensitive areas without a risk assessment, and more.
 - **Safe parallelism.** Git worktrees isolate parallel work; cleanup keeps branches
-  for you to merge by hand — never `--force`, never auto-merge.
+  for you to merge by hand — never `--force`, never auto-merge. Before fan-out, chamba
+  reports file overlap, a `merge-tree` conflict preview, and (opt-in) a unique `PORT`
+  per worktree so two QA servers do not bind `:3000`.
 - **Obsidian + cross-session memory.** Pull context from your vault, write summaries
   back, and persist knowledge as plain markdown. Notes are grouped per project (by git
   remote) and each folder keeps a lightweight `INDEX.md`, so recall scans a cheap index
@@ -110,7 +112,11 @@ the log directory and worktrees.
 | `chamba_generate_plan` | `{ task, context? }` | A structured plan template to fill |
 | `chamba_review_plan` | `{ plan, task, context? }` | `{ approved, issues, suggestions, riskFlags }` — no LLM |
 | `chamba_create_worktree` | `{ taskSlug, workerId, baseBranch? }` | An isolated git worktree |
-| `chamba_list_worktrees` | `{}` | The repo's worktrees |
+| `chamba_list_worktrees` | `{}` | Worktrees with dirty/stale/ahead-behind flags and file overlap |
+| `chamba_worktree_status` | `{ repos?, baseBranch? }` | Full status + overlaps (no LLM). `ok: false` if `failOnOverlap` and files collide |
+| `chamba_conflict_preview` | `{ baseBranch?, branches? }` | `git merge-tree` dry-run vs base + pairwise — **never merges** |
+| `chamba_partition` | `{ plan?, items?, fromWorktrees? }` | Parallel waves so overlapping paths do not run together (predicted = warning) |
+| `chamba_worktree_env` | `{ ticket?, worktreePath? }` | Opt-in unique `PORT` in `.env.local`; skips occupied ports; no-op unless `ports.enabled` |
 | `chamba_cleanup_worktree` | `{ branch }` | Removes the dir, **keeps the branch** |
 | `chamba_remember` | `{ key, content, tags? }` | Persists a markdown memory |
 | `chamba_recall` | `{ query }` | Searches saved memories |
@@ -239,6 +245,7 @@ no single-machine RAM ceiling, less waiting. **Guide:
 | Needs its own API key | ❌ | ❌ | ❌ |
 | Plan + heuristic review | ✅ | ⚠️ ad-hoc | ❌ |
 | Git worktree isolation | ✅ | ❌ | ❌ |
+| File overlap + conflict preview (no merge) | ✅ | ❌ | ❌ |
 | Obsidian context + write-back | ✅ | ❌ | ❌ |
 | Cross-session memory | ✅ | ⚠️ via files | ⚠️ raw files |
 
@@ -273,6 +280,7 @@ no single-machine RAM ceiling, less waiting. **Guide:
 - ✅ **1.2.0 — reliable connection:** `install --global` (launch the `chamba-mcp` binary, no npx per spawn) + a `doctor` MCP-registration check (warns on duplicate/inconsistent entries)
 - ✅ **1.3.0 — OpenCode extras:** `@chamba/opencode-extras` installs the same slash commands + subagents into OpenCode (translated to its format) and registers the MCP server
 - ✅ **1.4.0 — Cursor extras:** `@chamba/cursor-extras` installs the same commands + subagents into Cursor (`.cursor/commands` + `.cursor/agents`, model from your reparto) and registers the MCP server
+- 🔭 **1.5.0 — Safe parallelism 2.0:** worktree status + file overlap, `merge-tree` conflict preview, partition waves, opt-in per-worktree PORT
 - 🔭 V2: semantic vault search, MCP sampling, more knowledge bases
 
 See [`PLAN.md`](./PLAN.md) for the full phase plan.

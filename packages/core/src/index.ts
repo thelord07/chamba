@@ -32,8 +32,16 @@ export type {
   PartialWorktreeConfig,
   WorktreeConfig,
   WorktreeLayout,
+  WorktreeOverlapConfig,
+  WorktreePortsConfig,
 } from './config/worktrees.js';
-export { DEFAULT_WORKTREE_CONFIG, resolveWorktreeConfig } from './config/worktrees.js';
+export {
+  DEFAULT_WORKTREE_CONFIG,
+  DEFAULT_WORKTREE_OVERLAP,
+  DEFAULT_WORKTREE_PORTS,
+  mergeWorktreePartial,
+  resolveWorktreeConfig,
+} from './config/worktrees.js';
 // Design sources (linked mockups/Figma/prototype + UI-architecture prefs, no LLM)
 export type {
   Design,
@@ -101,6 +109,7 @@ export { validatePlan } from './plan/validator.js';
 export type { ClockPort } from './ports/clock.js';
 // Ports
 export type { DirEntry, FilesystemPort } from './ports/filesystem.js';
+export type { NetPort } from './ports/net.js';
 export type { ProcessExecOptions, ProcessPort, ProcessResult } from './ports/process.js';
 export type { SystemPort, SystemResources } from './ports/system.js';
 // QA capabilities (project + machine probe for acceptance QA, no LLM)
@@ -118,7 +127,7 @@ export type {
   ConcurrencyBudget,
   ConcurrencyBudgetInput,
 } from './resources/budget.js';
-export { computeConcurrencyBudget } from './resources/budget.js';
+export { applyOverlapCap, computeConcurrencyBudget } from './resources/budget.js';
 // Skills / playbooks registry (index-first, no LLM)
 export type { Skill, SkillRef } from './skills/skill.js';
 export {
@@ -128,6 +137,7 @@ export {
   readSkill,
   SKILLS_DIR,
 } from './skills/skill-registry.js';
+export { FakeNet } from './testing/fake-net.js';
 export type { ProcessHandler, RecordedCall } from './testing/fake-process.js';
 export { FakeProcess } from './testing/fake-process.js';
 // Testing utilities
@@ -181,18 +191,32 @@ export {
 } from './workspace/workspace.js';
 export type { BranchNameInput } from './worktree/branch-naming.js';
 export { buildBranchName, slugifyForGit, worktreeRelativePath } from './worktree/branch-naming.js';
+export type {
+  ConflictPair,
+  ConflictPreviewMode,
+  ConflictPreviewReport,
+} from './worktree/conflict-preview.js';
+export { ConflictPreviewer } from './worktree/conflict-preview.js';
 export { writeEditorWorkspace } from './worktree/editor-workspace.js';
 export { copyEnvFiles } from './worktree/env-copy.js';
+export { readEnvVar, upsertEnvVar } from './worktree/env-upsert.js';
 // Worktree
 export { GitDetector } from './worktree/git-detector.js';
 export { detectGitRepos } from './worktree/git-repo-detector.js';
+export type { WorktreeInspection, WorktreeSnapshot } from './worktree/inspector.js';
+export {
+  inspectRepos,
+  isStale,
+  WORKTREE_STALE_AFTER_MS,
+  WorktreeInspector,
+} from './worktree/inspector.js';
 export type {
   CleanupResult,
   CreateWorktreeInput,
-  ListedWorktree,
   WorktreeHandle,
 } from './worktree/manager.js';
 export { WorktreeError, WorktreeManager } from './worktree/manager.js';
+export { parseMergeTreeOutput } from './worktree/merge-tree.js';
 export type {
   CleanupMultiResult,
   CreateMultiInput,
@@ -209,3 +233,15 @@ export {
   safeTicket,
   worktreePathFor,
 } from './worktree/multi-repo-plan.js';
+export type {
+  FileOverlap,
+  PartitionItem,
+  PartitionResult,
+  PartitionWave,
+} from './worktree/overlap.js';
+export { findOverlaps, partitionByOverlap } from './worktree/overlap.js';
+export { extractSubtaskPaths } from './worktree/plan-paths.js';
+export type { ListedWorktree } from './worktree/porcelain.js';
+export { parseWorktreePorcelain } from './worktree/porcelain.js';
+export type { AllocatedPort, AssignPortsInput } from './worktree/port-assign.js';
+export { allocatePort, assignWorktreePorts } from './worktree/port-assign.js';

@@ -1,7 +1,7 @@
 import type { SystemResources } from '../ports/system.js';
 
 /** Which constraint decided the recommended parallelism. */
-export type BudgetLimit = 'memory' | 'cpu' | 'load' | 'cap' | 'requested';
+export type BudgetLimit = 'memory' | 'cpu' | 'load' | 'cap' | 'requested' | 'overlap';
 
 export interface ConcurrencyBudgetInput {
   resources: SystemResources;
@@ -117,6 +117,8 @@ function explain(
       return `config cap (worktrees.maxParallel=${ctx.cap})`;
     case 'requested':
       return `what you asked for (${ctx.requested})`;
+    case 'overlap':
+      return 'overlapping files across worktrees';
   }
 }
 
@@ -126,4 +128,27 @@ function positive(value: number | undefined, fallback: number): number {
 
 function nonNegative(value: number | undefined, fallback: number): number {
   return value != null && value >= 0 ? value : fallback;
+}
+
+/**
+ * Cap a RAM/CPU budget by observed file overlap. If two worktrees share files,
+ * they must not run in the same wave — `maxWaveSize` is the largest set of
+ * non-overlapping workers. Never drops below 1.
+ */
+export function applyOverlapCap(
+  budget: ConcurrencyBudget,
+  maxWaveSize: number,
+  overlapCount: number,
+): ConcurrencyBudget {
+  const n = Math.max(1, Math.floor(maxWaveSize));
+  if (overlapCount <= 0 || n >= budget.recommended) return budget;
+  const workers = n === 1 ? 'worker' : 'workers';
+  return {
+    ...budget,
+    recommended: n,
+    limitedBy: 'overlap',
+    reason:
+      `${budget.reason} Then capped to ${n} parallel ${workers} ` +
+      `(${overlapCount} overlapping file pair${overlapCount === 1 ? '' : 's'}).`,
+  };
 }

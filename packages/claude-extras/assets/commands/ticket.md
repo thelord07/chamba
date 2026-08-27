@@ -71,18 +71,27 @@ the workspace.
    `chamba_create_worktrees` with the ticket and that repo list. ALL work happens
    inside these worktrees — never edit the main checkouts. Its result includes
    `recommendedParallelism` — a safe number of repos to work at once for THIS machine's
-   RAM/CPU (or call `chamba_resource_budget` yourself with the repo count).
+   RAM/CPU **and** observed file overlap (or call `chamba_resource_budget` /
+   `chamba_partition` yourself). Then call `chamba_worktree_status`. If it reports
+   overlapping changed files, do **not** fan those worktrees out in parallel — run
+   them in the waves `chamba_partition` (with `fromWorktrees: true`, or the plan for
+   a predicted warning) returns. `chamba_conflict_preview` is a `git merge-tree`
+   dry-run: never merge, never `--force`. If `worktrees.ports.enabled` is on, the
+   create tool already wrote `.env.local` PORT values so two `/qa` servers do not
+   bind `:3000`; otherwise call `chamba_worktree_env` before booting apps.
 6. For each subtask/repo, delegate implementation to the **implementer** subagent
    (in that repo's worktree) and the tests to the **tester** subagent; run them. If the
    plan has a `## Design` section, the implementer builds to it — exact tokens/measures
    from a Figma MCP if one is configured, otherwise the linked mockups/standalone prototype
    + specs — and follows the saved UI architecture (`chamba_design_prefs`).
-   **Respect the machine budget:** if `recommendedParallelism` is below the number of
-   repos, fan out in **waves** of that size instead of launching a worker per repo at
-   once — on an 8/16 GB laptop, every worker (dev server + build) running together can
-   thrash or OOM. Say the cap and why in one line when it bites; the same applies to any
-   dev servers the QA phase starts.
-7. **Verify against the real diff** (not the plan). For each touched repo: have the
+   **Respect the machine budget and overlap waves:** if `recommendedParallelism` is below
+   the number of repos, or `chamba_partition` / `chamba_worktree_status` shows overlap,
+   fan out in **waves** instead of launching a worker per repo at once — overlapping
+   files in parallel is how merge conflicts get born, and on an 8/16 GB laptop every
+   worker (dev server + build) running together can thrash or OOM. Say the cap and why
+   in one line when it bites; the same applies to any dev servers the QA phase starts.
+7. **Verify against the real diff** (not the plan). First call `chamba_conflict_preview`
+   (merge-tree dry-run — it never merges). For each touched repo: have the
    **reviewer** subagent audit the actual diff for correctness, missing tests, and
    **referential closure** — anything the change deleted must leave no orphaned
    callers and no now-unused exports. Then run that repo's build / typecheck / lint,

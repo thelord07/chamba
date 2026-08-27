@@ -94,6 +94,14 @@ export async function runWorktreesWizard(): Promise<PartialWorktreeConfig> {
     message: 'Generate a .code-workspace per ticket?',
     default: true,
   });
+  const portsEnabled = await confirm({
+    message: 'Assign a unique PORT per worktree (.env.local) so two QA servers do not collide?',
+    default: false,
+  });
+  const failOnOverlap = await confirm({
+    message: 'Treat overlapping changed files as a hard error (otherwise warn and run sequential)?',
+    default: false,
+  });
   return {
     layout,
     root,
@@ -101,6 +109,8 @@ export async function runWorktreesWizard(): Promise<PartialWorktreeConfig> {
     baseBranch,
     copyEnvFiles,
     editorWorkspace: editor ? 'code-workspace' : null,
+    ports: { enabled: portsEnabled },
+    overlap: { failOnOverlap },
   };
 }
 

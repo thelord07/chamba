@@ -6,7 +6,11 @@ export interface RecordedCall {
   cwd?: string;
 }
 
-export type ProcessHandler = (command: string, args: string[]) => Partial<ProcessResult>;
+export type ProcessHandler = (
+  command: string,
+  args: string[],
+  options?: ProcessExecOptions,
+) => Partial<ProcessResult>;
 
 /**
  * In-memory `ProcessPort` for tests. Records every call and returns whatever the
@@ -23,7 +27,7 @@ export class FakeProcess implements ProcessPort {
     options?: ProcessExecOptions,
   ): Promise<ProcessResult> {
     this.calls.push({ command, args, cwd: options?.cwd });
-    const out = this.handler(command, args);
+    const out = this.handler(command, args, options);
     return { stdout: out.stdout ?? '', stderr: out.stderr ?? '', exitCode: out.exitCode ?? 0 };
   }
 }

@@ -4,6 +4,7 @@ import { AGENT_ROLES } from './roles.js';
 import { type ConfigFile, parseChambaConfig } from './schema.js';
 import type { AgentConfig, ResolvedConfig } from './types.js';
 import {
+  mergeWorktreePartial,
   type PartialWorktreeConfig,
   resolveWorktreeConfig,
   type WorktreeConfig,
@@ -73,7 +74,7 @@ export async function loadConfig(
     }
     applyLayer(config, loaded.file);
     if (loaded.file.worktrees) {
-      worktreesPartial = { ...worktreesPartial, ...loaded.file.worktrees };
+      worktreesPartial = mergeWorktreePartial(worktreesPartial, loaded.file.worktrees);
     }
     sources.push({ kind: layer.kind, path: layer.path, status: 'applied' });
   }

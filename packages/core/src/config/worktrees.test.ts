@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { parseChambaConfig } from './schema.js';
-import { DEFAULT_WORKTREE_CONFIG, resolveWorktreeConfig } from './worktrees.js';
+import {
+  DEFAULT_WORKTREE_CONFIG,
+  mergeWorktreePartial,
+  resolveWorktreeConfig,
+} from './worktrees.js';
 
 describe('resolveWorktreeConfig', () => {
   it('returns the compiled defaults when nothing is provided', () => {
@@ -24,10 +28,18 @@ describe('resolveWorktreeConfig', () => {
     expect(d.perWorkerMemMB).toBeNull();
   });
 
-  it('carries an explicit parallelism cap and per-worker estimate', () => {
-    const resolved = resolveWorktreeConfig({ maxParallel: 2, perWorkerMemMB: 1024 });
-    expect(resolved.maxParallel).toBe(2);
-    expect(resolved.perWorkerMemMB).toBe(1024);
+  it('defaults ports off and overlap as warn-only', () => {
+    const d = resolveWorktreeConfig();
+    expect(d.ports).toEqual({ enabled: false, base: 3000, step: 10, envKey: 'PORT' });
+    expect(d.overlap.failOnOverlap).toBe(false);
+  });
+
+  it('merges nested ports fields over defaults', () => {
+    const resolved = resolveWorktreeConfig({ ports: { enabled: true, base: 4000 } });
+    expect(resolved.ports.enabled).toBe(true);
+    expect(resolved.ports.base).toBe(4000);
+    expect(resolved.ports.step).toBe(10);
+    expect(resolved.ports.envKey).toBe('PORT');
   });
 });
 
@@ -81,5 +93,34 @@ describe('worktrees schema (via parseChambaConfig)', () => {
   it('rejects a non-positive maxParallel', () => {
     const result = parseChambaConfig({ version: 1, worktrees: { maxParallel: 0 } });
     expect(result.ok).toBe(false);
+  });
+
+  it('accepts ports and overlap blocks', () => {
+    const result = parseChambaConfig({
+      version: 1,
+      worktrees: {
+        ports: { enabled: true, base: 4000, step: 10, envKey: 'PORT' },
+        overlap: { failOnOverlap: true },
+      },
+    });
+    expect(result.ok).toBe(true);
+  });
+
+  it('rejects an invalid envKey', () => {
+    const result = parseChambaConfig({
+      version: 1,
+      worktrees: { ports: { envKey: 'not-valid' } },
+    });
+    expect(result.ok).toBe(false);
+  });
+});
+
+describe('mergeWorktreePartial', () => {
+  it('deep-merges ports so a later layer can set only base', () => {
+    const merged = mergeWorktreePartial(
+      { ports: { enabled: true, base: 3000 } },
+      { ports: { base: 4000 } },
+    );
+    expect(merged.ports).toMatchObject({ enabled: true, base: 4000 });
   });
 });

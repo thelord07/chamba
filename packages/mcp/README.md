@@ -46,7 +46,9 @@ check, no LLM — powers `/triage`) · `chamba_generate_plan` · `chamba_review_
 (heuristic, no LLM) · `chamba_save_plan`
 
 **Worktrees (parallel work):** `chamba_create_worktree` · `chamba_create_worktrees` ·
-`chamba_list_worktrees` · `chamba_cleanup_worktree` · `chamba_cleanup_worktrees`
+`chamba_list_worktrees` · `chamba_worktree_status` · `chamba_conflict_preview` ·
+`chamba_partition` · `chamba_worktree_env` · `chamba_cleanup_worktree` ·
+`chamba_cleanup_worktrees`
 
 **Memory + vault:** `chamba_remember` · `chamba_recall` · `chamba_summarize_to_vault` ·
 `chamba_vault_status`
