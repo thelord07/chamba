@@ -30,7 +30,7 @@
 | 9 | Release 1.0.0 + push de tracción | ✅ Completada | 2026-06-09 | bb6db0a |
 | 10 | Configuración por-agente (modelo + esfuerzo) | ✅ Completada | 2026-06-09 | 313229c |
 | 11 | Worktrees multi-repo genéricos (workspace-aware) | ✅ Completada | 2026-06-09 | 7e3098e |
-| 12 | Safe parallelism 2.0 (overlap, conflict preview, ports) | ✅ Completada | 2026-08-27 | |
+| 12 | Safe parallelism 2.0 (overlap, conflict preview, ports) | ✅ Completada | 2026-08-27 | 7df6d8e |
 
 **Símbolos:** ⏳ Pendiente — 🚧 En progreso — ✅ Completada — ❌ Bloqueada
 
@@ -789,7 +789,7 @@ ejecución en la misma sesión (no Cursor aparte), con el hook validate-worktree
 
 ### Fase 12 — Safe parallelism 2.0 (overlap, conflict preview, ports)
 
-**Estado:** ✅ Completada — 2026-08-27
+**Estado:** ✅ Completada — 2026-08-27 — 7df6d8e
 
 **Goal:** worktrees que no pelean. Status sucio/stale/ahead-behind, overlap de archivos
 observado, `git merge-tree` como dry-run (nunca mergea), partition en waves, y ports
