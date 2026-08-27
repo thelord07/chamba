@@ -30,7 +30,9 @@ primitive — adapt to what you have.
 5. If this is a git repo, call `chamba_create_worktree` per worker for isolation.
 6. Delegate implementation to the **implementer** subagent (in its worktree) and
    the tests to the **tester** subagent; run them. When you fan out across several
-   workers, first check `chamba_resource_budget` (pass the worker count) and run in
-   **waves** of `recommended` — don't launch every worker at once on a small machine.
+   workers, first check `chamba_resource_budget` (pass the worker count) **and**
+   `chamba_worktree_status` / `chamba_partition` — run in **waves** of `recommended`,
+   and never in parallel when files overlap. Don't launch every worker at once on a
+   small machine. `chamba_conflict_preview` is a dry-run; never merge.
 7. When done, call `chamba_summarize_to_vault` with a summary of what changed.
 8. Leave any worktree branches open — do not merge. Tell me the merge command.

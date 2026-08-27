@@ -197,6 +197,8 @@ This writes a `worktrees` block to `~/.chamba/config.json` (or per project in
     "baseBranch": "main",
     "copyEnvFiles": true,
     "editorWorkspace": "code-workspace",
+    "ports": { "enabled": false, "base": 3000, "step": 10, "envKey": "PORT" },
+    "overlap": { "failOnOverlap": false },
     "repos": ["api", "web", "functions"]
   }
 }
@@ -208,6 +210,11 @@ This writes a `worktrees` block to `~/.chamba/config.json` (or per project in
 - **command** — escape hatch: set it to your own script (e.g.
   `"./ticket-create.sh {ticket} {repos}"`) and chamba shells out instead of using the
   built-in. Migrate from a bespoke script to config whenever you want.
+- **ports** — opt-in. When `enabled`, chamba writes a unique `PORT` into each
+  worktree's `.env.local` (skips occupied ports; never kills a process; never copies
+  `node_modules`).
+- **overlap.failOnOverlap** — default `false` (warn and run sequential). `true` makes
+  observed file overlap a hard `ok: false` from `chamba_worktree_status` / `chamba_partition`.
 
 Then, in Claude Code:
 

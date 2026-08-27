@@ -107,6 +107,8 @@ export function formatWorktrees(w: WorktreeConfig): string {
     `  editorWorkspace  ${w.editorWorkspace ?? '(none)'}`,
     `  repos            ${w.repos ? w.repos.join(', ') : '(autodetect)'}`,
     `  command          ${w.command ?? '(none)'}`,
+    `  ports            ${w.ports.enabled ? `${w.ports.envKey} from ${w.ports.base} step ${w.ports.step}` : 'off'}`,
+    `  failOnOverlap    ${w.overlap.failOnOverlap}`,
   ].join('\n');
 }
 

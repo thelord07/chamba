@@ -105,6 +105,8 @@ describe('formatWorktrees', () => {
     expect(out).toContain('layout');
     expect(out).toContain('WORKTREES');
     expect(out).toContain('(autodetect)');
+    expect(out).toContain('ports');
+    expect(out).toContain('failOnOverlap');
   });
 
   it('shows overridden fields', () => {

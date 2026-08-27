@@ -1,6 +1,9 @@
 import type { ProcessPort } from '../ports/process.js';
 import { joinPath } from '../util/path.js';
 import { buildBranchName, worktreeRelativePath } from './branch-naming.js';
+import { type ListedWorktree, parseWorktreePorcelain } from './porcelain.js';
+
+export type { ListedWorktree } from './porcelain.js';
 
 export class WorktreeError extends Error {
   override readonly name = 'WorktreeError';
@@ -20,12 +23,6 @@ export interface CreateWorktreeInput {
   /** `YYYY-MM-DD` for the branch name. */
   date: string;
   baseBranch?: string;
-}
-
-export interface ListedWorktree {
-  path: string;
-  head?: string;
-  branch?: string;
 }
 
 export interface CleanupResult {
@@ -71,7 +68,7 @@ export class WorktreeManager {
       cwd: root,
     });
     if (result.exitCode !== 0) return [];
-    return parsePorcelain(result.stdout);
+    return parseWorktreePorcelain(result.stdout);
   }
 
   async cleanup(root: string, branch: string): Promise<CleanupResult> {
@@ -94,22 +91,4 @@ export class WorktreeManager {
     // The branch is intentionally kept. chamba never runs `git branch -D` or `git merge`.
     return { removed: true, branchKept: true, mergeSuggestion: `git merge --no-ff ${branch}` };
   }
-}
-
-function parsePorcelain(output: string): ListedWorktree[] {
-  const result: ListedWorktree[] = [];
-  for (const block of output.split(/\n\s*\n/)) {
-    let path: string | undefined;
-    let head: string | undefined;
-    let branch: string | undefined;
-    for (const raw of block.split('\n')) {
-      const line = raw.trim();
-      if (line.startsWith('worktree ')) path = line.slice('worktree '.length);
-      else if (line.startsWith('HEAD ')) head = line.slice('HEAD '.length);
-      else if (line.startsWith('branch '))
-        branch = line.slice('branch '.length).replace(/^refs\/heads\//, '');
-    }
-    if (path) result.push({ path, head, branch });
-  }
-  return result;
 }

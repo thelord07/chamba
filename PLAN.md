@@ -30,6 +30,7 @@
 | 9 | Release 1.0.0 + push de tracción | ✅ Completada | 2026-06-09 | bb6db0a |
 | 10 | Configuración por-agente (modelo + esfuerzo) | ✅ Completada | 2026-06-09 | 313229c |
 | 11 | Worktrees multi-repo genéricos (workspace-aware) | ✅ Completada | 2026-06-09 | 7e3098e |
+| 12 | Safe parallelism 2.0 (overlap, conflict preview, ports) | ✅ Completada | 2026-08-27 | |
 
 **Símbolos:** ⏳ Pendiente — 🚧 En progreso — ✅ Completada — ❌ Bloqueada
 
@@ -783,6 +784,26 @@ con wizard; `/ticket` autónomo hasta el final, sin commits/merge/push (los hace
 ejecución en la misma sesión (no Cursor aparte), con el hook validate-worktree de guardia.
 
 **DoD:** ver `PLAN-fase-11.md` §"DoD de la Fase 11".
+
+---
+
+### Fase 12 — Safe parallelism 2.0 (overlap, conflict preview, ports)
+
+**Estado:** ✅ Completada — 2026-08-27
+
+**Goal:** worktrees que no pelean. Status sucio/stale/ahead-behind, overlap de archivos
+observado, `git merge-tree` como dry-run (nunca mergea), partition en waves, y ports
+opt-in (`.env.local`) para que dos `/qa` no bindéen `:3000`. Sin LLM. Sin auto-merge.
+
+El detalle (5 sub-fases 12.1–12.5) vive en [`PLAN-fase-12.md`](./PLAN-fase-12.md).
+
+**Sub-fases:**
+- **12.1** — `@chamba/core`: config `ports`/`overlap`, overlap+partition puros, parsers.
+- **12.2** — `@chamba/core`: inspector, conflict preview, allocator de ports sobre ports.
+- **12.3** — `@chamba/mcp`: tools `chamba_worktree_status`, `chamba_conflict_preview`,
+  `chamba_partition`, `chamba_worktree_env` + upgrade de list/create (28 tools).
+- **12.4** — extras: `/ticket`, `/orq`, `/worktrees` + wizard.
+- **12.5** — docs + changeset → 1.5.0.
 
 ---
 

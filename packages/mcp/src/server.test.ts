@@ -48,6 +48,7 @@ describe('chamba MCP server', () => {
     expect(tools.map((t) => t.name).sort()).toEqual([
       'chamba_cleanup_worktree',
       'chamba_cleanup_worktrees',
+      'chamba_conflict_preview',
       'chamba_create_worktree',
       'chamba_create_worktrees',
       'chamba_design_prefs',
@@ -58,6 +59,7 @@ describe('chamba MCP server', () => {
       'chamba_load_context',
       'chamba_load_design',
       'chamba_load_skills',
+      'chamba_partition',
       'chamba_qa_capabilities',
       'chamba_recall',
       'chamba_remember',
@@ -70,6 +72,8 @@ describe('chamba MCP server', () => {
       'chamba_workspace_init',
       'chamba_workspace_reload',
       'chamba_workspace_show',
+      'chamba_worktree_env',
+      'chamba_worktree_status',
     ]);
 
     await server.close();

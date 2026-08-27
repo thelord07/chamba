@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { SystemResources } from '../ports/system.js';
-import { computeConcurrencyBudget } from './budget.js';
+import { applyOverlapCap, computeConcurrencyBudget } from './budget.js';
 
 const GB = 1024 ** 3;
 
@@ -77,5 +77,24 @@ describe('computeConcurrencyBudget', () => {
     expect(b.totalMemGB).toBe(16);
     expect(b.freeMemGB).toBe(8);
     expect(b.cpus).toBe(10);
+  });
+});
+
+describe('applyOverlapCap', () => {
+  it('caps recommended when overlapping files force smaller waves', () => {
+    const b = computeConcurrencyBudget({
+      resources: res({ totalMemBytes: 64 * GB, freeMemBytes: 40 * GB, cpus: 16 }),
+    });
+    const capped = applyOverlapCap(b, 1, 2);
+    expect(capped.recommended).toBe(1);
+    expect(capped.limitedBy).toBe('overlap');
+    expect(capped.reason).toContain('overlapping');
+  });
+
+  it('leaves the budget alone when there is no overlap', () => {
+    const b = computeConcurrencyBudget({
+      resources: res({ totalMemBytes: 64 * GB, freeMemBytes: 40 * GB, cpus: 16 }),
+    });
+    expect(applyOverlapCap(b, 8, 0)).toEqual(b);
   });
 });

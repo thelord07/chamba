@@ -1,14 +1,18 @@
 import {
+  applyOverlapCap,
+  assignWorktreePorts,
   buildTicketBranch,
   computeConcurrencyBudget,
   detectGitRepos,
   editorWorkspaceDir,
+  inspectRepos,
   joinPath,
   loadConfig,
   MultiRepoWorktreeManager,
   planWorktrees,
   WORKSPACE_DIR,
   type WorktreeConfig,
+  WorktreeInspector,
   writeEditorWorkspace,
 } from '@chamba/core';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -21,7 +25,7 @@ const TOOL_NAME = 'chamba_create_worktrees';
 const DESCRIPTION =
   'Create git worktrees for a ticket across the repos it touches, driven by the ' +
   '`worktrees` block of .chamba/config.json (layout, branch prefix, base branch, ' +
-  'env copy, editor workspace). Reuses an existing local/remote branch or forks a ' +
+  'env copy, editor workspace, optional per-worktree PORT). Reuses an existing local/remote branch or forks a ' +
   'new one from the base. If `worktrees.command` is set, runs that command instead. ' +
   'Never merges, never pushes — branches are left open for you.';
 
@@ -117,12 +121,46 @@ export function registerCreateWorktrees(
 
       // Size safe parallelism from the machine so the orchestrator can fan out
       // in waves instead of launching a worker per repo and exhausting RAM.
-      const budget = computeConcurrencyBudget({
+      let budget = computeConcurrencyBudget({
         resources: services.system.resources(),
         requested: results.length,
         perWorkerMemMB: worktrees.perWorkerMemMB ?? undefined,
         cap: worktrees.maxParallel ?? undefined,
       });
+
+      const inspector = new WorktreeInspector(services.process, services.clock);
+      const inspections = await inspectRepos({
+        inspector,
+        fs: services.fs,
+        cwd: services.cwd,
+        repos: repoList,
+        baseBranch: worktrees.baseBranch,
+      });
+      const overlapCount = inspections.reduce((n, i) => n + i.overlaps.length, 0);
+      const maxWaveSize = Math.max(
+        1,
+        ...inspections.flatMap((i) => {
+          const linked = i.worktrees.filter((w) => !w.primary);
+          if (linked.length === 0) return [results.length];
+          // Treat overlapping linked worktrees as wave size 1 when any overlap exists.
+          return [overlapCount > 0 ? 1 : Math.max(linked.length, 1)];
+        }),
+      );
+      budget = applyOverlapCap(budget, maxWaveSize, overlapCount);
+
+      let portsAssigned: Array<{ path: string; port: number }> = [];
+      if (worktrees.ports.enabled && services.net) {
+        const paths = results
+          .filter((r) => r.status !== 'skipped-not-git')
+          .map((r) => r.worktreePath);
+        const assigned = await assignWorktreePorts({
+          net: services.net,
+          fs: services.fs,
+          worktreePaths: paths,
+          ports: worktrees.ports,
+        });
+        portsAssigned = assigned.map((a) => ({ path: a.path, port: a.port }));
+      }
 
       logger.info(
         {
@@ -142,10 +180,15 @@ export function registerCreateWorktrees(
         results.length > 1
           ? `\n\nParallelism: run up to ${budget.recommended} of these at a time — ${budget.reason}.`
           : '';
+      const portNote =
+        portsAssigned.length > 0
+          ? `\nPorts: ${portsAssigned.map((p) => `${p.port}`).join(', ')} (written to .env.local).`
+          : '';
       const text =
         `Worktrees for ${ticket} on branch ${branch} (${worktrees.layout} layout):\n${lines.join('\n')}` +
         `${workspaceFile ? `\nEditor workspace: ${workspaceFile}` : ''}` +
         parallelNote +
+        portNote +
         '\n\nBranches are left open — review, commit and merge by hand.';
 
       return {
@@ -158,6 +201,8 @@ export function registerCreateWorktrees(
           worktrees: results,
           recommendedParallelism: budget.recommended,
           parallelismReason: budget.reason,
+          overlapCount,
+          ports: portsAssigned,
         } as Record<string, unknown>,
       };
     },

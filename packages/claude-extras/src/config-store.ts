@@ -6,7 +6,14 @@ import type {
   PartialWorktreeConfig,
   PresetName,
 } from '@chamba/core';
-import { ConfigError, DEFAULT_CONFIG, dirname, PRESETS, parseChambaConfig } from '@chamba/core';
+import {
+  ConfigError,
+  DEFAULT_CONFIG,
+  dirname,
+  mergeWorktreePartial,
+  PRESETS,
+  parseChambaConfig,
+} from '@chamba/core';
 
 /**
  * Reads and writes a single chamba config file (the global `~/.chamba/config.json`).
@@ -56,7 +63,7 @@ export class ConfigStore {
     const next: ConfigFile = {
       ...current,
       version: 1,
-      worktrees: { ...(current.worktrees ?? {}), ...patch },
+      worktrees: mergeWorktreePartial(current.worktrees ?? {}, patch),
     };
     const parsed = parseChambaConfig(next);
     if (!parsed.ok) throw new ConfigError(parsed.error);

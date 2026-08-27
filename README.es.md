@@ -36,7 +36,9 @@ El modelo de tu editor hace el razonamiento y llama a las tools de chamba. Eso s
   responsable, áreas sensibles sin evaluación de riesgo, y más.
 - **Paralelismo seguro.** Los git worktrees aíslan el trabajo paralelo; el cleanup
   conserva las ramas para que vos las mergees a mano — nunca `--force`, nunca merge
-  automático.
+  automático. Antes del fan-out, chamba reporta overlap de archivos, un preview de
+  conflictos con `merge-tree`, y (opt-in) un `PORT` único por worktree para que dos
+  servidores de QA no bindéen `:3000`.
 - **Obsidian + memoria entre sesiones.** Trae contexto de tu vault, escribe resúmenes
   de vuelta, y persiste conocimiento como markdown plano. Las notas se agrupan por
   proyecto (por git remote) y cada carpeta mantiene un `INDEX.md` liviano, así el recall
@@ -111,7 +113,11 @@ el directorio de logs y los worktrees.
 | `chamba_generate_plan` | `{ task, context? }` | Un template de plan para completar |
 | `chamba_review_plan` | `{ plan, task, context? }` | `{ approved, issues, suggestions, riskFlags }` — sin LLM |
 | `chamba_create_worktree` | `{ taskSlug, workerId, baseBranch? }` | Un git worktree aislado |
-| `chamba_list_worktrees` | `{}` | Los worktrees del repo |
+| `chamba_list_worktrees` | `{}` | Worktrees con flags dirty/stale/ahead-behind y overlap de archivos |
+| `chamba_worktree_status` | `{ repos?, baseBranch? }` | Status completo + overlaps (sin LLM). `ok: false` si `failOnOverlap` y hay colisión |
+| `chamba_conflict_preview` | `{ baseBranch?, branches? }` | Dry-run `git merge-tree` vs base + pairwise — **nunca mergea** |
+| `chamba_partition` | `{ plan?, items?, fromWorktrees? }` | Waves paralelas para que paths que se pisan no corran juntos (predicho = warning) |
+| `chamba_worktree_env` | `{ ticket?, worktreePath? }` | `PORT` único opt-in en `.env.local`; salta puertos ocupados; no-op si `ports.enabled` está off |
 | `chamba_cleanup_worktree` | `{ branch }` | Borra el dir, **conserva la rama** |
 | `chamba_remember` | `{ key, content, tags? }` | Persiste una memoria en markdown |
 | `chamba_recall` | `{ query }` | Busca en las memorias guardadas |
@@ -250,6 +256,7 @@ corrés chamba en paralelo entre máquinas: sin techo de RAM de una sola, menos 
 - ✅ **1.2.0 — conexión confiable:** `install --global` (lanza el binario `chamba-mcp`, sin npx en cada arranque) + check de registro MCP en `doctor` (avisa de duplicados/inconsistencias)
 - ✅ **1.3.0 — extras de OpenCode:** `@chamba/opencode-extras` instala los mismos slash commands + subagentes en OpenCode (traducidos a su formato) y registra el MCP
 - ✅ **1.4.0 — extras de Cursor:** `@chamba/cursor-extras` instala los mismos comandos + subagentes en Cursor (`.cursor/commands` + `.cursor/agents`, modelo de tu reparto) y registra el MCP
+- 🔭 **1.5.0 — Paralelismo seguro 2.0:** status de worktrees + overlap, preview `merge-tree`, waves, PORT opt-in
 - 🔭 V2: búsqueda semántica del vault, MCP sampling, más bases de conocimiento
 
 Ver [`PLAN.md`](./PLAN.md) para el plan completo de fases.
