@@ -1,6 +1,6 @@
 {
   "name": "@chamba/cursor-extras",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "description": "Optional Cursor extras for chamba: slash commands + subagents installer",
   "license": "MIT",
   "type": "module",
