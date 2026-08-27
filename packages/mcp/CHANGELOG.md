@@ -1,5 +1,17 @@
 # @chamba/mcp
 
+## 1.5.0
+
+### Minor Changes
+
+- 70f3cce: Safe parallelism 2.0: worktree status + file overlap, merge-tree conflict preview (never merges), partition waves, and opt-in per-worktree PORT in `.env.local`.
+
+### Patch Changes
+
+- Updated dependencies [70f3cce]
+  - @chamba/core@1.5.0
+  - @chamba/adapters@1.5.0
+
 ## 1.4.0
 
 ### Patch Changes

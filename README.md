@@ -280,7 +280,7 @@ no single-machine RAM ceiling, less waiting. **Guide:
 - ✅ **1.2.0 — reliable connection:** `install --global` (launch the `chamba-mcp` binary, no npx per spawn) + a `doctor` MCP-registration check (warns on duplicate/inconsistent entries)
 - ✅ **1.3.0 — OpenCode extras:** `@chamba/opencode-extras` installs the same slash commands + subagents into OpenCode (translated to its format) and registers the MCP server
 - ✅ **1.4.0 — Cursor extras:** `@chamba/cursor-extras` installs the same commands + subagents into Cursor (`.cursor/commands` + `.cursor/agents`, model from your reparto) and registers the MCP server
-- 🔭 **1.5.0 — Safe parallelism 2.0:** worktree status + file overlap, `merge-tree` conflict preview, partition waves, opt-in per-worktree PORT
+- ✅ **1.5.0 — Safe parallelism 2.0:** worktree status + file overlap, `merge-tree` conflict preview (never merges), partition waves, opt-in per-worktree PORT
 - 🔭 V2: semantic vault search, MCP sampling, more knowledge bases
 
 See [`PLAN.md`](./PLAN.md) for the full phase plan.

@@ -256,7 +256,7 @@ corrés chamba en paralelo entre máquinas: sin techo de RAM de una sola, menos 
 - ✅ **1.2.0 — conexión confiable:** `install --global` (lanza el binario `chamba-mcp`, sin npx en cada arranque) + check de registro MCP en `doctor` (avisa de duplicados/inconsistencias)
 - ✅ **1.3.0 — extras de OpenCode:** `@chamba/opencode-extras` instala los mismos slash commands + subagentes en OpenCode (traducidos a su formato) y registra el MCP
 - ✅ **1.4.0 — extras de Cursor:** `@chamba/cursor-extras` instala los mismos comandos + subagentes en Cursor (`.cursor/commands` + `.cursor/agents`, modelo de tu reparto) y registra el MCP
-- 🔭 **1.5.0 — Paralelismo seguro 2.0:** status de worktrees + overlap, preview `merge-tree`, waves, PORT opt-in
+- ✅ **1.5.0 — Paralelismo seguro 2.0:** status de worktrees + overlap, preview `merge-tree` (nunca mergea), waves, PORT opt-in
 - 🔭 V2: búsqueda semántica del vault, MCP sampling, más bases de conocimiento
 
 Ver [`PLAN.md`](./PLAN.md) para el plan completo de fases.

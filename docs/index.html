@@ -68,7 +68,7 @@
 
 <script>
 const AC = 'var(--accent)', OK = 'var(--accent2)', AM = 'var(--amber)', MU = 'var(--muted)';
-const VERSION = '1.4.0';
+const VERSION = '1.5.0';
 
 const EDITORS = [
   { id: 'cursor', name: 'Cursor', file: '.cursor/mcp.json',
@@ -190,7 +190,11 @@ const CONTENT = {
       { name: 'get_agent_config', in: '{ role }', out: '{ model, effort, hint } para un rol — sin LLM' },
       { name: 'create_worktree', in: '{ taskSlug, workerId, baseBranch? }', out: 'Un git worktree aislado' },
       { name: 'create_worktrees', in: '{ ticket, repos? }', out: 'Worktrees multi‑repo para un ticket' },
-      { name: 'list_worktrees', in: '{ }', out: 'Los worktrees del repo' },
+      { name: 'list_worktrees', in: '{ }', out: 'Worktrees del repo + flags dirty/stale/ahead-behind y overlap de archivos' },
+      { name: 'worktree_status', in: '{ repos?, baseBranch? }', out: 'Estado completo + overlaps (sin LLM); ok:false si failOnOverlap y hay colisión' },
+      { name: 'conflict_preview', in: '{ baseBranch?, branches? }', out: 'Dry-run git merge-tree vs base + pairwise — nunca mergea' },
+      { name: 'partition', in: '{ plan?, items?, fromWorktrees? }', out: 'Oleadas para que paths que se pisan no corran juntos' },
+      { name: 'worktree_env', in: '{ ticket?, worktreePath? }', out: 'PORT único opt-in por worktree en .env.local (no-op si ports off)' },
       { name: 'cleanup_worktree', in: '{ branch }', out: 'Borra el dir, conserva la rama' },
       { name: 'cleanup_worktrees', in: '{ ticket, repos? }', out: 'Borra los worktrees de un ticket, conserva las ramas' },
       { name: 'doctor', in: '{ }', out: 'Chequeo de salud del entorno (sin LLM): Node, sistema, git multi‑repo, workspace, config, vault, registro MCP (duplicados), worktrees → ok/warn/fail' },
@@ -259,7 +263,8 @@ const CONTENT = {
       { badge: 'Listo', dot: OK, title: 'v1.1.0 — Opus 5 + Sonnet 5', desc: 'Nuevo reparto por defecto: Opus 5 para razonar (calidad de Fable a mitad de precio) y Sonnet 5 para ejecutar (intro $2/$10). Tuning de ahorro de tokens y caveat de Fable incluido en el plan Max.' },
       { badge: 'Listo', dot: OK, title: 'v1.2.0 — conexión confiable', desc: 'install --global lanza el binario chamba-mcp en vez de npx en cada arranque (adiós desconexiones por spawn). Y el doctor ahora avisa si chamba quedó registrado duplicado/inconsistente entre configs.' },
       { badge: 'Listo', dot: OK, title: 'v1.3.0 — extras de OpenCode', desc: '@chamba/opencode-extras instala los mismos /comandos y subagentes en OpenCode (traducidos a su formato) y registra el MCP. Un solo comando, misma fuente que Claude Code.' },
-      { badge: 'Ahora', dot: AM, title: 'v1.4.0 — extras de Cursor', desc: '@chamba/cursor-extras instala los /comandos y subagentes en Cursor (.cursor/commands + .cursor/agents, con el modelo de tu reparto) y registra el MCP. Tres editores con extras nativos, un solo set de prompts.' },
+      { badge: 'Listo', dot: OK, title: 'v1.4.0 — extras de Cursor', desc: '@chamba/cursor-extras instala los /comandos y subagentes en Cursor (.cursor/commands + .cursor/agents, con el modelo de tu reparto) y registra el MCP. Tres editores con extras nativos, un solo set de prompts.' },
+      { badge: 'Ahora', dot: AM, title: 'v1.5.0 — safe parallelism 2.0', desc: 'chamba mira los diffs reales: reporta si dos worktrees tocan los mismos archivos y los corre en oleadas en vez de en paralelo, y hace un dry-run del merge (git merge-tree) que lista los conflictos vs main — nunca mergea. /worktrees ahora muestra dirty/stale/ahead-behind. Opt-in: un PORT único por worktree en .env.local. Sin LLM, sin auto-merge.' },
       { badge: 'Explorando', dot: MU, title: 'V2: registro de servicios, búsqueda semántica', desc: 'Registro con detección de drift y búsqueda del vault.' }
     ],
     ctaTitle: 'Pon a tu editor a trabajar la chamba',
@@ -332,7 +337,11 @@ const CONTENT = {
       { name: 'get_agent_config', in: '{ role }', out: '{ model, effort, hint } for a role — no LLM' },
       { name: 'create_worktree', in: '{ taskSlug, workerId, baseBranch? }', out: 'An isolated git worktree' },
       { name: 'create_worktrees', in: '{ ticket, repos? }', out: 'Multi‑repo worktrees for a ticket' },
-      { name: 'list_worktrees', in: '{ }', out: 'The repo’s worktrees' },
+      { name: 'list_worktrees', in: '{ }', out: 'The repo’s worktrees + dirty/stale/ahead-behind flags & file overlap' },
+      { name: 'worktree_status', in: '{ repos?, baseBranch? }', out: 'Full status + overlaps (no LLM); ok:false if failOnOverlap and files collide' },
+      { name: 'conflict_preview', in: '{ baseBranch?, branches? }', out: 'git merge-tree dry-run vs base + pairwise — never merges' },
+      { name: 'partition', in: '{ plan?, items?, fromWorktrees? }', out: 'Parallel waves so overlapping paths do not run together' },
+      { name: 'worktree_env', in: '{ ticket?, worktreePath? }', out: 'Opt-in unique PORT per worktree in .env.local (no-op unless ports.enabled)' },
       { name: 'cleanup_worktree', in: '{ branch }', out: 'Removes the dir, keeps the branch' },
       { name: 'cleanup_worktrees', in: '{ ticket, repos? }', out: 'Removes a ticket’s worktrees, keeps branches' },
       { name: 'doctor', in: '{ }', out: 'Environment health check (no LLM): Node, system, git (multi‑repo aware), workspace, config, vault, MCP registration (duplicates), worktrees → ok/warn/fail' },
@@ -401,7 +410,8 @@ const CONTENT = {
       { badge: 'Shipped', dot: OK, title: 'v1.1.0 — Opus 5 + Sonnet 5', desc: 'New default reparto: Opus 5 for the reasoning roles (Fable-grade quality at half the price) and Sonnet 5 for execution (intro $2/$10). Token-savings tuning and a Fable-included-on-Max caveat.' },
       { badge: 'Shipped', dot: OK, title: 'v1.2.0 — reliable connection', desc: 'install --global launches the chamba-mcp binary instead of npx on every spawn (no more disconnects from a flaky launch). And doctor now warns if chamba is registered inconsistently across configs.' },
       { badge: 'Shipped', dot: OK, title: 'v1.3.0 — OpenCode extras', desc: '@chamba/opencode-extras installs the same /commands and subagents into OpenCode (translated to its format) and registers the MCP server. One command, same source as Claude Code.' },
-      { badge: 'Now', dot: AM, title: 'v1.4.0 — Cursor extras', desc: '@chamba/cursor-extras installs the /commands and subagents into Cursor (.cursor/commands + .cursor/agents, with the model from your reparto) and registers the MCP server. Three editors with native extras, one set of prompts.' },
+      { badge: 'Shipped', dot: OK, title: 'v1.4.0 — Cursor extras', desc: '@chamba/cursor-extras installs the /commands and subagents into Cursor (.cursor/commands + .cursor/agents, with the model from your reparto) and registers the MCP server. Three editors with native extras, one set of prompts.' },
+      { badge: 'Now', dot: AM, title: 'v1.5.0 — safe parallelism 2.0', desc: 'chamba reads the real diffs: it reports when two worktrees touch the same files and runs them in waves instead of in parallel, and does a merge dry-run (git merge-tree) listing conflicts vs main — it never merges. /worktrees now shows dirty/stale/ahead-behind. Opt-in: a unique PORT per worktree in .env.local. No LLM, no auto-merge.' },
       { badge: 'Exploring', dot: MU, title: 'V2: service registry, semantic search', desc: 'Registry with drift detection and vault search.' }
     ],
     ctaTitle: 'Put your editor to work — la chamba',
