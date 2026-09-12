@@ -156,14 +156,14 @@ Every MCP editor gets the tools. On **Claude Code**, **Cursor** and **OpenCode**
 also install the slash commands and subagents (same prompts, one source):
 
 ```bash
-npx @chamba/cursor-extras@latest install     # Cursor:   /ticket, /triage, /qa … + subagents + MCP
-npx @chamba/opencode-extras@latest install   # OpenCode: /ticket, /triage, /qa … + subagents + MCP
+npx @chamba/cursor-extras@latest install     # Cursor:   /ticket, /babysit, /triage, /qa … + subagents + MCP
+npx @chamba/opencode-extras@latest install   # OpenCode: /ticket, /babysit, /triage, /qa … + subagents + MCP
 ```
 
 On **Claude Code** you additionally get hooks:
 
 ```bash
-npx @chamba/claude-extras@latest install     # /ticket, /triage, /workspace, /map, /qa, /design … +
+npx @chamba/claude-extras@latest install     # /ticket, /babysit, /triage, /workspace, /map, /qa, /design … +
                                       # planner/implementer/reviewer/tester/qa/diagnostician agents + 2 hooks
 npx @chamba/claude-extras uninstall
 ```
@@ -185,6 +185,13 @@ at once with `config preset <budget|balanced|quality|fast>`.
 chamba still never calls a model: this only tells your editor's model how to delegate.
 Other editors read the same config via `chamba_get_agent_config`. See the
 [claude-extras README](./packages/claude-extras/README.md#configuration-per-agent-model--effort).
+
+**Babysit until it's merge-ready.** After `/ticket` (or any branch), `/babysit`
+triages review comments, merge conflicts, and in-scope CI without merging or
+force-pushing. It does not assume GitHub: it detects the host from `git remote`
+and uses `gh` / `glab` / `az repos` / whatever review MCP the editor already has
+— or babysits locally if none of those exist. Same command in Claude Code,
+Cursor, and OpenCode.
 
 **Read-only triage before you commit to a fix.** `/triage BUG-42` is the front half of
 `/ticket` with the back half off: it investigates and proposes a fix but **never touches
@@ -284,6 +291,7 @@ no single-machine RAM ceiling, less waiting. **Guide:
 - ✅ **1.4.0 — Cursor extras:** `@chamba/cursor-extras` installs the same commands + subagents into Cursor (`.cursor/commands` + `.cursor/agents`, model from your reparto) and registers the MCP server
 - ✅ **1.5.0 — Safe parallelism 2.0:** worktree status + file overlap, `merge-tree` conflict preview (never merges), partition waves, opt-in per-worktree PORT
 - ✅ **1.6.0 — Per-repo base branches:** `worktrees.baseBranch` accepts a per-repo map so each repo forks from its own integration branch (e.g. `web`=main, `api`=develop)
+- ✅ `/babysit`: merge-ready loop (comments, conflicts, CI) on any forge — same prompt in Claude Code, Cursor, OpenCode
 - 🔭 V2: semantic vault search, MCP sampling, more knowledge bases
 
 See [`PLAN.md`](./PLAN.md) for the full phase plan.

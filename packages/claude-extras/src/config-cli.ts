@@ -102,7 +102,7 @@ export function formatWorktrees(w: WorktreeConfig): string {
     `  layout           ${w.layout}`,
     `  root             ${w.root}`,
     `  branchPrefix     ${w.branchPrefix}`,
-    `  baseBranch       ${w.baseBranch}`,
+    `  baseBranch       ${typeof w.baseBranch === 'string' ? w.baseBranch : JSON.stringify(w.baseBranch)}`,
     `  copyEnvFiles     ${w.copyEnvFiles}`,
     `  editorWorkspace  ${w.editorWorkspace ?? '(none)'}`,
     `  repos            ${w.repos ? w.repos.join(', ') : '(autodetect)'}`,

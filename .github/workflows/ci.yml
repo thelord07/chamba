@@ -24,11 +24,13 @@ jobs:
       - name: Lint + format
         run: pnpm biome check .
 
-      - name: Typecheck
-        run: pnpm -r exec tsc --noEmit
-
+      # Packages export types from dist/; typecheck before build cannot resolve
+      # workspace deps (e.g. adapters → @chamba/core).
       - name: Build
         run: pnpm -r build
+
+      - name: Typecheck
+        run: pnpm -r exec tsc --noEmit
 
       - name: Test
         run: pnpm -r test

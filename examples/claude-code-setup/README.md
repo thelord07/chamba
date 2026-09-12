@@ -32,7 +32,7 @@ commands, subagents and hooks:
 npx @chamba/claude-extras@latest install
 ```
 
-This adds `/orq`, `/workspace`, `/worktrees`, `/recall`, the
+This adds `/orq`, `/ticket`, `/babysit`, `/workspace`, `/worktrees`, `/recall`, the
 implementer/reviewer/tester subagents, two hooks, and registers the chamba MCP
 server in `~/.claude.json`. Remove with `npx @chamba/claude-extras uninstall`.
 

@@ -129,4 +129,5 @@ the workspace.
       worktree directory if no workspace file was generated);
     - the suggested commit + `git merge --no-ff` commands.
     Do NOT commit, merge or push — I review, commit and send to my company's code
-    review by hand.
+    review by hand. After the review request exists, `/babysit` triages comments,
+    conflicts and CI without merging.

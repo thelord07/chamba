@@ -32,7 +32,7 @@ Use chamba to load context for "add a health check endpoint" and review a plan.
 ## Optional: the slash commands + subagents (like Claude Code)
 
 The MCP tools work on their own, but OpenCode also supports custom **commands** and
-**subagents** — so chamba's `/ticket`, `/triage`, `/qa`, `/design`, `/orq`, … and the
+**subagents** — so chamba's `/ticket`, `/babysit`, `/triage`, `/qa`, `/design`, `/orq`, … and the
 `planner` / `implementer` / `reviewer` / `tester` / `qa` / `diagnostician` agents can be
 installed too. One command does it (and registers the MCP server for you):
 
@@ -45,7 +45,7 @@ npx @chamba/opencode-extras@latest install --global
 It writes the commands to `~/.config/opencode/commands/`, the subagents to
 `~/.config/opencode/agents/` (`mode: subagent`, model from your chamba reparto), and adds
 `chamba` under `"mcp"` in `~/.config/opencode/opencode.json`. Restart OpenCode, then
-`/ticket ABC-123` (or `/triage`, `/qa`, …) works in the TUI. `npx @chamba/opencode-extras
+`/ticket ABC-123` (or `/babysit`, `/triage`, `/qa`, …) works in the TUI. `npx @chamba/opencode-extras
 uninstall` removes them. The command/agent prompts are the same ones Claude Code gets —
 one source, both editors.
 

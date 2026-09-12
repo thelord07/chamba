@@ -36,7 +36,7 @@ Use chamba to map this workspace, then load context for "add a health check endp
 ## Optional: the slash commands + subagents (like Claude Code)
 
 Cursor supports custom **commands** (1.6+) and **subagents** (2.4+), so chamba's `/ticket`,
-`/triage`, `/qa`, `/design`, `/orq`, … and the `planner` / `implementer` / `reviewer` /
+`/babysit`, `/triage`, `/qa`, `/design`, `/orq`, … and the `planner` / `implementer` / `reviewer` /
 `tester` / `qa` / `diagnostician` agents can be installed too. One command does it (and
 registers the MCP server for you):
 
@@ -49,7 +49,7 @@ npx @chamba/cursor-extras@latest install --global
 It writes the commands to `~/.cursor/commands/` (plain markdown — type `/` in the Agent to
 run them), the subagents to `~/.cursor/agents/` (`name` + `description` + `model` from your
 chamba reparto, or `inherit`), and adds `chamba` under `mcpServers` in `~/.cursor/mcp.json`.
-Restart Cursor, then `/ticket ABC-123` (or `/triage`, `/qa`, …) works in the chat.
+Restart Cursor, then `/ticket ABC-123` (or `/babysit`, `/triage`, `/qa`, …) works in the chat.
 `npx @chamba/cursor-extras@latest uninstall` removes them. The command/agent prompts are the
 same ones Claude Code and OpenCode get — one source, every editor.
 

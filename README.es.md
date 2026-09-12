@@ -154,14 +154,14 @@ Todo editor MCP tiene las tools. En **Claude Code**, **Cursor** y **OpenCode** p
 instalar los slash commands y subagentes (mismos prompts, una sola fuente):
 
 ```bash
-npx @chamba/cursor-extras@latest install     # Cursor:   /ticket, /triage, /qa … + subagentes + MCP
-npx @chamba/opencode-extras@latest install   # OpenCode: /ticket, /triage, /qa … + subagentes + MCP
+npx @chamba/cursor-extras@latest install     # Cursor:   /ticket, /babysit, /triage, /qa … + subagentes + MCP
+npx @chamba/opencode-extras@latest install   # OpenCode: /ticket, /babysit, /triage, /qa … + subagentes + MCP
 ```
 
 En **Claude Code** además tenés hooks:
 
 ```bash
-npx @chamba/claude-extras@latest install     # /ticket, /triage, /workspace, /map, /qa, /design … +
+npx @chamba/claude-extras@latest install     # /ticket, /babysit, /triage, /workspace, /map, /qa, /design … +
                                       # agentes planner/implementer/reviewer/tester/qa/diagnostician + 2 hooks
 npx @chamba/claude-extras uninstall
 ```
@@ -183,6 +183,13 @@ costo/calidad de una con `config preset <budget|balanced|quality|fast>`.
 chamba sigue sin llamar a ningún modelo: esto solo le dice al modelo de tu editor cómo
 delegar. Otros editores leen la misma config vía `chamba_get_agent_config`. Ver el
 [README de claude-extras](./packages/claude-extras/README.md#configuration-per-agent-model--effort).
+
+**Babysit hasta que esté listo para merge.** Después de `/ticket` (o cualquier
+rama), `/babysit` triagea comentarios de review, conflictos de merge y CI que
+esté en el alcance — sin mergear ni hacer force-push. No asume GitHub: detecta
+el host desde `git remote` y usa `gh` / `glab` / `az repos` / el MCP de review
+que ya tenga el editor, o babysitea en local si no hay CLI. El mismo comando
+en Claude Code, Cursor y OpenCode.
 
 **Triage read-only antes de comprometerte a un fix.** `/triage BUG-42` es la mitad
 delantera de `/ticket` con la trasera apagada: investiga y propone un fix pero **nunca
@@ -260,6 +267,7 @@ corrés chamba en paralelo entre máquinas: sin techo de RAM de una sola, menos 
 - ✅ **1.4.0 — extras de Cursor:** `@chamba/cursor-extras` instala los mismos comandos + subagentes en Cursor (`.cursor/commands` + `.cursor/agents`, modelo de tu reparto) y registra el MCP
 - ✅ **1.5.0 — Paralelismo seguro 2.0:** status de worktrees + overlap, preview `merge-tree` (nunca mergea), waves, PORT opt-in
 - ✅ **1.6.0 — Rama base por repo:** `worktrees.baseBranch` acepta un mapa por repo para que cada repo forkee de su propia rama de integración (ej. `web`=main, `api`=develop)
+- ✅ `/babysit`: loop merge-ready (comentarios, conflictos, CI) en cualquier forge — mismo prompt en Claude Code, Cursor, OpenCode
 - 🔭 V2: búsqueda semántica del vault, MCP sampling, más bases de conocimiento
 
 Ver [`PLAN.md`](./PLAN.md) para el plan completo de fases.

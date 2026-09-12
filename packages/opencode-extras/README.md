@@ -19,13 +19,13 @@ npx @chamba/opencode-extras --version
 
 It installs into `~/.config/opencode/` (or `$OPENCODE_CONFIG_DIR`):
 
-- **Commands** → `commands/`: `/ticket`, `/triage`, `/qa`, `/design`, `/orq`, `/map`,
+- **Commands** → `commands/`: `/ticket`, `/babysit`, `/triage`, `/qa`, `/design`, `/orq`, `/map`,
   `/workspace`, `/worktrees`, `/recall`, `/vault`.
 - **Subagents** → `agents/` (`mode: subagent`): `planner`, `implementer`, `reviewer`,
   `tester`, `qa`, `diagnostician`.
 - **MCP server** → `chamba` under `"mcp"` in `opencode.json` (preserves any others).
 
-Then restart OpenCode and run `/ticket ABC-123` (or `/triage`, `/qa`, …) in the TUI.
+Then restart OpenCode and run `/ticket ABC-123` (or `/babysit`, `/triage`, `/qa`, …) in the TUI.
 
 ## How it relates to Claude Code
 

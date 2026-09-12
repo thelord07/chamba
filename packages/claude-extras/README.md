@@ -43,7 +43,7 @@ Snapshots dedup by content and the newest 5 (plus any pinned) are kept.
 
 It installs into `~/.claude/`:
 
-- **Slash commands**: `/ticket`, `/triage`, `/workspace`, `/map`, `/qa`, `/design`, `/worktrees`, `/orq`, `/recall`, `/vault`
+- **Slash commands**: `/ticket`, `/babysit`, `/triage`, `/workspace`, `/map`, `/qa`, `/design`, `/worktrees`, `/orq`, `/recall`, `/vault`
 - **Subagents**: `planner`, `implementer`, `reviewer`, `tester`, `qa`, `diagnostician`
 - **Hooks**: warn on destructive commands, validate worktree edits
 
@@ -243,6 +243,30 @@ model + effort you configured above.
 > **Security:** `copyEnvFiles` copies secrets into the worktree directories. Add your
 > `worktrees.root` (e.g. `WORKTREES/`) to `.gitignore` so they're never committed. It's
 > off by default.
+
+## Keep a change merge-ready with `/babysit`
+
+`/ticket` stops before commit and merge. Once the branch (or PR/MR) exists,
+`/babysit` is the loop that gets it **merge-ready**: conflicts with the base,
+unresolved review comments (humans and bots), and in-scope CI — without merging,
+force-pushing, or inventing new scope.
+
+```
+/babysit                 # current branch's PR/MR, or the branch if none
+/babysit 142             # that PR/MR number
+/babysit https://…       # any forge URL
+/babysit local           # no remote review request — conflicts + local verify
+/babysit <pasted notes>  # treat the paste as the review inbox
+```
+
+It does **not** assume GitHub. It detects the host from `git remote` (GitHub,
+GitLab, Bitbucket, Azure DevOps, Gitea/Forgejo/Codeberg) and uses whichever CLI
+or review MCP is actually there (`gh`, `glab`, `az repos`, …). Missing CLI →
+local babysit + a note of what would unlock remote comments/CI. Work happens in
+the worktree that matches the branch when one exists.
+
+Same editor-agnostic degrade as `/ticket` (parallel subagents → sequential →
+inline) and the same loop-until-dry cap (6 rounds). You still merge by hand.
 
 ## Read-only pre-diagnosis with `/triage`
 

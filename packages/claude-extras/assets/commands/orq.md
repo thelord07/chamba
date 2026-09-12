@@ -36,3 +36,4 @@ primitive — adapt to what you have.
    small machine. `chamba_conflict_preview` is a dry-run; never merge.
 7. When done, call `chamba_summarize_to_vault` with a summary of what changed.
 8. Leave any worktree branches open — do not merge. Tell me the merge command.
+   After the review request exists, `/babysit` triages comments, conflicts and CI.

@@ -22,7 +22,7 @@
     "test": "pnpm -r test",
     "check": "biome check .",
     "check:write": "biome check --write .",
-    "typecheck": "pnpm -r exec tsc --noEmit",
+    "typecheck": "pnpm -r build && pnpm -r exec tsc --noEmit",
     "changeset": "changeset",
     "version": "changeset version",
     "release": "pnpm -r build && changeset publish"
