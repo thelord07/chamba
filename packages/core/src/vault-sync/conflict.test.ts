@@ -5,6 +5,7 @@ import {
   readConflictMeta,
   sanitizeAuthor,
 } from './conflict.js';
+import { pathKey } from './path-key.js';
 
 describe('sanitizeAuthor', () => {
   it('sanitizes diacritics, lowercases and replaces spaces', () => {
@@ -64,6 +65,26 @@ describe('conflictCopyPath — AC6', () => {
   it('file with no extension', () => {
     const result = conflictCopyPath('notes/README', 'bob', new Set());
     expect(result).toBe('notes/README (conflicto bob)');
+  });
+
+  it('AC3: existing with N (Conflicto Joys).md blocks n (conflicto joys).md → returns n (conflicto joys 2).md', () => {
+    const result = conflictCopyPath('n.md', 'joys', new Set(['N (Conflicto Joys).md']));
+    expect(result).toBe('n (conflicto joys 2).md');
+  });
+
+  it('intra-plan case-insensitive copy collision: copies for Nota.md then nota.md get distinct pathKeys', () => {
+    // Simulate planPull building the existing set incrementally
+    const existing = new Set<string>();
+    // First conflict on Nota.md → copy gets "Nota (conflicto joys).md"
+    const copy1 = conflictCopyPath('Nota.md', 'joys', existing);
+    existing.add(copy1);
+    // Second conflict on nota.md → first candidate "nota (conflicto joys).md" collides
+    // case-insensitively with "Nota (conflicto joys).md" → must get 2
+    const copy2 = conflictCopyPath('nota.md', 'joys', existing);
+    expect(copy1).toBe('Nota (conflicto joys).md');
+    expect(copy2).toBe('nota (conflicto joys 2).md');
+    // The two copies must have distinct pathKeys
+    expect(pathKey(copy1)).not.toBe(pathKey(copy2));
   });
 });
 

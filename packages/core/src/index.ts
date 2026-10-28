@@ -164,6 +164,7 @@ export {
   readConflictMeta,
   sanitizeAuthor,
 } from './vault-sync/conflict.js';
+export { findCaseCollisions, pathKey } from './vault-sync/path-key.js';
 export type {
   LocalSnapshot,
   PullAction,
@@ -171,7 +172,7 @@ export type {
   PushEntry,
   SyncState,
 } from './vault-sync/plan.js';
-export { applyPushResults, planPull, planPush } from './vault-sync/plan.js';
+export { applyPullPlan, applyPushResults, planPull, planPush } from './vault-sync/plan.js';
 export type {
   ChangeEntry,
   ChangesResponse,

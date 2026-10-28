@@ -4,6 +4,7 @@
  */
 
 import { z } from 'zod';
+import { pathKey } from './path-key.js';
 
 export const PROTOCOL_VERSION = 1 as const;
 
@@ -73,7 +74,7 @@ export const vaultPathSchema = z
         });
         return;
       }
-      if (seg.startsWith('.chamba-sync')) {
+      if (seg.toLowerCase().startsWith('.chamba-sync')) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           message: 'path must not have segments starting with .chamba-sync',
@@ -118,17 +119,19 @@ export const pushRequestSchema = z.object({
     .min(1, 'at least one change required')
     .max(500, 'at most 500 changes per request')
     .superRefine((changes, ctx) => {
+      // Dedup by pathKey so Nota.md + nota.md are treated as the same path
+      // (macOS/Windows FS are case-insensitive)
       const seen = new Set<string>();
       for (const c of changes) {
-        // path is already NFC-normalized by vaultPathSchema transform
-        if (seen.has(c.path)) {
+        const key = pathKey(c.path);
+        if (seen.has(key)) {
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
             message: `duplicate path in push request: ${c.path}`,
           });
           return;
         }
-        seen.add(c.path);
+        seen.add(key);
       }
     }),
 });

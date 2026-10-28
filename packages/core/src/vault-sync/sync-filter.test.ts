@@ -29,6 +29,9 @@ describe('isSyncable — denied by segment', () => {
   });
   it('denies .chamba-sync prefix', () => expect(isSyncable('.chamba-sync/state.json')).toBe(false));
   it('denies .chamba-sync sub', () => expect(isSyncable('a/.chamba-sync-extra/x.md')).toBe(false));
+  it('denies .Chamba-Sync/x.md (mixed-case, AC4 optional)', () => {
+    expect(isSyncable('.Chamba-Sync/x.md')).toBe(false);
+  });
 
   // Decision 5 — narrow .env filter
   it('denies .env segment', () => expect(isSyncable('.env')).toBe(false));

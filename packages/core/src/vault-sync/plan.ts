@@ -19,6 +19,16 @@ export type LocalSnapshot = Record<string, string>;
 export type PullAction =
   | { type: 'write'; path: string; hash: string }
   | { type: 'delete'; path: string }
+  /**
+   * The adapter executes conflict actions in two steps (and `planPull` returns
+   * conflict actions before all others so the adapter always runs them first):
+   *   1. Write `localHash` to `copyPath` (the local version is preserved there).
+   *   2a. If `remoteHash !== null`: write `remoteHash` to `path`.
+   *   2b. If `remoteHash === null`: delete `path` (tombstone wins at path).
+   * Order matters on case-insensitive FS: a rename that only changes case arrives
+   * as `delete OldCase.md` + `write newcase.md`; doing write→delete on a
+   * case-insensitive FS would delete the freshly written file.
+   */
   | {
       type: 'conflict';
       path: string;
@@ -27,7 +37,7 @@ export type PullAction =
       copyPath: string;
       base: string | null;
     }
-  | { type: 'noop'; path: string };
+  | { type: 'noop'; path: string; hash: string | null };
 
 export interface PullPlan {
   actions: PullAction[];
@@ -106,6 +116,16 @@ export interface PlanPullOptions {
  *
  * cursor = max(state.cursor, max seq of remote entries).
  *
+ * **Action order:** actions are sorted by rank (conflict=0, delete=1, write/noop=2)
+ * then by path ascending. The adapter MUST execute them in this order.
+ * Reason: a rename that only changes case arrives as `delete OldCase.md` +
+ * `write newcase.md`; on a case-insensitive FS, executing write before delete
+ * would silently delete the freshly written file.
+ * For conflict actions the adapter performs two steps:
+ *   1. Write `localHash` to `copyPath` (preserve local version).
+ *   2a. `remoteHash !== null` → write `remoteHash` to `path`.
+ *   2b. `remoteHash === null` → delete `path` (tombstone wins).
+ *
  * NOTE: push before pull to avoid rule #4 resurrecting a local delete.
  */
 export function planPull(
@@ -146,7 +166,7 @@ export function planPull(
 
     // Rule 1: R === L → noop
     if (R === L) {
-      actions.push({ type: 'noop', path });
+      actions.push({ type: 'noop', path, hash: R });
       continue;
     }
 
@@ -184,7 +204,65 @@ export function planPull(
     actions.push({ type: 'conflict', path, remoteHash: null, localHash: L, copyPath, base });
   }
 
+  // Sort by rank (conflict=0, delete=1, write/noop=2) then path ascending.
+  // The adapter must execute in this order — see JSDoc.
+  actions.sort((a, b) => {
+    const ra = actionRank(a);
+    const rb = actionRank(b);
+    if (ra !== rb) return ra - rb;
+    return a.path < b.path ? -1 : a.path > b.path ? 1 : 0;
+  });
+
   return { actions, cursor: maxSeq };
+}
+
+/** Map action type to sort rank (lower = earlier). */
+function actionRank(a: PullAction): number {
+  if (a.type === 'conflict') return 0;
+  if (a.type === 'delete') return 1;
+  return 2; // write or noop
+}
+
+// ─── applyPullPlan ────────────────────────────────────────────────────────────
+
+/**
+ * Derive a new SyncState after applying a pull plan (pure, no mutation).
+ *
+ * - `write {path, hash}`    → `files[path] = { syncedHash: hash }`
+ * - `delete {path}`         → `files[path] = { syncedHash: null }`
+ * - `noop {path, hash}`     → `files[path] = { syncedHash: hash }` (convergence)
+ * - `conflict {path, remoteHash}` → `files[path] = { syncedHash: remoteHash }`
+ *   `copyPath` is NOT added to state — it is a new local file the next
+ *   `planPush` will upload with `baseHash: null`.
+ * - `cursor` = `plan.cursor`
+ *
+ * Input state is not mutated. Returns fresh objects.
+ */
+export function applyPullPlan(state: SyncState, plan: PullPlan): SyncState {
+  const newFiles: Record<string, { syncedHash: string | null }> = {};
+  // Copy existing state (fresh objects)
+  for (const [p, f] of Object.entries(state.files)) {
+    newFiles[p] = { syncedHash: f.syncedHash };
+  }
+  // Apply each action
+  for (const action of plan.actions) {
+    switch (action.type) {
+      case 'write':
+        newFiles[action.path] = { syncedHash: action.hash };
+        break;
+      case 'delete':
+        newFiles[action.path] = { syncedHash: null };
+        break;
+      case 'noop':
+        newFiles[action.path] = { syncedHash: action.hash };
+        break;
+      case 'conflict':
+        // copyPath never enters state — it is uploaded on the next push
+        newFiles[action.path] = { syncedHash: action.remoteHash };
+        break;
+    }
+  }
+  return { cursor: plan.cursor, files: newFiles };
 }
 
 // ─── applyPushResults ─────────────────────────────────────────────────────────

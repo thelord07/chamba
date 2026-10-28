@@ -5,6 +5,7 @@
 
 import { basename, dirname, extname, joinPath } from '../util/path.js';
 import { joinFrontmatter, readScalar, splitFrontmatter, upsertScalar } from './frontmatter.js';
+import { pathKey } from './path-key.js';
 
 // ─── Author sanitization ───────────────────────────────────────────────────────
 
@@ -31,6 +32,8 @@ export function sanitizeAuthor(author: string): string {
  * Format: `dir/stem (conflicto <sanitized-author>[ N]).ext`
  * Starts unnumbered (N omitted), then 2, 3, …
  * `existing` is the set of already-used paths (grows as the plan is built).
+ * Occupancy is checked case-insensitively via `pathKey` so that
+ * `N (Conflicto Joys).md` blocks `n (conflicto joys).md` on macOS/Windows.
  */
 export function conflictCopyPath(path: string, author: string, existing: Set<string>): string {
   const dir = dirname(path);
@@ -40,6 +43,12 @@ export function conflictCopyPath(path: string, author: string, existing: Set<str
   const stem = ext.length > 0 ? base.slice(0, base.length - ext.length) : base;
   const token = sanitizeAuthor(author);
 
+  // Build a case-insensitive occupancy set from the raw existing paths
+  const existingKeys = new Set<string>();
+  for (const p of existing) {
+    existingKeys.add(pathKey(p));
+  }
+
   const candidate = (n?: number): string => {
     const suffix = n === undefined ? `(conflicto ${token})` : `(conflicto ${token} ${n})`;
     const name = `${stem} ${suffix}${ext}`;
@@ -48,7 +57,7 @@ export function conflictCopyPath(path: string, author: string, existing: Set<str
 
   let n: number | undefined;
   let c = candidate(n);
-  while (existing.has(c)) {
+  while (existingKeys.has(pathKey(c))) {
     n = n === undefined ? 2 : n + 1;
     c = candidate(n);
   }

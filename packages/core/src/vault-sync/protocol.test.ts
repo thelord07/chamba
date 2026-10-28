@@ -52,8 +52,16 @@ describe('vaultPathSchema — AC3', () => {
   it('rejects path with .. segment', () => {
     expect(() => vaultPathSchema.parse('../x.md')).toThrow();
   });
-  it('rejects segment starting with .chamba-sync', () => {
+  it('rejects segment starting with .chamba-sync (lowercase)', () => {
     expect(() => vaultPathSchema.parse('.chamba-sync/state.json')).toThrow();
+  });
+
+  it('AC4: rejects .Chamba-Sync/state.md (mixed-case variant)', () => {
+    expect(() => vaultPathSchema.parse('.Chamba-Sync/state.md')).toThrow();
+  });
+
+  it('AC4: rejects notas/.CHAMBA-SYNC (all-caps variant)', () => {
+    expect(() => vaultPathSchema.parse('notas/.CHAMBA-SYNC')).toThrow();
   });
   it('rejects path with 513 chars', () => {
     expect(() => vaultPathSchema.parse('a'.repeat(513))).toThrow();
@@ -116,6 +124,18 @@ describe('pushRequestSchema — AC4', () => {
       pushRequestSchema.parse({
         protocol: 1,
         changes: [validChange, { ...validChange, baseHash: null }],
+      }),
+    ).toThrow();
+  });
+
+  it('AC2: rejects case-insensitive duplicate paths (Nota.md + nota.md)', () => {
+    expect(() =>
+      pushRequestSchema.parse({
+        protocol: 1,
+        changes: [
+          { path: 'Nota.md', baseHash: null, newHash: 'a'.repeat(64) },
+          { path: 'nota.md', baseHash: null, newHash: 'b'.repeat(64) },
+        ],
       }),
     ).toThrow();
   });
