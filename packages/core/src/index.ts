@@ -157,6 +157,59 @@ export {
 } from './triage/ticket-completeness.js';
 // Path helpers
 export { basename, dirname, extname, joinPath } from './util/path.js';
+export type { ConflictMeta } from './vault-sync/conflict.js';
+export {
+  addConflictFrontmatter,
+  conflictCopyPath,
+  readConflictMeta,
+  sanitizeAuthor,
+} from './vault-sync/conflict.js';
+export { findCaseCollisions, pathKey } from './vault-sync/path-key.js';
+export type {
+  LocalSnapshot,
+  PullAction,
+  PullPlan,
+  PushEntry,
+  SyncState,
+} from './vault-sync/plan.js';
+export { applyPullPlan, applyPushResults, planPull, planPush } from './vault-sync/plan.js';
+export type {
+  ChangeEntry,
+  ChangesResponse,
+  DeviceAuthPollResponse,
+  DeviceAuthStartResponse,
+  Group,
+  Hash,
+  JoinRequest,
+  JoinResponse,
+  PushChange,
+  PushRequest,
+  PushResponse,
+  PushResult,
+  Role,
+  VaultPath,
+} from './vault-sync/protocol.js';
+// Vault sync (parche protocol v1 — pure, no Node APIs, no LLM)
+export {
+  changeEntrySchema,
+  changesResponseSchema,
+  deviceAuthPollResponseSchema,
+  deviceAuthStartResponseSchema,
+  groupSchema,
+  hashSchema,
+  joinRequestSchema,
+  joinResponseSchema,
+  PROTOCOL_VERSION,
+  pushChangeSchema,
+  pushRequestSchema,
+  pushResponseSchema,
+  pushResultSchema,
+  roleSchema,
+  vaultPathSchema,
+} from './vault-sync/protocol.js';
+export type { SyncAction } from './vault-sync/roles.js';
+export { can, ROLE_PERMISSIONS } from './vault-sync/roles.js';
+export { isSyncable } from './vault-sync/sync-filter.js';
 export type { BuiltContext, ContextBuildInput, RelevantNote } from './workspace/context-builder.js';
 export { ContextBuilder, listVaultNotes } from './workspace/context-builder.js';
 export { diffLines, textsEqual } from './workspace/diff.js';

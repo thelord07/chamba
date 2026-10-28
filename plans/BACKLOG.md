@@ -160,6 +160,18 @@ Encontrado dogfooding en **finalis**. El check "Git repo" corría `git rev-parse
 
 ---
 
+## parche
+
+> parche — servidor privado de sync de vault Obsidian-compatible entre miembros de un grupo.
+> El protocolo vive en `@chamba/core` (MIT) para que server + cliente validen con el mismo schema.
+
+- **PARCHE-002 — protocolo de sync v1 en `@chamba/core` (✅ HECHO, pendiente de release)**
+  Schemas zod, sync-filter, conflict helpers, planPush/planPull/applyPushResults, roles + `can()`.
+  Repo: chamba · `packages/core/src/vault-sync/`. Changeset minor. Sin red, sin fs, sin LLM.
+  Refs: `.planning/2026-10-27-parche-vault-sync-arquitectura.md`, `.planning/reviews/parche-design-v1-review.md`.
+
+---
+
 ## 💭 Parkeado / "lo que teníamos antes"
 - **Service registry + drift detection** (roadmap original #6): mapear servicios/contratos entre repos y detectar drift.
 - **V2 del README**: búsqueda semántica del vault, MCP sampling, más bases de conocimiento.
