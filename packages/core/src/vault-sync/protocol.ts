@@ -119,19 +119,31 @@ export const pushRequestSchema = z.object({
     .min(1, 'at least one change required')
     .max(500, 'at most 500 changes per request')
     .superRefine((changes, ctx) => {
-      // Dedup by pathKey so Nota.md + nota.md are treated as the same path
-      // (macOS/Windows FS are case-insensitive)
-      const seen = new Set<string>();
+      // Invalid: (a) the same exact path twice (paths are already NFC), or (b) two live
+      // entries (newHash !== null) sharing a pathKey — they would be the same file on a
+      // case-insensitive FS. A delete + a live entry with the same pathKey is a casing
+      // rename (Nota.md → nota.md) and is valid.
+      const seenPaths = new Set<string>();
+      const liveKeys = new Set<string>();
       for (const c of changes) {
-        const key = pathKey(c.path);
-        if (seen.has(key)) {
+        if (seenPaths.has(c.path)) {
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
             message: `duplicate path in push request: ${c.path}`,
           });
           return;
         }
-        seen.add(key);
+        seenPaths.add(c.path);
+        if (c.newHash === null) continue;
+        const key = pathKey(c.path);
+        if (liveKeys.has(key)) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: `two live entries share the same path identity (case-insensitive): ${c.path}`,
+          });
+          return;
+        }
+        liveKeys.add(key);
       }
     }),
 });

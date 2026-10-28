@@ -10,7 +10,7 @@ import {
   planPush,
   type SyncState,
 } from './plan.js';
-import type { ChangeEntry } from './protocol.js';
+import { type ChangeEntry, pushRequestSchema } from './protocol.js';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -59,18 +59,49 @@ describe('planPush — AC8', () => {
     expect(byPath['unchanged.md']).toBeUndefined();
   });
 
-  it('is sorted by path', () => {
+  it('orders deletes first, then the rest; by path within each group', () => {
     const state: SyncState = {
       cursor: 0,
       files: {
         'z.md': { syncedHash: A },
+        'y.md': { syncedHash: A },
+        'c.md': { syncedHash: A },
         'a.md': { syncedHash: null },
       },
     };
+    // y.md and c.md deleted locally; z.md modified; b.md new
     const local: LocalSnapshot = { 'z.md': B, 'b.md': C };
     const changes = planPush(state, local);
-    const paths = changes.map((c) => c.path);
-    expect(paths).toEqual([...paths].sort());
+    expect(changes.map((c) => [c.path, c.newHash])).toEqual([
+      ['c.md', null],
+      ['y.md', null],
+      ['b.md', C],
+      ['z.md', B],
+    ]);
+  });
+
+  it('addendum: casing rename → [Nota.md→null, nota.md→S1] in that order, accepted by pushRequestSchema', () => {
+    const S = '1'.repeat(64);
+    const state: SyncState = { cursor: 0, files: { 'Nota.md': { syncedHash: S } } };
+    const local: LocalSnapshot = { 'nota.md': S };
+    const changes = planPush(state, local);
+    expect(changes).toEqual([
+      { path: 'Nota.md', baseHash: S, newHash: null },
+      { path: 'nota.md', baseHash: null, newHash: S },
+    ]);
+    expect(() => pushRequestSchema.parse({ protocol: 1, changes })).not.toThrow();
+  });
+
+  it('addendum: casing rename where the new name sorts first (nota.md → NOTA.md) still pushes the delete first', () => {
+    const S = '1'.repeat(64);
+    const state: SyncState = { cursor: 0, files: { 'nota.md': { syncedHash: S } } };
+    const local: LocalSnapshot = { 'NOTA.md': S };
+    const changes = planPush(state, local);
+    expect(changes).toEqual([
+      { path: 'nota.md', baseHash: S, newHash: null },
+      { path: 'NOTA.md', baseHash: null, newHash: S },
+    ]);
+    expect(() => pushRequestSchema.parse({ protocol: 1, changes })).not.toThrow();
   });
 
   it('skips known tombstones', () => {

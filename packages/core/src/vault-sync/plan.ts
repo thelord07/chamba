@@ -58,7 +58,9 @@ export interface PushEntry {
  * - Modified files → baseHash: syncedHash
  * - Locally deleted files (syncedHash !== null) → newHash: null
  * - Unchanged and known-tombstone files → skipped
- * Returns sorted by path.
+ * Order: deletes (newHash null) first, then the rest; by path within each group.
+ * The server applies a push in the order received, so a casing rename
+ * (Nota.md → nota.md) removes the old name before creating the new one.
  */
 export function planPush(state: SyncState, local: LocalSnapshot): PushEntry[] {
   const out: PushEntry[] = [];
@@ -86,7 +88,12 @@ export function planPush(state: SyncState, local: LocalSnapshot): PushEntry[] {
     }
   }
 
-  return out.sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
+  return out.sort((a, b) => {
+    const ra = a.newHash === null ? 0 : 1;
+    const rb = b.newHash === null ? 0 : 1;
+    if (ra !== rb) return ra - rb;
+    return a.path < b.path ? -1 : a.path > b.path ? 1 : 0;
+  });
 }
 
 // ─── planPull ─────────────────────────────────────────────────────────────────

@@ -24,7 +24,7 @@ No network, no crypto, no fs — hashes arrive pre-computed from the adapter.
 |---|---|
 | `hashSchema`, `vaultPathSchema`, `roleSchema` | Zod primitives (NFC-normalized paths, sha256 hashes, 4-role enum) |
 | `changeEntrySchema`, `changesResponseSchema` | Remote change feed schemas |
-| `pushRequestSchema`, `pushResponseSchema` | Optimistic push schemas (≥1, ≤500 changes, unique paths by `pathKey`) |
+| `pushRequestSchema`, `pushResponseSchema` | Optimistic push schemas (≥1, ≤500 changes; no exact duplicate path; no two live entries sharing a `pathKey`) |
 | `joinRequestSchema`, `joinResponseSchema` | Invite-code join (normalizes to uppercase) |
 | `deviceAuthStartResponseSchema`, `deviceAuthPollResponseSchema` | Device flow auth |
 | `isSyncable(path)` | Returns true iff path should be synced (denylist + extension allowlist) |
@@ -33,7 +33,7 @@ No network, no crypto, no fs — hashes arrive pre-computed from the adapter.
 | `conflictCopyPath(path, author, existing)` | D3 conflict copy name: `dir/stem (conflicto author[ N]).ext`; occupancy checked case-insensitively via `pathKey` |
 | `addConflictFrontmatter(md, meta)` | Upsert `conflict_of`/`conflict_base` in YAML frontmatter |
 | `readConflictMeta(md)` | Read back `{ conflictOf, conflictBase }` or null |
-| `planPush(state, local)` | Compute push entries (new/modified/deleted) |
+| `planPush(state, local)` | Compute push entries (new/modified/deleted); deletes first, then the rest, by path |
 | `planPull(state, local, remote, opts)` | Compute pull actions (write/delete/conflict/noop) sorted by (rank, path) — see Action order below |
 | `applyPullPlan(state, plan)` | Derive new SyncState from a pull plan (pure, no mutation); closes the false-conflict gap after a converged pull |
 | `applyPushResults(state, request, response)` | Advance SyncState after push; only `ok` results advance |
@@ -58,9 +58,22 @@ pathKey('Nota.md')       // → 'nota.md'
 pathKey('NOTAS/A.MD')    // → 'notas/a.md'
 ```
 
-`pushRequestSchema` rejects a push that contains two paths with the same `pathKey`
-(e.g. `Nota.md` + `nota.md`). `vaultPathSchema` also rejects any path segment that
-starts with `.chamba-sync` regardless of case (`.Chamba-Sync/…` fails).
+`pushRequestSchema` rejects a push when the same exact path appears twice, or when two
+**live** entries (`newHash !== null`) share a `pathKey` (e.g. `Nota.md → H1` + `nota.md → H2`).
+A delete plus a live entry with the same `pathKey` is a casing rename and is valid:
+
+```ts
+planPush({ cursor: 0, files: { 'Nota.md': { syncedHash: S1 } } }, { 'nota.md': S1 })
+// → [{ path: 'Nota.md', baseHash: S1, newHash: null },
+//    { path: 'nota.md', baseHash: null, newHash: S1 }]   // accepted by pushRequestSchema
+```
+
+`planPush` returns deletes (`newHash: null`) first, then the rest, by path within each
+group. The server applies a push in the order received, so the old name is removed
+before the new one is created.
+
+`vaultPathSchema` also rejects any path segment that starts with `.chamba-sync`
+regardless of case (`.Chamba-Sync/…` fails).
 
 `findCaseCollisions(['Nota.md', 'nota.md', 'b.md'])` returns `[['Nota.md', 'nota.md']]`.
 

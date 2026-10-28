@@ -128,7 +128,42 @@ describe('pushRequestSchema — AC4', () => {
     ).toThrow();
   });
 
-  it('AC2: rejects case-insensitive duplicate paths (Nota.md + nota.md)', () => {
+  it('addendum: rejects a.md twice even when one entry is a delete', () => {
+    expect(() =>
+      pushRequestSchema.parse({
+        protocol: 1,
+        changes: [
+          { path: 'a.md', baseHash: 'a'.repeat(64), newHash: null },
+          { path: 'a.md', baseHash: null, newHash: 'b'.repeat(64) },
+        ],
+      }),
+    ).toThrow();
+  });
+
+  it('addendum: accepts a casing rename (delete Nota.md + live nota.md)', () => {
+    const parsed = pushRequestSchema.parse({
+      protocol: 1,
+      changes: [
+        { path: 'Nota.md', baseHash: 'a'.repeat(64), newHash: null },
+        { path: 'nota.md', baseHash: null, newHash: 'a'.repeat(64) },
+      ],
+    });
+    expect(parsed.changes.map((c) => c.path)).toEqual(['Nota.md', 'nota.md']);
+  });
+
+  it('addendum: accepts two deletes that share a pathKey', () => {
+    expect(() =>
+      pushRequestSchema.parse({
+        protocol: 1,
+        changes: [
+          { path: 'Nota.md', baseHash: 'a'.repeat(64), newHash: null },
+          { path: 'nota.md', baseHash: 'b'.repeat(64), newHash: null },
+        ],
+      }),
+    ).not.toThrow();
+  });
+
+  it('AC2 + addendum: rejects two live entries sharing a pathKey (Nota.md→H1 + nota.md→H2)', () => {
     expect(() =>
       pushRequestSchema.parse({
         protocol: 1,
