@@ -3,7 +3,7 @@
  * Spins up a real node:http server in the test process. Never touches external hosts.
  */
 
-import type { Server } from 'node:http';
+import type { RequestListener, Server } from 'node:http';
 import { createServer } from 'node:http';
 import { afterEach, describe, expect, it } from 'vitest';
 import { NodeHttp } from './node-http.js';
@@ -11,7 +11,7 @@ import { NodeHttp } from './node-http.js';
 let server: Server;
 let port: number;
 
-function makeServer(handler: Parameters<typeof createServer>[0]): Promise<Server> {
+function makeServer(handler: RequestListener): Promise<Server> {
   return new Promise((resolve, reject) => {
     const s = createServer(handler);
     s.listen(0, '127.0.0.1', () => {

@@ -1,5 +1,13 @@
 # @chamba/claude-extras
 
+## 1.8.0
+
+### Patch Changes
+
+- Updated dependencies [35bebe3]
+  - @chamba/core@1.8.0
+  - @chamba/adapters@1.8.0
+
 ## 1.7.0
 
 ### Patch Changes

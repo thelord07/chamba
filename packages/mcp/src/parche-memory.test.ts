@@ -401,7 +401,8 @@ describe('Gate 4 — personal vs vault memory labels', () => {
       arguments: {},
     });
 
-    const sc = (result as { structuredContent: { personalMemoryCount: number } }).structuredContent;
+    const sc = (result as unknown as { structuredContent: { personalMemoryCount: number } })
+      .structuredContent;
     expect(sc.personalMemoryCount).toBe(1);
 
     await server.close();

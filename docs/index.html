@@ -68,7 +68,7 @@
 
 <script>
 const AC = 'var(--accent)', OK = 'var(--accent2)', AM = 'var(--amber)', MU = 'var(--muted)';
-const VERSION = '1.7.0';
+const VERSION = '1.8.0';
 
 const EDITORS = [
   { id: 'cursor', name: 'Cursor', file: '.cursor/mcp.json',
@@ -184,6 +184,9 @@ const CONTENT = {
       { name: 'summarize_to_vault', in: '{ title, content, projectSlug? }', out: 'Escribe un resumen a la carpeta proyectos/' },
       { name: 'save_plan', in: '{ title, content, projectSlug? }', out: 'Guarda un plan en la carpeta plans/' },
       { name: 'vault_status', in: '{ }', out: 'Ruta del vault + las notas que chamba ve (diagnóstico)' },
+      { name: 'vault_join', in: '{ code, name, email, deviceLabel? }', out: 'Se une a un vault de grupo de parche con un código o link de invitación: crea el vault local, guarda credenciales (0600) y hace el primer sync. Nunca devuelve el token' },
+      { name: 'vault_sync', in: '{ slug? }', out: 'Sincroniza uno o todos los vaults de parche con el server: subidos, bajados y conflictos (copias, nunca pisa)' },
+      { name: 'parche_status', in: '{ }', out: 'Por vault: server, slug, rol, último sync, cambios pendientes y ruta. Sin token' },
       { name: 'triage_ticket', in: '{ ticket }', out: 'Chequeo de completitud del ticket (sin LLM): qué le falta (repro, esperado/actual, entorno, alcance, criterios, severidad) + las preguntas para pedir. Potencia /triage' },
       { name: 'generate_plan', in: '{ task, context? }', out: 'Plantilla de plan estructurado' },
       { name: 'review_plan', in: '{ plan, task, context? }', out: '{ approved, issues, riskFlags } — sin LLM' },
@@ -266,7 +269,8 @@ const CONTENT = {
       { badge: 'Listo', dot: OK, title: 'v1.4.0 — extras de Cursor', desc: '@chamba/cursor-extras instala los /comandos y subagentes en Cursor (.cursor/commands + .cursor/agents, con el modelo de tu reparto) y registra el MCP. Tres editores con extras nativos, un solo set de prompts.' },
       { badge: 'Listo', dot: OK, title: 'v1.5.0 — safe parallelism 2.0', desc: 'chamba mira los diffs reales: reporta si dos worktrees tocan los mismos archivos y los corre en oleadas en vez de en paralelo, y hace un dry-run del merge (git merge-tree) que lista los conflictos vs main — nunca mergea. /worktrees ahora muestra dirty/stale/ahead-behind. Opt-in: un PORT único por worktree en .env.local. Sin LLM, sin auto-merge.' },
       { badge: 'Listo', dot: OK, title: 'v1.6.0 — rama base por repo', desc: 'worktrees.baseBranch acepta una sola rama o un mapa por repo ({ "web": "main", "api": "develop", "*": "main" }): cada repo del ticket forkea desde su propia rama de integración, y el conflict-preview compara contra la base correcta de cada uno. Retrocompatible, sin LLM.' },
-      { badge: 'Ahora', dot: AM, title: 'v1.7.0 — protocolo de sync de vault', desc: '@chamba/core trae el protocolo v1 de parche (sync privado de un vault Obsidian entre miembros de un grupo): schemas zod, roles owner/admin/editor/reader, copias en conflicto en vez de pisar notas, paths seguros en FS case-insensitive y un planificador puro de push/pull. Base para el server y el cliente; todavía sin tools nuevas. Sin red, sin LLM.' },
+      { badge: 'Listo', dot: OK, title: 'v1.7.0 — protocolo de sync de vault', desc: '@chamba/core trae el protocolo v1 de parche (sync privado de un vault Obsidian entre miembros de un grupo): schemas zod, roles owner/admin/editor/reader, copias en conflicto en vez de pisar notas, paths seguros en FS case-insensitive y un planificador puro de push/pull. Base para el server y el cliente; todavía sin tools nuevas. Sin red, sin LLM.' },
+      { badge: 'Ahora', dot: AM, title: 'v1.8.0 — vaults de grupo (cliente de parche)', desc: 'Tu equipo comparte un vault Obsidian y chamba lo mantiene sincronizado: vault join con un código de invitación, vault sync / status / leave por CLI y tres tools MCP nuevas (vault_join, vault_sync, parche_status). summarize_to_vault, load_context, remember y recall sincronizan solos en segundo plano con tope de 10 s. Las memorias del grupo viven en el vault; las personales nunca se suben. Conflictos como copias, nunca pisa. Sin LLM.' },
       { badge: 'Explorando', dot: MU, title: 'V2: registro de servicios, búsqueda semántica', desc: 'Registro con detección de drift y búsqueda del vault.' }
     ],
     ctaTitle: 'Pon a tu editor a trabajar la chamba',
@@ -333,6 +337,9 @@ const CONTENT = {
       { name: 'summarize_to_vault', in: '{ title, content, projectSlug? }', out: 'Writes a run summary to proyectos/' },
       { name: 'save_plan', in: '{ title, content, projectSlug? }', out: 'Saves a plan to plans/' },
       { name: 'vault_status', in: '{ }', out: 'Resolved vault path + the notes chamba can see' },
+      { name: 'vault_join', in: '{ code, name, email, deviceLabel? }', out: 'Joins a parche group vault with an invite code or link: creates the local vault, saves credentials (0600) and runs the first sync. Never returns the token' },
+      { name: 'vault_sync', in: '{ slug? }', out: 'Syncs one or all parche vaults with the server: pushed, pulled and conflicts (copies, never overwrites)' },
+      { name: 'parche_status', in: '{ }', out: 'Per vault: server, slug, role, last sync, pending changes and path. No token' },
       { name: 'triage_ticket', in: '{ ticket }', out: 'Ticket-completeness check (no LLM): what it is missing (repro, expected/actual, environment, scope, criteria, severity) + the questions to ask back. Powers /triage' },
       { name: 'generate_plan', in: '{ task, context? }', out: 'A structured plan template' },
       { name: 'review_plan', in: '{ plan, task, context? }', out: '{ approved, issues, riskFlags } — no LLM' },
@@ -415,7 +422,8 @@ const CONTENT = {
       { badge: 'Shipped', dot: OK, title: 'v1.4.0 — Cursor extras', desc: '@chamba/cursor-extras installs the /commands and subagents into Cursor (.cursor/commands + .cursor/agents, with the model from your reparto) and registers the MCP server. Three editors with native extras, one set of prompts.' },
       { badge: 'Shipped', dot: OK, title: 'v1.5.0 — safe parallelism 2.0', desc: 'chamba reads the real diffs: it reports when two worktrees touch the same files and runs them in waves instead of in parallel, and does a merge dry-run (git merge-tree) listing conflicts vs main — it never merges. /worktrees now shows dirty/stale/ahead-behind. Opt-in: a unique PORT per worktree in .env.local. No LLM, no auto-merge.' },
       { badge: 'Shipped', dot: OK, title: 'v1.6.0 — per-repo base branches', desc: 'worktrees.baseBranch takes a single branch or a per-repo map ({ "web": "main", "api": "develop", "*": "main" }): each repo in a ticket forks from its own integration branch, and the conflict preview compares against each repo\'s real base. Backward compatible, no LLM.' },
-      { badge: 'Now', dot: AM, title: 'v1.7.0 — vault sync protocol', desc: '@chamba/core ships parche\'s v1 protocol (private sync of an Obsidian vault across a group): zod schemas, owner/admin/editor/reader roles, conflict copies instead of overwriting notes, safe paths on case-insensitive filesystems and a pure push/pull planner. Groundwork for the server and client; no new tools yet. No network, no LLM.' },
+      { badge: 'Shipped', dot: OK, title: 'v1.7.0 — vault sync protocol', desc: '@chamba/core ships parche\'s v1 protocol (private sync of an Obsidian vault across a group): zod schemas, owner/admin/editor/reader roles, conflict copies instead of overwriting notes, safe paths on case-insensitive filesystems and a pure push/pull planner. Groundwork for the server and client; no new tools yet. No network, no LLM.' },
+      { badge: 'Now', dot: AM, title: 'v1.8.0 — group vaults (parche client)', desc: 'Your team shares an Obsidian vault and chamba keeps it in sync: vault join with an invite code, vault sync / status / leave from the CLI and three new MCP tools (vault_join, vault_sync, parche_status). summarize_to_vault, load_context, remember and recall sync in the background, capped at 10 s. Group memories live in the vault; personal ones are never uploaded. Conflicts become copies, never overwrites. No LLM.' },
       { badge: 'Exploring', dot: MU, title: 'V2: service registry, semantic search', desc: 'Registry with drift detection and vault search.' }
     ],
     ctaTitle: 'Put your editor to work — la chamba',

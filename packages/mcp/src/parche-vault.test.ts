@@ -353,8 +353,8 @@ describe('CLI error messages', () => {
     parche.addInvite({
       code: 'K7QX-M2RQ',
       groupId: [
-        ...(parche as FakeParche & { groups: Map<string, { id: string }> }).groups.values(),
-      ][0].id,
+        ...(parche as unknown as { groups: Map<string, { id: string }> }).groups.values(),
+      ][0]?.id as string,
       role: 'editor',
     });
 

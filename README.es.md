@@ -108,6 +108,9 @@ el directorio de logs y los worktrees.
 | `chamba_summarize_to_vault` | `{ title, content, projectSlug? }` | Escribe un resumen a `proyectos/` — agrupado por proyecto (git remote) + un `INDEX.md` por carpeta para recall barato |
 | `chamba_save_plan` | `{ title, content, projectSlug? }` | Guarda un plan en `plans/` — mismo agrupamiento por proyecto + índice |
 | `chamba_vault_status` | `{}` | Ruta del vault resuelta + las notas que chamba ve (diagnóstico) |
+| `chamba_vault_join` | `{ code, name, email, deviceLabel? }` | Se une a un vault de grupo de **parche** con un código o link de invitación: crea el vault local, guarda credenciales (0600, fuera del vault) y hace el primer sync. Nunca devuelve el token |
+| `chamba_vault_sync` | `{ slug? }` | Sincroniza un vault de parche (o todos) con el server → subidos / bajados / conflictos. Los conflictos quedan como copias, nunca pisa |
+| `chamba_parche_status` | `{}` | Por vault: server, slug, rol, último sync, cambios pendientes, ruta. Sin token |
 | `chamba_doctor` | `{}` | Chequeo de salud del entorno (sin LLM): Node, sistema (RAM/CPU), git (consciente de multi-repo), workspace, config, vault, registro MCP (avisa si chamba está duplicado/inconsistente entre configs), logs, worktrees → pass/warn/fail. También `npx @chamba/mcp doctor` |
 | `chamba_resource_budget` | `{ requested?, perWorkerMemMB? }` | Paralelismo seguro para **esta** máquina (sin LLM): lee RAM/CPU/carga en vivo → cuántos worktrees/workers correr a la vez. Consultalo antes de un fan-out multi-repo |
 | `chamba_qa_capabilities` | `{}` | Con qué correr la QA de aceptación (sin LLM): web vs móvil (React Native / Expo), tooling E2E, y los simuladores iOS / emuladores Android realmente disponibles (read-only `xcrun simctl` / `adb` / `emulator` — lista, nunca bootea). El agente qa elige su modo con esto |
@@ -261,6 +264,7 @@ corrés chamba en paralelo entre máquinas: sin techo de RAM de una sola, menos 
 - ✅ **1.5.0 — Paralelismo seguro 2.0:** status de worktrees + overlap, preview `merge-tree` (nunca mergea), waves, PORT opt-in
 - ✅ **1.6.0 — Rama base por repo:** `worktrees.baseBranch` acepta un mapa por repo para que cada repo forkee de su propia rama de integración (ej. `web`=main, `api`=develop)
 - ✅ **1.7.0 — Protocolo de sync de vault:** `@chamba/core` trae el protocolo v1 de parche (sync privado de un vault Obsidian entre miembros de un grupo): schemas, roles, copias en conflicto y un planificador puro de push/pull. Solo la base, sin tools nuevas
+- ✅ **1.8.0 — Vaults de grupo (cliente de parche):** CLI `vault join/sync/status/leave` + `chamba_vault_join` / `chamba_vault_sync` / `chamba_parche_status`; las tools de contexto y memoria sincronizan solas en segundo plano (tope de 10 s). Memorias del grupo en el vault, las personales nunca se suben. Detalle en el [README de `@chamba/mcp`](./packages/mcp/README.md#parche--group-vaults)
 - 🔭 V2: búsqueda semántica del vault, MCP sampling, más bases de conocimiento
 
 Ver [`PLAN.md`](./PLAN.md) para el plan completo de fases.

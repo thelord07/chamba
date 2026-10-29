@@ -625,7 +625,7 @@ class CrashingWriteFs extends MemoryFilesystem {
     data: Uint8Array,
     opts?: import('../ports/filesystem.js').WriteBytesOptions,
   ): Promise<void> {
-    if (this.norm(path) === this.norm(this.targetPath)) {
+    if (this.normPath(path) === this.normPath(this.targetPath)) {
       this.callsToTarget += 1;
       if (this.callsToTarget === this.crashOnCall) {
         throw new Error(`Simulated crash writing ${path}`);
@@ -634,8 +634,8 @@ class CrashingWriteFs extends MemoryFilesystem {
     return super.writeBytes(path, data, opts);
   }
 
-  /** Access the private norm() for path comparison */
-  norm(p: string): string {
+  /** Mirrors MemoryFilesystem's private path normalization */
+  private normPath(p: string): string {
     return p.replace(/\/+$/, '') || '/';
   }
 }

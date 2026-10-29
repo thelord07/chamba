@@ -169,6 +169,10 @@ Encontrado dogfooding en **finalis**. El check "Git repo" corría `git rev-parse
   Schemas zod, sync-filter, conflict helpers, planPush/planPull/applyPushResults, roles + `can()`.
   Repo: chamba · `packages/core/src/vault-sync/`. Changeset minor. Sin red, sin fs, sin LLM.
   Refs: `.planning/2026-10-27-parche-vault-sync-arquitectura.md`, `.planning/reviews/parche-design-v1-review.md`.
+- **PARCHE-004 — cliente de parche (✅ HECHO — 1.8.0)**
+  CLI `vault join|sync|status|leave`, tools `chamba_vault_join` / `chamba_vault_sync` / `chamba_parche_status`,
+  auto-sync no bloqueante (10 s) en las tools de contexto y memoria, memoria de grupo en `<vault>/memory/`.
+  Ports `HttpPort` / `HashPort` en core; `NodeHttp` / `NodeHash` en adapters. Sin LLM.
 
 ---
 
@@ -203,6 +207,7 @@ Encontrado dogfooding en **finalis**. El check "Git repo" corría `git rev-parse
 - ✅ **0.21.0** — `/triage` read-only: pre-diagnóstico + plan de fix sin ejecutar (`chamba_triage_ticket` sin LLM, agente `diagnostician`).
 - ✅ **1.0.0** — primer estable: el server MCP reporta su versión real en el handshake, superficie de 24 tools revisada, docs endurecidas (grid de la landing 24/24), catálogo de modelos re-verificado. Sin features nuevas.
 - ✅ **1.7.0** — protocolo de sync de vault v1 (parche) en `@chamba/core`: schemas, roles, conflictos, planificador puro. Sin tools nuevas.
+- ✅ **1.8.0** — cliente de parche: vault join/sync/status/leave (CLI + 3 tools MCP) + sync automático; memoria de grupo en el vault.
 
 ## Orden sugerido (lo que sigue)
 1. ✅ **1.0.0** — Tier 3 completo. Pulido y estabilización: superficie de tools revisada, docs
