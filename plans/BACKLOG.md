@@ -165,7 +165,7 @@ Encontrado dogfooding en **finalis**. El check "Git repo" corría `git rev-parse
 > parche — servidor privado de sync de vault Obsidian-compatible entre miembros de un grupo.
 > El protocolo vive en `@chamba/core` (MIT) para que server + cliente validen con el mismo schema.
 
-- **PARCHE-002 — protocolo de sync v1 en `@chamba/core` (✅ HECHO, pendiente de release)**
+- **PARCHE-002 — protocolo de sync v1 en `@chamba/core` (✅ HECHO — 1.7.0)**
   Schemas zod, sync-filter, conflict helpers, planPush/planPull/applyPushResults, roles + `can()`.
   Repo: chamba · `packages/core/src/vault-sync/`. Changeset minor. Sin red, sin fs, sin LLM.
   Refs: `.planning/2026-10-27-parche-vault-sync-arquitectura.md`, `.planning/reviews/parche-design-v1-review.md`.
@@ -202,6 +202,7 @@ Encontrado dogfooding en **finalis**. El check "Git repo" corría `git rev-parse
 - ✅ **0.20.1** — sync del README de npm (lista de tools completa).
 - ✅ **0.21.0** — `/triage` read-only: pre-diagnóstico + plan de fix sin ejecutar (`chamba_triage_ticket` sin LLM, agente `diagnostician`).
 - ✅ **1.0.0** — primer estable: el server MCP reporta su versión real en el handshake, superficie de 24 tools revisada, docs endurecidas (grid de la landing 24/24), catálogo de modelos re-verificado. Sin features nuevas.
+- ✅ **1.7.0** — protocolo de sync de vault v1 (parche) en `@chamba/core`: schemas, roles, conflictos, planificador puro. Sin tools nuevas.
 
 ## Orden sugerido (lo que sigue)
 1. ✅ **1.0.0** — Tier 3 completo. Pulido y estabilización: superficie de tools revisada, docs

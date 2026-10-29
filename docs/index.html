@@ -68,7 +68,7 @@
 
 <script>
 const AC = 'var(--accent)', OK = 'var(--accent2)', AM = 'var(--amber)', MU = 'var(--muted)';
-const VERSION = '1.6.0';
+const VERSION = '1.7.0';
 
 const EDITORS = [
   { id: 'cursor', name: 'Cursor', file: '.cursor/mcp.json',
@@ -265,7 +265,8 @@ const CONTENT = {
       { badge: 'Listo', dot: OK, title: 'v1.3.0 — extras de OpenCode', desc: '@chamba/opencode-extras instala los mismos /comandos y subagentes en OpenCode (traducidos a su formato) y registra el MCP. Un solo comando, misma fuente que Claude Code.' },
       { badge: 'Listo', dot: OK, title: 'v1.4.0 — extras de Cursor', desc: '@chamba/cursor-extras instala los /comandos y subagentes en Cursor (.cursor/commands + .cursor/agents, con el modelo de tu reparto) y registra el MCP. Tres editores con extras nativos, un solo set de prompts.' },
       { badge: 'Listo', dot: OK, title: 'v1.5.0 — safe parallelism 2.0', desc: 'chamba mira los diffs reales: reporta si dos worktrees tocan los mismos archivos y los corre en oleadas en vez de en paralelo, y hace un dry-run del merge (git merge-tree) que lista los conflictos vs main — nunca mergea. /worktrees ahora muestra dirty/stale/ahead-behind. Opt-in: un PORT único por worktree en .env.local. Sin LLM, sin auto-merge.' },
-      { badge: 'Ahora', dot: AM, title: 'v1.6.0 — rama base por repo', desc: 'worktrees.baseBranch acepta una sola rama o un mapa por repo ({ "web": "main", "api": "develop", "*": "main" }): cada repo del ticket forkea desde su propia rama de integración, y el conflict-preview compara contra la base correcta de cada uno. Retrocompatible, sin LLM.' },
+      { badge: 'Listo', dot: OK, title: 'v1.6.0 — rama base por repo', desc: 'worktrees.baseBranch acepta una sola rama o un mapa por repo ({ "web": "main", "api": "develop", "*": "main" }): cada repo del ticket forkea desde su propia rama de integración, y el conflict-preview compara contra la base correcta de cada uno. Retrocompatible, sin LLM.' },
+      { badge: 'Ahora', dot: AM, title: 'v1.7.0 — protocolo de sync de vault', desc: '@chamba/core trae el protocolo v1 de parche (sync privado de un vault Obsidian entre miembros de un grupo): schemas zod, roles owner/admin/editor/reader, copias en conflicto en vez de pisar notas, paths seguros en FS case-insensitive y un planificador puro de push/pull. Base para el server y el cliente; todavía sin tools nuevas. Sin red, sin LLM.' },
       { badge: 'Explorando', dot: MU, title: 'V2: registro de servicios, búsqueda semántica', desc: 'Registro con detección de drift y búsqueda del vault.' }
     ],
     ctaTitle: 'Pon a tu editor a trabajar la chamba',
@@ -413,7 +414,8 @@ const CONTENT = {
       { badge: 'Shipped', dot: OK, title: 'v1.3.0 — OpenCode extras', desc: '@chamba/opencode-extras installs the same /commands and subagents into OpenCode (translated to its format) and registers the MCP server. One command, same source as Claude Code.' },
       { badge: 'Shipped', dot: OK, title: 'v1.4.0 — Cursor extras', desc: '@chamba/cursor-extras installs the /commands and subagents into Cursor (.cursor/commands + .cursor/agents, with the model from your reparto) and registers the MCP server. Three editors with native extras, one set of prompts.' },
       { badge: 'Shipped', dot: OK, title: 'v1.5.0 — safe parallelism 2.0', desc: 'chamba reads the real diffs: it reports when two worktrees touch the same files and runs them in waves instead of in parallel, and does a merge dry-run (git merge-tree) listing conflicts vs main — it never merges. /worktrees now shows dirty/stale/ahead-behind. Opt-in: a unique PORT per worktree in .env.local. No LLM, no auto-merge.' },
-      { badge: 'Now', dot: AM, title: 'v1.6.0 — per-repo base branches', desc: 'worktrees.baseBranch takes a single branch or a per-repo map ({ "web": "main", "api": "develop", "*": "main" }): each repo in a ticket forks from its own integration branch, and the conflict preview compares against each repo\'s real base. Backward compatible, no LLM.' },
+      { badge: 'Shipped', dot: OK, title: 'v1.6.0 — per-repo base branches', desc: 'worktrees.baseBranch takes a single branch or a per-repo map ({ "web": "main", "api": "develop", "*": "main" }): each repo in a ticket forks from its own integration branch, and the conflict preview compares against each repo\'s real base. Backward compatible, no LLM.' },
+      { badge: 'Now', dot: AM, title: 'v1.7.0 — vault sync protocol', desc: '@chamba/core ships parche\'s v1 protocol (private sync of an Obsidian vault across a group): zod schemas, owner/admin/editor/reader roles, conflict copies instead of overwriting notes, safe paths on case-insensitive filesystems and a pure push/pull planner. Groundwork for the server and client; no new tools yet. No network, no LLM.' },
       { badge: 'Exploring', dot: MU, title: 'V2: service registry, semantic search', desc: 'Registry with drift detection and vault search.' }
     ],
     ctaTitle: 'Put your editor to work — la chamba',

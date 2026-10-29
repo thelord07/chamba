@@ -260,6 +260,7 @@ corrés chamba en paralelo entre máquinas: sin techo de RAM de una sola, menos 
 - ✅ **1.4.0 — extras de Cursor:** `@chamba/cursor-extras` instala los mismos comandos + subagentes en Cursor (`.cursor/commands` + `.cursor/agents`, modelo de tu reparto) y registra el MCP
 - ✅ **1.5.0 — Paralelismo seguro 2.0:** status de worktrees + overlap, preview `merge-tree` (nunca mergea), waves, PORT opt-in
 - ✅ **1.6.0 — Rama base por repo:** `worktrees.baseBranch` acepta un mapa por repo para que cada repo forkee de su propia rama de integración (ej. `web`=main, `api`=develop)
+- ✅ **1.7.0 — Protocolo de sync de vault:** `@chamba/core` trae el protocolo v1 de parche (sync privado de un vault Obsidian entre miembros de un grupo): schemas, roles, copias en conflicto y un planificador puro de push/pull. Solo la base, sin tools nuevas
 - 🔭 V2: búsqueda semántica del vault, MCP sampling, más bases de conocimiento
 
 Ver [`PLAN.md`](./PLAN.md) para el plan completo de fases.

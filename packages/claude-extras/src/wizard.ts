@@ -85,7 +85,10 @@ export async function runWorktreesWizard(): Promise<PartialWorktreeConfig> {
     default: layout === 'sibling' ? 'WORKTREES' : '.chamba/worktrees',
   });
   const branchPrefix = await input({ message: 'Branch prefix', default: 'ticket/' });
-  const baseBranch = await input({ message: 'Base branch to fork from', default: d.baseBranch });
+  const baseBranch = await input({
+    message: 'Base branch to fork from',
+    default: typeof d.baseBranch === 'string' ? d.baseBranch : 'main',
+  });
   const copyEnvFiles = await confirm({
     message: 'Copy git-ignored .env* files into worktrees?',
     default: false,

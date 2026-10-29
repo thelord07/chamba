@@ -284,6 +284,7 @@ no single-machine RAM ceiling, less waiting. **Guide:
 - ✅ **1.4.0 — Cursor extras:** `@chamba/cursor-extras` installs the same commands + subagents into Cursor (`.cursor/commands` + `.cursor/agents`, model from your reparto) and registers the MCP server
 - ✅ **1.5.0 — Safe parallelism 2.0:** worktree status + file overlap, `merge-tree` conflict preview (never merges), partition waves, opt-in per-worktree PORT
 - ✅ **1.6.0 — Per-repo base branches:** `worktrees.baseBranch` accepts a per-repo map so each repo forks from its own integration branch (e.g. `web`=main, `api`=develop)
+- ✅ **1.7.0 — Vault sync protocol:** `@chamba/core` ships the v1 sync protocol for parche (private Obsidian vault sync across a group): schemas, roles, conflict copies and a pure push/pull planner. Groundwork only, no new tools
 - 🔭 V2: semantic vault search, MCP sampling, more knowledge bases
 
 See [`PLAN.md`](./PLAN.md) for the full phase plan.
