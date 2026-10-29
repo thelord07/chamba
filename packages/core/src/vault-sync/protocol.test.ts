@@ -3,6 +3,7 @@ import {
   changesResponseSchema,
   deviceAuthPollResponseSchema,
   deviceAuthStartResponseSchema,
+  deviceSchema,
   groupSchema,
   hashSchema,
   joinRequestSchema,
@@ -11,6 +12,7 @@ import {
   pushRequestSchema,
   pushResponseSchema,
   roleSchema,
+  userSchema,
   vaultPathSchema,
 } from './protocol.js';
 
@@ -202,38 +204,46 @@ describe('pushRequestSchema — AC4', () => {
   });
 });
 
-describe('joinRequestSchema — AC5', () => {
+describe('joinRequestSchema — code', () => {
+  const validBase = { name: 'Joys', email: 'joys@example.com' };
+
   it('normalizes lowercase to uppercase', () => {
-    const result = joinRequestSchema.parse({ code: 'k7qx-m2rp' });
+    const result = joinRequestSchema.parse({ ...validBase, code: 'k7qx-m2rp' });
     expect(result.code).toBe('K7QX-M2RP');
   });
 
   it('trims whitespace then normalizes', () => {
-    const result = joinRequestSchema.parse({ code: '  k7qx-m2rp  ' });
+    const result = joinRequestSchema.parse({ ...validBase, code: '  k7qx-m2rp  ' });
     expect(result.code).toBe('K7QX-M2RP');
   });
 
   it('rejects code without dash', () => {
-    expect(() => joinRequestSchema.parse({ code: 'K7QXM2RP' })).toThrow();
+    expect(() => joinRequestSchema.parse({ ...validBase, code: 'K7QXM2RP' })).toThrow();
   });
 
   it('rejects code with wrong format', () => {
-    expect(() => joinRequestSchema.parse({ code: 'K7QX-M2R' })).toThrow();
+    expect(() => joinRequestSchema.parse({ ...validBase, code: 'K7QX-M2R' })).toThrow();
   });
 
   it('accepts valid uppercase code', () => {
-    const result = joinRequestSchema.parse({ code: 'K7QX-M2RP' });
+    const result = joinRequestSchema.parse({ ...validBase, code: 'K7QX-M2RP' });
     expect(result.code).toBe('K7QX-M2RP');
   });
 });
 
 describe('joinResponseSchema', () => {
+  const validUserDevice = {
+    user: { id: 'u1', name: 'Joys' },
+    device: { id: 'd1', label: 'MacBook' },
+  };
+
   it('accepts valid response with admin role', () => {
     expect(() =>
       joinResponseSchema.parse({
         group: { id: '1', slug: 'mi-vault', name: 'Mi Vault' },
         role: 'admin',
         deviceToken: 'tok123',
+        ...validUserDevice,
       }),
     ).not.toThrow();
   });
@@ -243,6 +253,7 @@ describe('joinResponseSchema', () => {
       group: { id: '1', slug: 'x', name: 'X' },
       role: 'editor',
       deviceToken: 'tok',
+      ...validUserDevice,
       secretPassword: 'leaked', // should be stripped
     });
     expect(Object.keys(result)).not.toContain('secretPassword');
@@ -302,6 +313,8 @@ describe('deviceAuthPollResponseSchema', () => {
       deviceToken: 'tok456',
       group: { id: '2', slug: 'g2', name: 'G2' },
       role: 'admin',
+      user: { id: 'u1', name: 'Joys' },
+      device: { id: 'd1', label: 'MacBook' },
     });
     expect(result).toMatchObject({ status: 'approved', role: 'admin' });
   });
@@ -312,6 +325,8 @@ describe('deviceAuthPollResponseSchema', () => {
       deviceToken: 'tok',
       group: { id: '1', slug: 's', name: 'N' },
       role: 'owner',
+      user: { id: 'u1', name: 'N' },
+      device: { id: 'd1', label: 'L' },
       apiKey: 'shouldbestripped', // extra
     }) as { status: 'approved' };
     expect(Object.keys(result)).not.toContain('apiKey');
@@ -322,5 +337,254 @@ describe('groupSchema', () => {
   it('has exactly id, slug, name keys', () => {
     const g = groupSchema.parse({ id: '1', slug: 'x', name: 'X', extra: 'y' });
     expect(new Set(Object.keys(g))).toEqual(new Set(['id', 'slug', 'name']));
+  });
+});
+
+// ─── 002c AC2 — join request identity normalization ───────────────────────────
+
+describe('joinRequestSchema — 002c AC2', () => {
+  it('002c AC2: normalizes code to uppercase, trims name, lowercases email, deviceLabel undefined', () => {
+    const result = joinRequestSchema.parse({
+      code: 'k7qx-m2rp',
+      name: ' Joys ',
+      email: 'Joys@Lapzo.COM',
+    });
+    expect(result.code).toBe('K7QX-M2RP');
+    expect(result.name).toBe('Joys');
+    expect(result.email).toBe('joys@lapzo.com');
+    expect(result.deviceLabel).toBeUndefined();
+  });
+});
+
+// ─── 002c AC3 — join request field validation ─────────────────────────────────
+
+describe('joinRequestSchema — 002c AC3', () => {
+  const validBase = { code: 'K7QX-M2RP', name: 'Joys', email: 'joys@example.com' };
+
+  // Four required-fail tests
+  it('002c AC3: name empty string fails', () => {
+    expect(() => joinRequestSchema.parse({ ...validBase, name: '' })).toThrow();
+  });
+
+  it('002c AC3: name 65 chars fails', () => {
+    expect(() => joinRequestSchema.parse({ ...validBase, name: 'a'.repeat(65) })).toThrow();
+  });
+
+  it('002c AC3: email not-an-email fails', () => {
+    expect(() => joinRequestSchema.parse({ ...validBase, email: 'not-an-email' })).toThrow();
+  });
+
+  it('002c AC3: deviceLabel with internal newline fails', () => {
+    expect(() => joinRequestSchema.parse({ ...validBase, deviceLabel: 'Mac\nBook' })).toThrow();
+  });
+
+  // Pass cases
+  it('002c AC3: name 64 chars passes', () => {
+    const result = joinRequestSchema.parse({ ...validBase, name: 'a'.repeat(64) });
+    expect(result.name).toBe('a'.repeat(64));
+  });
+
+  // Gate decision 1 — whitespace-only treated as empty
+  it('002c AC3: name only spaces fails (gate decision 1)', () => {
+    expect(() => joinRequestSchema.parse({ ...validBase, name: '   ' })).toThrow();
+  });
+
+  it('002c AC3: deviceLabel empty string fails (gate decision 1)', () => {
+    expect(() => joinRequestSchema.parse({ ...validBase, deviceLabel: '' })).toThrow();
+  });
+
+  it('002c AC3: deviceLabel only spaces fails (gate decision 1)', () => {
+    expect(() => joinRequestSchema.parse({ ...validBase, deviceLabel: '   ' })).toThrow();
+  });
+
+  // Gate decision 2 — trailing newline trimmed, internal newline rejected
+  it('002c AC3: deviceLabel trailing newline is trimmed to Mac (gate decision 2)', () => {
+    const result = joinRequestSchema.parse({ ...validBase, deviceLabel: 'Mac\n' });
+    expect(result.deviceLabel).toBe('Mac');
+  });
+
+  it('002c AC3: name with trailing newline is trimmed (gate decision 2)', () => {
+    const result = joinRequestSchema.parse({ ...validBase, name: ' Joys\n' });
+    expect(result.name).toBe('Joys');
+  });
+
+  // Email normalization
+  it('002c AC3: email with uppercase and spaces is normalized', () => {
+    const result = joinRequestSchema.parse({ ...validBase, email: '  Joys@Lapzo.COM  ' });
+    expect(result.email).toBe('joys@lapzo.com');
+  });
+
+  it('002c AC3: email of 255 chars after normalization fails', () => {
+    // 249 local + @ + b.com(5) = 255 chars — exceeds the 254-char limit
+    const longEmail = `${'a'.repeat(249)}@b.com`;
+    expect(longEmail.length).toBe(255);
+    expect(() => joinRequestSchema.parse({ ...validBase, email: longEmail })).toThrow();
+  });
+});
+
+// ─── 002c AC4 — join response with user and device ───────────────────────────
+
+describe('joinResponseSchema — 002c AC4', () => {
+  const validGroup = { id: 'g1', slug: 'my-vault', name: 'My Vault' };
+  const validUser = { id: 'u1', name: 'Joys' };
+  const validDevice = { id: 'd1', label: 'MacBook' };
+
+  it('002c AC4: joinResponseSchema without user fails', () => {
+    expect(() =>
+      joinResponseSchema.parse({
+        group: validGroup,
+        role: 'editor',
+        deviceToken: 'tok',
+        device: validDevice,
+      }),
+    ).toThrow();
+  });
+
+  it('002c AC4: joinResponseSchema without device fails', () => {
+    expect(() =>
+      joinResponseSchema.parse({
+        group: validGroup,
+        role: 'editor',
+        deviceToken: 'tok',
+        user: validUser,
+      }),
+    ).toThrow();
+  });
+
+  it('002c AC4: joinResponseSchema complete passes', () => {
+    expect(() =>
+      joinResponseSchema.parse({
+        group: validGroup,
+        role: 'editor',
+        deviceToken: 'tok',
+        user: validUser,
+        device: validDevice,
+      }),
+    ).not.toThrow();
+  });
+
+  it('002c AC4: user {id:""} fails', () => {
+    expect(() =>
+      joinResponseSchema.parse({
+        group: validGroup,
+        role: 'editor',
+        deviceToken: 'tok',
+        user: { id: '', name: 'Joys' },
+        device: validDevice,
+      }),
+    ).toThrow();
+  });
+});
+
+// ─── 002c Gate decision 3 — approved poll requires user + device ──────────────
+
+describe('deviceAuthPollResponseSchema — 002c gate decision 3', () => {
+  const validGroup = { id: 'g1', slug: 's', name: 'N' };
+  const validUser = { id: 'u1', name: 'Joys' };
+  const validDevice = { id: 'd1', label: 'MacBook' };
+
+  it('002c gate3: approved without user fails', () => {
+    expect(() =>
+      deviceAuthPollResponseSchema.parse({
+        status: 'approved',
+        deviceToken: 'tok',
+        group: validGroup,
+        role: 'owner',
+        device: validDevice,
+      }),
+    ).toThrow();
+  });
+
+  it('002c gate3: approved without device fails', () => {
+    expect(() =>
+      deviceAuthPollResponseSchema.parse({
+        status: 'approved',
+        deviceToken: 'tok',
+        group: validGroup,
+        role: 'owner',
+        user: validUser,
+      }),
+    ).toThrow();
+  });
+
+  it('002c gate3: approved complete passes', () => {
+    expect(() =>
+      deviceAuthPollResponseSchema.parse({
+        status: 'approved',
+        deviceToken: 'tok',
+        group: validGroup,
+        role: 'owner',
+        user: validUser,
+        device: validDevice,
+      }),
+    ).not.toThrow();
+  });
+
+  it('002c gate3: non-approved statuses unaffected (pending still passes)', () => {
+    expect(() => deviceAuthPollResponseSchema.parse({ status: 'pending' })).not.toThrow();
+  });
+
+  it('002c gate3: non-approved statuses unaffected (denied still passes)', () => {
+    expect(() => deviceAuthPollResponseSchema.parse({ status: 'denied' })).not.toThrow();
+  });
+});
+
+// ─── 002c Key-set — schema shape and no secret fields ────────────────────────
+
+describe('userSchema — 002c key-set', () => {
+  it('002c key-set: userSchema parsed keys are exactly [id, name]', () => {
+    const result = userSchema.parse({ id: 'u1', name: 'Joys', extra: 'stripped' });
+    expect(new Set(Object.keys(result))).toEqual(new Set(['id', 'name']));
+  });
+});
+
+describe('deviceSchema — 002c key-set', () => {
+  it('002c key-set: deviceSchema parsed keys are exactly [id, label]', () => {
+    const result = deviceSchema.parse({ id: 'd1', label: 'MacBook', extra: 'stripped' });
+    expect(new Set(Object.keys(result))).toEqual(new Set(['id', 'label']));
+  });
+});
+
+describe('joinResponseSchema — 002c key-set no secrets', () => {
+  it('002c key-set: join response has no credential-like keys besides deviceToken', () => {
+    const result = joinResponseSchema.parse({
+      group: { id: 'g1', slug: 's', name: 'N' },
+      role: 'owner',
+      deviceToken: 'tok',
+      user: { id: 'u1', name: 'Joys' },
+      device: { id: 'd1', label: 'MacBook' },
+      password: 'leaked',
+      secret: 'leaked',
+      apiKey: 'leaked',
+      token: 'leaked',
+    });
+    const keys = Object.keys(result);
+    const forbidden = ['password', 'secret', 'apiKey', 'token'];
+    for (const k of forbidden) {
+      expect(keys).not.toContain(k);
+    }
+    expect(keys).toContain('deviceToken');
+  });
+});
+
+describe('deviceAuthPollResponseSchema — 002c key-set approved no secrets', () => {
+  it('002c key-set: approved poll has no credential-like keys besides deviceToken', () => {
+    const result = deviceAuthPollResponseSchema.parse({
+      status: 'approved',
+      deviceToken: 'tok',
+      group: { id: 'g1', slug: 's', name: 'N' },
+      role: 'owner',
+      user: { id: 'u1', name: 'N' },
+      device: { id: 'd1', label: 'L' },
+      password: 'leaked',
+      secret: 'leaked',
+      apiKey: 'leaked',
+    }) as { status: 'approved' };
+    const keys = Object.keys(result);
+    const forbidden = ['password', 'secret', 'apiKey'];
+    for (const k of forbidden) {
+      expect(keys).not.toContain(k);
+    }
+    expect(keys).toContain('deviceToken');
   });
 });

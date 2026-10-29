@@ -25,8 +25,9 @@ No network, no crypto, no fs — hashes arrive pre-computed from the adapter.
 | `hashSchema`, `vaultPathSchema`, `roleSchema` | Zod primitives (NFC-normalized paths, sha256 hashes, 4-role enum) |
 | `changeEntrySchema`, `changesResponseSchema` | Remote change feed schemas |
 | `pushRequestSchema`, `pushResponseSchema` | Optimistic push schemas (≥1, ≤500 changes; no exact duplicate path; no two live entries sharing a `pathKey`) |
-| `joinRequestSchema`, `joinResponseSchema` | Invite-code join (normalizes to uppercase) |
-| `deviceAuthStartResponseSchema`, `deviceAuthPollResponseSchema` | Device flow auth |
+| `joinRequestSchema`, `joinResponseSchema` | Invite-code join: request carries `{ code, name, email, deviceLabel? }` (code normalized to uppercase; email trimmed + lowercased); response includes `user: { id, name }` and `device: { id, label }` |
+| `userSchema`, `deviceSchema` | Identity objects returned by the server after a successful join or device-flow approval |
+| `deviceAuthStartResponseSchema`, `deviceAuthPollResponseSchema` | Device flow auth; `approved` variant includes `user` and `device` |
 | `isSyncable(path)` | Returns true iff path should be synced (denylist + extension allowlist) |
 | `pathKey(path)` | Canonical key: `path.normalize('NFC').toLowerCase()` — case-insensitive identity for macOS/Windows FS |
 | `findCaseCollisions(paths)` | Groups of paths that collide under `pathKey` (≥2 distinct paths per group); for server/client validation |

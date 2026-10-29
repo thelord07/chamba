@@ -176,6 +176,7 @@ export { applyPullPlan, applyPushResults, planPull, planPush } from './vault-syn
 export type {
   ChangeEntry,
   ChangesResponse,
+  Device,
   DeviceAuthPollResponse,
   DeviceAuthStartResponse,
   Group,
@@ -187,6 +188,7 @@ export type {
   PushResponse,
   PushResult,
   Role,
+  User,
   VaultPath,
 } from './vault-sync/protocol.js';
 // Vault sync (parche protocol v1 — pure, no Node APIs, no LLM)
@@ -195,6 +197,7 @@ export {
   changesResponseSchema,
   deviceAuthPollResponseSchema,
   deviceAuthStartResponseSchema,
+  deviceSchema,
   groupSchema,
   hashSchema,
   joinRequestSchema,
@@ -205,6 +208,7 @@ export {
   pushResponseSchema,
   pushResultSchema,
   roleSchema,
+  userSchema,
   vaultPathSchema,
 } from './vault-sync/protocol.js';
 export type { SyncAction } from './vault-sync/roles.js';

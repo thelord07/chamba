@@ -177,6 +177,27 @@ export const joinRequestSchema = z.object({
     .trim()
     .toUpperCase()
     .regex(/^[A-Z0-9]{4}-[A-Z0-9]{4}$/, 'invalid invite code format'),
+  name: z
+    .string()
+    .trim()
+    .min(1, 'name must not be empty')
+    .max(64, 'name must not exceed 64 characters')
+    .refine((s) => !hasControlChars(s), { message: 'name must not contain control characters' }),
+  email: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .email('invalid email address')
+    .max(254, 'email must not exceed 254 characters'),
+  deviceLabel: z
+    .string()
+    .trim()
+    .min(1, 'deviceLabel must not be empty')
+    .max(64, 'deviceLabel must not exceed 64 characters')
+    .refine((s) => !hasControlChars(s), {
+      message: 'deviceLabel must not contain control characters',
+    })
+    .optional(),
 });
 
 export const groupSchema = z.object({
@@ -185,10 +206,22 @@ export const groupSchema = z.object({
   name: z.string().min(1),
 });
 
+export const userSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+});
+
+export const deviceSchema = z.object({
+  id: z.string().min(1),
+  label: z.string().min(1),
+});
+
 export const joinResponseSchema = z.object({
   group: groupSchema,
   role: roleSchema,
   deviceToken: z.string().min(1),
+  user: userSchema,
+  device: deviceSchema,
 });
 
 // ─── Device flow ──────────────────────────────────────────────────────────────
@@ -210,6 +243,8 @@ const deviceAuthApprovedSchema = z.object({
   deviceToken: z.string().min(1),
   group: groupSchema,
   role: roleSchema,
+  user: userSchema,
+  device: deviceSchema,
 });
 
 export const deviceAuthPollResponseSchema = z.discriminatedUnion('status', [
@@ -234,5 +269,7 @@ export type PushResponse = z.infer<typeof pushResponseSchema>;
 export type JoinRequest = z.infer<typeof joinRequestSchema>;
 export type JoinResponse = z.infer<typeof joinResponseSchema>;
 export type Group = z.infer<typeof groupSchema>;
+export type User = z.infer<typeof userSchema>;
+export type Device = z.infer<typeof deviceSchema>;
 export type DeviceAuthStartResponse = z.infer<typeof deviceAuthStartResponseSchema>;
 export type DeviceAuthPollResponse = z.infer<typeof deviceAuthPollResponseSchema>;
