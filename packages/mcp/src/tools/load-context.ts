@@ -2,6 +2,8 @@ import { ContextBuilder, ObsidianDetector, WorkspaceScanner } from '@chamba/core
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { Logger } from 'pino';
 import { z } from 'zod';
+import { resolveActiveParcheVault } from '../parche/active-vault.js';
+import { maybeAutoSync } from '../parche/autosync.js';
 import { obsidianSearchRoots, type Services } from '../services.js';
 
 const TOOL_NAME = 'chamba_load_context';
@@ -31,6 +33,14 @@ export function registerLoadContext(server: McpServer, logger: Logger, services:
       },
     },
     async ({ task, includeObsidian, includeRules }) => {
+      // C5: pull auto-sync before reading if active vault is a parche vault
+      let syncWarning: string | undefined;
+      const parcheVault = await resolveActiveParcheVault(services);
+      if (parcheVault) {
+        const syncResult = await maybeAutoSync(services, logger, parcheVault, 'pull');
+        syncWarning = syncResult.warning;
+      }
+
       const workspace = await new WorkspaceScanner(services.fs).scan(services.cwd);
 
       let vaultPath: string | undefined;
@@ -53,7 +63,9 @@ export function registerLoadContext(server: McpServer, logger: Logger, services:
         'context built',
       );
 
-      return { content: [{ type: 'text', text: built.context }] };
+      const text = syncWarning ? `${built.context}\n\n⚠ ${syncWarning}` : built.context;
+
+      return { content: [{ type: 'text' as const, text }] };
     },
   );
 }

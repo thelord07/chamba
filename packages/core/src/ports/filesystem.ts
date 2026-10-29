@@ -5,6 +5,18 @@ export interface DirEntry {
   isFile: boolean;
 }
 
+/** File stat information. */
+export interface FileStat {
+  size: number;
+  mtimeMs: number;
+}
+
+/** Options for writeBytes. */
+export interface WriteBytesOptions {
+  /** Unix file mode to apply after writing (e.g. 0o600). */
+  mode?: number;
+}
+
 /**
  * Filesystem access behind a port so `@chamba/core` never imports `node:fs`.
  * Node implementation lives in `@chamba/adapters`; an in-memory implementation
@@ -19,4 +31,16 @@ export interface FilesystemPort {
   mkdir(path: string): Promise<void>;
   /** Remove a file or directory (recursive); a no-op if it doesn't exist. */
   remove(path: string): Promise<void>;
+  /** Read raw bytes from a file. */
+  readBytes(path: string): Promise<Uint8Array>;
+  /**
+   * Write raw bytes to a file atomically (tmp + rename in the same directory).
+   * If `opts.mode` is provided, it is applied to the file after the rename
+   * (overriding umask) so there is no window where the file is readable.
+   */
+  writeBytes(path: string, data: Uint8Array, opts?: WriteBytesOptions): Promise<void>;
+  /** Rename (move) a file or directory. Throws on cross-filesystem moves (EXDEV). */
+  rename(from: string, to: string): Promise<void>;
+  /** Return stat info, or `null` if the path does not exist (ENOENT). */
+  stat(path: string): Promise<FileStat | null>;
 }

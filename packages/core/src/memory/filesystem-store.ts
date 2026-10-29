@@ -7,6 +7,16 @@ import type { Memory, MemoryStore, RememberInput } from './store.js';
 /** Directory (relative to root) where memories live. */
 export const MEMORY_DIR = `${WORKSPACE_DIR}/memory`;
 
+export interface FilesystemMemoryStoreOpts {
+  /**
+   * Subdirectory (relative to `root`) where memory files live.
+   * Default: `MEMORY_DIR` (`.chamba/memory`).
+   * With an active parche vault: pass `'memory'` so files land in
+   * `<vault>/memory/<slug>.md` (syncable via parche).
+   */
+  dir?: string;
+}
+
 /**
  * Filesystem-backed `MemoryStore`. One markdown file per memory under
  * `.chamba/memory/<slug>.md`, with YAML-ish frontmatter (key, tags, createdAt,
@@ -15,14 +25,19 @@ export const MEMORY_DIR = `${WORKSPACE_DIR}/memory`;
  * and content.
  */
 export class FilesystemMemoryStore implements MemoryStore {
+  private readonly memDir: string;
+
   constructor(
     private readonly fs: FilesystemPort,
     private readonly clock: ClockPort,
     private readonly root: string,
-  ) {}
+    opts?: FilesystemMemoryStoreOpts,
+  ) {
+    this.memDir = opts?.dir ?? MEMORY_DIR;
+  }
 
   private dir(): string {
-    return joinPath(this.root, MEMORY_DIR);
+    return joinPath(this.root, this.memDir);
   }
 
   private pathFor(key: string): string {

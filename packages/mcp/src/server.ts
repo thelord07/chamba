@@ -14,6 +14,7 @@ import { registerListWorktrees } from './tools/list-worktrees.js';
 import { registerLoadContext } from './tools/load-context.js';
 import { registerLoadDesign } from './tools/load-design.js';
 import { registerLoadSkills } from './tools/load-skills.js';
+import { registerParcheStatus } from './tools/parche-status.js';
 import { registerPartition } from './tools/partition.js';
 import { registerQaCapabilities } from './tools/qa-capabilities.js';
 import { registerRecall } from './tools/recall.js';
@@ -23,7 +24,9 @@ import { registerReviewPlan } from './tools/review-plan.js';
 import { registerSavePlan } from './tools/save-plan.js';
 import { registerSummarizeToVault } from './tools/summarize-to-vault.js';
 import { registerTriageTicket } from './tools/triage-ticket.js';
+import { registerVaultJoin } from './tools/vault-join.js';
 import { registerVaultStatus } from './tools/vault-status.js';
+import { registerVaultSync } from './tools/vault-sync.js';
 import { registerWorkspaceInit } from './tools/workspace-init.js';
 import { registerWorkspaceReload } from './tools/workspace-reload.js';
 import { registerWorkspaceShow } from './tools/workspace-show.js';
@@ -73,6 +76,9 @@ export function createServer(logger: Logger, services: Services = createNodeServ
   registerRemember(server, logger, services);
   registerRecall(server, logger, services);
   registerGetAgentConfig(server, logger, services);
+  registerVaultJoin(server, logger, services);
+  registerVaultSync(server, logger, services);
+  registerParcheStatus(server, logger, services);
 
   return server;
 }

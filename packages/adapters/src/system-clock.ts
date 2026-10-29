@@ -9,4 +9,8 @@ export class SystemClock implements ClockPort {
   today(): string {
     return this.now().toISOString().slice(0, 10);
   }
+
+  sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
 }

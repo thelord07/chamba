@@ -109,7 +109,9 @@ export type {
 export { validatePlan } from './plan/validator.js';
 export type { ClockPort } from './ports/clock.js';
 // Ports
-export type { DirEntry, FilesystemPort } from './ports/filesystem.js';
+export type { DirEntry, FileStat, FilesystemPort, WriteBytesOptions } from './ports/filesystem.js';
+export type { HashPort } from './ports/hash.js';
+export type { HttpPort, HttpRequest, HttpResponse } from './ports/http.js';
 export type { NetPort } from './ports/net.js';
 export type { ProcessExecOptions, ProcessPort, ProcessResult } from './ports/process.js';
 export type { SystemPort, SystemResources } from './ports/system.js';
@@ -138,7 +140,9 @@ export {
   readSkill,
   SKILLS_DIR,
 } from './skills/skill-registry.js';
+export { FakeHash } from './testing/fake-hash.js';
 export { FakeNet } from './testing/fake-net.js';
+export { FakeParche } from './testing/fake-parche.js';
 export type { ProcessHandler, RecordedCall } from './testing/fake-process.js';
 export { FakeProcess } from './testing/fake-process.js';
 // Testing utilities
@@ -164,6 +168,18 @@ export {
   readConflictMeta,
   sanitizeAuthor,
 } from './vault-sync/conflict.js';
+// Vault sync — client (PARCHE-004)
+export type { CredentialEntry, CredentialsFile } from './vault-sync/credentials.js';
+export { CredentialsStore, credentialsFileSchema } from './vault-sync/credentials.js';
+export {
+  ParcheAlreadyMemberError,
+  ParcheCaseCollisionError,
+  ParcheClient,
+  ParcheHttpError,
+  ParcheMissingBlobsError,
+  ParcheNotFoundError,
+  ParcheRateLimitedError,
+} from './vault-sync/parche-client.js';
 export { findCaseCollisions, pathKey } from './vault-sync/path-key.js';
 export type {
   LocalSnapshot,
@@ -213,6 +229,37 @@ export {
 } from './vault-sync/protocol.js';
 export type { SyncAction } from './vault-sync/roles.js';
 export { can, ROLE_PERMISSIONS } from './vault-sync/roles.js';
+export type {
+  JoinOnceOpts,
+  JoinOnceResult,
+  SyncDeps,
+  SyncOpts,
+  SyncSummary,
+} from './vault-sync/runner.js';
+export {
+  BlobHashMismatchError,
+  CaseCollisionError,
+  joinOnce,
+  scanLocal,
+  syncOnce,
+} from './vault-sync/runner.js';
+export type { ParsedJoinInput, ResolveServerUrlOptions } from './vault-sync/server-url.js';
+export {
+  assertAllowedServerUrl,
+  DEFAULT_PARCHE_URL,
+  InvalidJoinInputError,
+  parseJoinInput,
+  resolveServerUrl,
+  ServerUrlError,
+} from './vault-sync/server-url.js';
+export type { SyncStateFile } from './vault-sync/state-store.js';
+export {
+  mergeIntoStateFile,
+  readState,
+  syncStateFileSchema,
+  toSyncState,
+  writeState,
+} from './vault-sync/state-store.js';
 export { isSyncable } from './vault-sync/sync-filter.js';
 export type { BuiltContext, ContextBuildInput, RelevantNote } from './workspace/context-builder.js';
 export { ContextBuilder, listVaultNotes } from './workspace/context-builder.js';
