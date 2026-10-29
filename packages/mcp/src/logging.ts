@@ -17,7 +17,17 @@ export function createLogger(): Logger {
   const logPath = join(logDir, `mcp-${process.pid}.log`);
 
   return pino(
-    { level: process.env.CHAMBA_LOG_LEVEL ?? 'info' },
+    {
+      level: process.env.CHAMBA_LOG_LEVEL ?? 'info',
+      // Redact sensitive credential fields so the token never reaches the log file.
+      redact: [
+        'token',
+        'deviceToken',
+        '*.token',
+        'headers.authorization',
+        'req.headers.authorization',
+      ],
+    },
     destination({ dest: logPath, sync: false }),
   );
 }

@@ -127,6 +127,74 @@ Derives a new `SyncState` from a pull plan without mutating the input:
 locally-deleted file if you pull before pushing. Always push first, then pull. This is
 intentional — content is never lost.
 
+## Vault sync client (PARCHE-004)
+
+`@chamba/core` ships a pure-TypeScript vault sync client (no Node imports) that speaks the parche protocol. Import it from the `vault-sync/` sub-paths or directly from `@chamba/core`.
+
+### Ports required
+
+| Port | Method | Description |
+|---|---|---|
+| `HttpPort` | `request(req)` | HTTP client; `HttpRequest` carries an optional `AbortSignal`. |
+| `HashPort` | `sha256(data)` | Async SHA-256 returning a lowercase hex string. |
+| `FilesystemPort` | `readBytes / writeBytes / rename / stat` | Binary I/O; `writeBytes` accepts `{ mode? }` for chmod-style permissions. |
+| `ClockPort` | `now() / today() / sleep?()` | Wall-clock and optional async sleep. |
+
+### Key exports
+
+```ts
+// Ports
+import type { HttpPort, HttpRequest, HttpResponse } from '@chamba/core';
+import type { HashPort } from '@chamba/core';
+import type { FileStat, WriteBytesOptions } from '@chamba/core';
+
+// Sync client
+import { syncOnce, joinOnce, scanLocal, CaseCollisionError } from '@chamba/core';
+import { readState, writeState } from '@chamba/core';
+import { CredentialsStore } from '@chamba/core';
+import { ParcheClient, ParcheHttpError } from '@chamba/core';
+import { parseJoinInput, resolveServerUrl } from '@chamba/core';
+
+// Test doubles (in-memory, no Node)
+import { FakeParche, FakeHash } from '@chamba/core';
+```
+
+### syncOnce
+
+```ts
+const summary = await syncOnce({ fs, http, hash, clock }, {
+  vaultDir: '/path/to/vault',
+  server: 'https://parche.chamba.tools',
+  slug: 'my-group',
+  token: 'pch_…',
+  localAuthor: 'joys',
+  device: 'laptop',
+});
+// summary: { pushed, pulled, conflicts, movedToTrash, errors }
+```
+
+Three-phase flow: **push local changes → fetch all remote pages → apply pull plan**. All remote pages are accumulated in memory before any disk write is attempted (AC13: page-N failure leaves state unchanged, no partial writes).
+
+### joinOnce
+
+Calls `POST /api/join`, saves the device token to `~/.chamba/credentials.json` (mode 0600), creates `.obsidian/`, and resets `state.json` with `cursor: 0` and the new `groupId` (gate decision 1: a re-join never inherits prior sync state).
+
+### Conflict resolution
+
+When local and remote both modified a file from the same base:
+
+1. Local version is written to `a (conflicto joys).md` with YAML frontmatter (`conflict_of`, `conflict_base`, `conflict_at`).
+2. Remote version replaces `a.md`.
+3. The copy is pushed in phase 3 (`baseHash: null`, new file).
+
+**Gate decision 2 — dedupe**: before creating a copy, the runner scans the vault for an existing copy whose frontmatter and bytes match. If found, the existing path is reused (idempotent on crash-then-retry).
+
+### Test doubles
+
+`FakeParche` implements `HttpPort` with full in-memory parche server semantics including `baseHash` conflict detection, blob presence checks, case-collision detection, pagination, and configurable failure knobs (`pageLimit`, `failChangesPage`, `corruptBlob`, `rejectPushBlobs`).
+
+`FakeHash` uses `globalThis.crypto.subtle` (no Node import) and produces the same SHA-256 as `NodeHash`.
+
 ## License
 
 MIT

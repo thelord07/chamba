@@ -1,4 +1,4 @@
-import { MemoryFilesystem } from '@chamba/core';
+import { FakeHash, FakeParche, MemoryFilesystem } from '@chamba/core';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { pino } from 'pino';
@@ -23,6 +23,13 @@ function services(files: Record<string, string>, vaultPath?: string): Services {
     },
     cwd: '/proj',
     homedir: '/home/test',
+    http: new FakeParche({
+      now: () => new Date('2026-06-09T00:00:00Z'),
+      today: () => '2026-06-09',
+    }),
+    hash: new FakeHash(),
+    parchePullTtlMin: 5,
+    vaultMutex: new Map(),
     obsidianVaultPath: vaultPath,
   };
 }

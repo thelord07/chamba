@@ -3,6 +3,8 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { Logger } from 'pino';
 import { z } from 'zod';
 import { readGitRemote } from '../git-remote.js';
+import { resolveActiveParcheVault } from '../parche/active-vault.js';
+import { maybeAutoSync } from '../parche/autosync.js';
 import { obsidianSearchRoots, type Services } from '../services.js';
 
 const TOOL_NAME = 'chamba_summarize_to_vault';
@@ -41,7 +43,7 @@ export function registerSummarizeToVault(
 
       if (!detection.found || !detection.path) {
         logger.info({ tool: TOOL_NAME }, 'no vault configured');
-        return { isError: true, content: [{ type: 'text', text: NO_VAULT_ERROR }] };
+        return { isError: true, content: [{ type: 'text' as const, text: NO_VAULT_ERROR }] };
       }
 
       const writer = new VaultWriter(services.fs, services.clock);
@@ -54,7 +56,19 @@ export function registerSummarizeToVault(
       });
       logger.info({ tool: TOOL_NAME, notePath }, 'note written to vault');
 
-      return { content: [{ type: 'text', text: `Wrote note to ${notePath}` }] };
+      // C5: push auto-sync after writing if active vault is a parche vault
+      let syncWarning: string | undefined;
+      const parcheVault = await resolveActiveParcheVault(services);
+      if (parcheVault) {
+        const syncResult = await maybeAutoSync(services, logger, parcheVault, 'push');
+        syncWarning = syncResult.warning;
+      }
+
+      const text = syncWarning
+        ? `Wrote note to ${notePath}\n\n⚠ ${syncWarning}`
+        : `Wrote note to ${notePath}`;
+
+      return { content: [{ type: 'text' as const, text }] };
     },
   );
 }

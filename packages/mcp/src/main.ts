@@ -1,5 +1,7 @@
+import { createInterface } from 'node:readline';
 import { renderDoctorReport, runDoctor } from '@chamba/core';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { runVaultCli } from './cli/vault.js';
 import { createLogger } from './logging.js';
 import { createServer } from './server.js';
 import { createNodeServices, obsidianSearchRoots } from './services.js';
@@ -17,6 +19,32 @@ async function main(): Promise<void> {
   const flag = process.argv[2];
   if (flag === '--version' || flag === '-v') {
     process.stdout.write(`${readPackageVersion()}\n`);
+    return;
+  }
+
+  // `vault` runs CLI subcommands (join, sync, status, leave) and exits.
+  if (flag === 'vault') {
+    const services = createNodeServices();
+
+    // Build a default readline prompter (replaced in tests)
+    const prompt = (question: string): Promise<string> => {
+      return new Promise((resolve) => {
+        const rl = createInterface({ input: process.stdin, output: process.stdout });
+        rl.question(question, (answer) => {
+          rl.close();
+          resolve(answer);
+        });
+      });
+    };
+
+    await runVaultCli(process.argv.slice(3), {
+      services,
+      stdout: (msg) => process.stdout.write(`${msg}\n`),
+      stderr: (msg) => process.stderr.write(`${msg}\n`),
+      exit: (code) => process.exit(code),
+      prompt,
+      isTTY: process.stdin.isTTY ?? false,
+    });
     return;
   }
 
@@ -40,7 +68,8 @@ async function main(): Promise<void> {
   }
 
   const logger = createLogger();
-  const server = createServer(logger);
+  const services = createNodeServices();
+  const server = createServer(logger, services);
   const transport = new StdioServerTransport();
 
   await server.connect(transport);

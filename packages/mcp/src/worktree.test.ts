@@ -1,4 +1,10 @@
-import { FakeProcess, MemoryFilesystem, type ProcessHandler } from '@chamba/core';
+import {
+  FakeHash,
+  FakeParche,
+  FakeProcess,
+  MemoryFilesystem,
+  type ProcessHandler,
+} from '@chamba/core';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { pino } from 'pino';
@@ -35,6 +41,13 @@ function services(handler: ProcessHandler): { svc: Services; process: FakeProces
       },
       cwd: '/repo',
       homedir: '/home/test',
+      http: new FakeParche({
+        now: () => new Date('2026-06-09T00:00:00Z'),
+        today: () => '2026-06-09',
+      }),
+      hash: new FakeHash(),
+      parchePullTtlMin: 5,
+      vaultMutex: new Map(),
     },
   };
 }
