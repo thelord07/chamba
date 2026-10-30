@@ -327,3 +327,150 @@ describe('summarize_to_vault — writes even when sync fails', () => {
     await server.close();
   });
 });
+
+// ─── PARCHE-009 AC10: autosync recognizes custom vault dir ───────────────────
+
+describe('PARCHE-009 AC10 — autosync with custom vault dir', () => {
+  it('chamba_remember triggers autosync against FakeParche when cred.dir is custom (AC10)', async () => {
+    const parche = new FakeParche(makeClock());
+    const group = parche.seedGroup({ slug: 'team-alpha', name: 'Team Alpha' });
+    const token = parche.addDevice(group.id, { userId: 'u1', label: 'laptop', role: 'editor' });
+
+    const customDir = '/my/custom/vault';
+    const homedir = '/home/test';
+    const server = 'https://parche.chamba.tools';
+    const slug = group.slug;
+    const fs = new MemoryFilesystem();
+
+    // Vault structure at custom dir
+    await fs.mkdir(`${customDir}/.obsidian`);
+
+    // Write state.json in the custom dir
+    await writeState(fs, customDir, {
+      server,
+      slug,
+      cursor: 0,
+      files: {},
+      lastSyncAt: OLD_SYNC,
+    });
+
+    // Write credential with cred.dir = customDir
+    const creds = new CredentialsStore(fs, homedir);
+    await creds.set(server, slug, {
+      token,
+      user: { id: 'u1', name: 'Joys' },
+      device: { id: 'd1', label: 'laptop' },
+      role: 'editor',
+      dir: customDir,
+    });
+
+    const svc: Services = {
+      fs,
+      process: { exec: async () => ({ stdout: '', stderr: '', exitCode: 0 }) },
+      clock: makeClock(),
+      system: {
+        resources: () => ({
+          totalMemBytes: 16 * 1024 ** 3,
+          freeMemBytes: 8 * 1024 ** 3,
+          cpus: 8,
+          loadAvg1: 0,
+        }),
+      },
+      cwd: '/proj',
+      homedir,
+      http: parche,
+      hash: new FakeHash(),
+      parchePullTtlMin: 5,
+      vaultMutex: new Map(),
+      obsidianVaultPath: customDir, // CHAMBA_OBSIDIAN_VAULT_PATH = customDir
+    };
+
+    const { client, server: mcpServer } = await connect(svc);
+
+    const requestsBefore = parche.requestLog.length;
+    await client.callTool({
+      name: 'chamba_remember',
+      arguments: { key: 'test-key', content: 'Test memory content' },
+    });
+
+    // Autosync should have run → FakeParche received at least one request
+    expect(parche.requestLog.length).toBeGreaterThan(requestsBefore);
+    const hasChangesOrPush = parche.requestLog
+      .slice(requestsBefore)
+      .some((r) => r.url.includes('/changes') || r.url.includes('/push'));
+    expect(hasChangesOrPush).toBe(true);
+
+    await mcpServer.close();
+  });
+
+  it('chamba_remember does NOT autosync when cred.dir differs from obsidianVaultPath (AC10)', async () => {
+    const parche = new FakeParche(makeClock());
+    const group = parche.seedGroup({ slug: 'team-alpha', name: 'Team Alpha' });
+    const token = parche.addDevice(group.id, { userId: 'u1', label: 'laptop', role: 'editor' });
+
+    const customDir = '/my/custom/vault';
+    const anotherDir = '/other/vault';
+    const homedir = '/home/test';
+    const server = 'https://parche.chamba.tools';
+    const slug = group.slug;
+    const fs = new MemoryFilesystem();
+
+    // Vault state.json lives in anotherDir
+    await fs.mkdir(`${anotherDir}/.obsidian`);
+    await writeState(fs, anotherDir, {
+      server,
+      slug,
+      cursor: 0,
+      files: {},
+      lastSyncAt: OLD_SYNC,
+    });
+
+    // Credential says customDir
+    const creds = new CredentialsStore(fs, homedir);
+    await creds.set(server, slug, {
+      token,
+      user: { id: 'u1', name: 'Joys' },
+      device: { id: 'd1', label: 'laptop' },
+      role: 'editor',
+      dir: customDir,
+    });
+    await fs.mkdir(customDir);
+
+    const svc: Services = {
+      fs,
+      process: { exec: async () => ({ stdout: '', stderr: '', exitCode: 0 }) },
+      clock: makeClock(),
+      system: {
+        resources: () => ({
+          totalMemBytes: 16 * 1024 ** 3,
+          freeMemBytes: 8 * 1024 ** 3,
+          cpus: 8,
+          loadAvg1: 0,
+        }),
+      },
+      cwd: '/proj',
+      homedir,
+      http: parche,
+      hash: new FakeHash(),
+      parchePullTtlMin: 5,
+      vaultMutex: new Map(),
+      obsidianVaultPath: anotherDir, // detection path differs from cred.dir
+    };
+
+    const { client, server: mcpServer } = await connect(svc);
+
+    const requestsBefore = parche.requestLog.length;
+    await client.callTool({
+      name: 'chamba_remember',
+      arguments: { key: 'test-key2', content: 'Test content 2' },
+    });
+
+    // No sync requests should have been made (realpath guard blocked it)
+    const syncRequests = parche.requestLog
+      .slice(requestsBefore)
+      .filter((r) => r.url.includes('/changes') || r.url.includes('/push') || r.method === 'PUT');
+    expect(syncRequests.length).toBe(0);
+
+    await mcpServer.close();
+  });
+});

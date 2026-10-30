@@ -27,8 +27,9 @@ import type { PullAction, PushEntry, SyncState } from './plan.js';
 import { applyPullPlan, applyPushResults, planPull, planPush } from './plan.js';
 import type { ChangeEntry, JoinRequest } from './protocol.js';
 import type { SyncStateFile } from './state-store.js';
-import { mergeIntoStateFile, readState, writeState } from './state-store.js';
+import { mergeIntoStateFile, readState, resetVaultState, writeState } from './state-store.js';
 import { isSyncable } from './sync-filter.js';
+import { resolveVaultDir } from './vault-dir.js';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -87,6 +88,40 @@ export class BlobHashMismatchError extends Error {
     public readonly got: string,
   ) {
     super(`Hash mismatch for "${path}": expected ${expected}, got ${got}`);
+  }
+}
+
+/**
+ * PARCHE-009: thrown when the vault directory stored in the credential no longer
+ * exists on disk. Never recreated — the user must run `chamba vault link <slug> --dir <ruta>`.
+ */
+export class VaultDirMissingError extends Error {
+  override name = 'VaultDirMissingError';
+  constructor(
+    public readonly vaultDir: string,
+    public readonly slug: string,
+  ) {
+    super(
+      `La carpeta "${vaultDir}" del parche "${slug}" ya no existe. ` +
+        `Usa \`chamba vault link ${slug} --dir <ruta>\`.`,
+    );
+  }
+}
+
+/**
+ * PARCHE-009: thrown when a vault is in `pendingAdoption` state, meaning it has been
+ * joined/linked but the adoption gate has not been confirmed yet.
+ */
+export class AdoptionPendingError extends Error {
+  override name = 'AdoptionPendingError';
+  constructor(
+    public readonly vaultDir: string,
+    public readonly slug: string,
+  ) {
+    super(
+      `La ruta "${vaultDir}" está pendiente de confirmar. ` +
+        `Corre \`chamba vault link ${slug} --dir "${vaultDir}" --yes\`.`,
+    );
   }
 }
 
@@ -566,8 +601,21 @@ export async function syncOnce(deps: SyncDeps, opts: SyncOpts): Promise<SyncSumm
 
   const client = new ParcheClient(http, server, token);
 
-  // Load current state
+  // PARCHE-009: check vault dir exists before reading state. state.json lives
+  // inside the dir, so if the dir is gone readState returns null and the sync
+  // would silently proceed (or try to recreate it). joinOnce always creates the
+  // dir before calling syncOnce, so this check is safe on first join too.
+  const vaultExists = await fs.exists(vaultDir);
+  if (!vaultExists) {
+    throw new VaultDirMissingError(vaultDir, slug);
+  }
+
   const stateFile = await readState(fs, vaultDir);
+
+  // PARCHE-009: block sync if pendingAdoption
+  if (stateFile?.pendingAdoption === true) {
+    throw new AdoptionPendingError(vaultDir, slug);
+  }
   let syncState: SyncState = stateFile
     ? { cursor: stateFile.cursor, files: stateFile.files }
     : { cursor: 0, files: {} };
@@ -707,13 +755,22 @@ export async function syncOnce(deps: SyncDeps, opts: SyncOpts): Promise<SyncSumm
 // ─── joinOnce ─────────────────────────────────────────────────────────────────
 
 export interface JoinOnceOpts {
-  vaultDir: string;
+  /**
+   * Custom vault directory (absolute canonical path already validated by `prepareVaultDir`).
+   * When empty or absent, the default location (resolveVaultDir) is used.
+   */
+  vaultDir?: string;
   server: string;
   homedir: string;
   joinRequest: JoinRequest;
-  /** Base vault path template: `<homedir>/.chamba/vaults/<slug>` will be used if vaultDir is empty */
   localAuthor?: string;
   signal?: AbortSignal;
+  /**
+   * PARCHE-009: when true, skip the initial syncOnce after join. The caller is
+   * responsible for running syncOnce after gate confirmation. Implies
+   * `pendingAdoption: true` in the written state.
+   */
+  skipInitialSync?: boolean;
 }
 
 export interface JoinOnceResult {
@@ -722,9 +779,18 @@ export interface JoinOnceResult {
   summary: SyncSummary;
 }
 
+/** Zero-count summary used when skipInitialSync is true. */
+const ZERO_SUMMARY: SyncSummary = {
+  pushed: 0,
+  pulled: 0,
+  conflicts: [],
+  movedToTrash: [],
+  errors: [],
+};
+
 export async function joinOnce(deps: SyncDeps, opts: JoinOnceOpts): Promise<JoinOnceResult> {
   const { fs, http, clock } = deps;
-  const { server, homedir, joinRequest, signal } = opts;
+  const { server, homedir, joinRequest, signal, skipInitialSync } = opts;
 
   const client = new ParcheClient(http, server, '');
 
@@ -734,31 +800,42 @@ export async function joinOnce(deps: SyncDeps, opts: JoinOnceOpts): Promise<Join
   const { slug, id: groupId } = joinRes.group;
   const token = joinRes.deviceToken;
 
-  // Compute vault directory: ~/.chamba/vaults/<slug>/
-  const vaultDir = opts.vaultDir || joinPath(homedir, '.chamba', 'vaults', slug);
+  // Compute vault directory: use custom dir or the default location (resolveVaultDir).
+  // resolveVaultDir is the ONLY place the default path is constructed.
+  const customDir = opts.vaultDir || undefined;
+  const vaultDir = customDir ?? resolveVaultDir({}, homedir, slug);
 
-  // Create vault directory and minimal .obsidian/ (gate decision: only the dir)
+  // Create vault directory and minimal .obsidian/
   await fs.mkdir(joinPath(vaultDir, '.obsidian'));
 
-  // Save credentials (mode 0600, outside vault)
+  // Save credentials (mode 0600, outside vault). Store dir only if custom.
   const creds = new CredentialsStore(fs, homedir);
   await creds.set(server, slug, {
     token,
     user: { id: joinRes.user.id, name: joinRes.user.name },
     device: { id: joinRes.device.id, label: joinRes.device.label },
     role: joinRes.role,
+    ...(customDir ? { dir: customDir } : {}),
   });
 
-  // Gate decision 1: reset state (cursor=0, files={}) with the new groupId
-  const freshStateFile = {
-    server,
-    slug,
-    groupId,
-    cursor: 0,
-    files: {},
-    lastSyncAt: clock.now().toISOString(),
-  };
-  await writeState(fs, vaultDir, freshStateFile);
+  // Reset state (cursor=0, files={}, pendingAdoption=true) with the new groupId
+  await resetVaultState(fs, vaultDir, { server, slug, groupId }, clock);
+
+  if (skipInitialSync) {
+    // Caller will handle the gate and then call syncOnce explicitly.
+    // pendingAdoption remains true until the caller clears it.
+    return { slug, vaultDir, summary: ZERO_SUMMARY };
+  }
+
+  // When skipInitialSync is false, clear pendingAdoption before syncing —
+  // the caller has chosen to proceed without the gate (e.g. direct API use,
+  // or the vault is empty so the gate passed automatically).
+  const stateFile = await readState(fs, vaultDir);
+  if (stateFile?.pendingAdoption === true) {
+    const cleared = { ...stateFile };
+    delete cleared.pendingAdoption;
+    await writeState(fs, vaultDir, cleared);
+  }
 
   // First sync
   const summary = await syncOnce(deps, {

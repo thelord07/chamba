@@ -43,4 +43,10 @@ export interface FilesystemPort {
   rename(from: string, to: string): Promise<void>;
   /** Return stat info, or `null` if the path does not exist (ENOENT). */
   stat(path: string): Promise<FileStat | null>;
+  /**
+   * Resolve symlinks and return the canonical absolute path.
+   * Tolerant to ENOENT: if the path does not exist, resolves the nearest
+   * existing ancestor and re-appends the remaining segments.
+   */
+  realpath(path: string): Promise<string>;
 }

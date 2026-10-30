@@ -21,6 +21,12 @@ const credentialEntrySchema = z.object({
     label: z.string().min(1),
   }),
   role: z.enum(['owner', 'admin', 'editor', 'reader']),
+  /**
+   * Custom vault directory (absolute canonical path). When absent, the default
+   * location (resolveVaultDir) is used. Added in PARCHE-009; optional for
+   * backward compatibility with credentials written before this release.
+   */
+  dir: z.string().min(1).optional(),
 });
 
 export const credentialsFileSchema = z.record(z.string(), credentialEntrySchema);

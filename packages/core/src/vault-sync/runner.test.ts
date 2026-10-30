@@ -12,7 +12,14 @@ import { MemoryFilesystem } from '../testing/memory-filesystem.js';
 import { readConflictMeta } from './conflict.js';
 import { CredentialsStore } from './credentials.js';
 import { ParcheClient } from './parche-client.js';
-import { CaseCollisionError, joinOnce, scanLocal, syncOnce } from './runner.js';
+import {
+  AdoptionPendingError,
+  CaseCollisionError,
+  joinOnce,
+  scanLocal,
+  syncOnce,
+  VaultDirMissingError,
+} from './runner.js';
 import { readState } from './state-store.js';
 
 const VAULT = '/vault';
@@ -417,6 +424,7 @@ describe('AC13 — fetch page 2 failure preserves state, no duplicate conflict c
     const group = setupGroup(parche);
     const hash = new FakeHash();
     const fs = new MemoryFilesystem();
+    await fs.mkdir(VAULT);
     const token = makeToken(parche, group);
 
     // Set pageLimit=1 so 2 changes require 2 pages
@@ -1045,6 +1053,7 @@ describe('no /push when planPush is empty', () => {
     const group = setupGroup(parche);
     const hash = new FakeHash();
     const fs = new MemoryFilesystem();
+    await fs.mkdir(VAULT);
     const token = makeToken(parche, group);
 
     const requestSpy = vi.spyOn(parche, 'request');
@@ -1093,6 +1102,7 @@ describe('fetch-all guard — hasMore=true with non-advancing cursor', () => {
 
     const hash = new FakeHash();
     const fs = new MemoryFilesystem();
+    await fs.mkdir(VAULT);
     const deps = { fs, http: badHttp, hash, clock: makeClock() };
 
     const opts: Parameters<typeof syncOnce>[1] = {
@@ -1113,5 +1123,187 @@ describe('fetch-all guard — hasMore=true with non-advancing cursor', () => {
     expect(contentFiles).toHaveLength(0);
     // The guard should have fired on the first iteration (one /changes call)
     expect(callCount).toBe(1);
+  });
+});
+
+// ─── PARCHE-009 D2: VaultDirMissingError ─────────────────────────────────────
+
+describe('syncOnce — D2: VaultDirMissingError when vault dir deleted', () => {
+  it('throws VaultDirMissingError when vault dir does not exist (D2)', async () => {
+    const parche = new FakeParche(makeClock());
+    const group = setupGroup(parche);
+    const token = makeToken(parche, group);
+    const { fs, hash, clock } = makeDeps(parche);
+    // Do NOT create the vault dir
+    const deps = { fs, http: parche, hash, clock };
+
+    await expect(
+      syncOnce(deps, {
+        vaultDir: '/nonexistent/vault',
+        server: SERVER,
+        slug: SLUG,
+        token,
+        localAuthor: LOCAL_AUTHOR,
+        device: 'laptop',
+      }),
+    ).rejects.toThrow(VaultDirMissingError);
+    // No PUT requests sent (nothing synced)
+    const putRequests = parche.requestLog.filter((r) => r.method === 'PUT');
+    expect(putRequests.length).toBe(0);
+    // Dir was never created
+    expect(await fs.exists('/nonexistent/vault')).toBe(false);
+  });
+
+  it('VaultDirMissingError has correct vaultDir and slug (D2)', async () => {
+    const parche = new FakeParche(makeClock());
+    const group = setupGroup(parche);
+    const token = makeToken(parche, group);
+    const { fs, hash, clock } = makeDeps(parche);
+    const deps = { fs, http: parche, hash, clock };
+
+    const err = await syncOnce(deps, {
+      vaultDir: '/deleted/vault',
+      server: SERVER,
+      slug: SLUG,
+      token,
+      localAuthor: LOCAL_AUTHOR,
+      device: 'laptop',
+    }).catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(VaultDirMissingError);
+    const typedErr = err as VaultDirMissingError;
+    expect(typedErr.vaultDir).toBe('/deleted/vault');
+    expect(typedErr.slug).toBe(SLUG);
+  });
+});
+
+// ─── PARCHE-009 R1: AdoptionPendingError blocks syncOnce ─────────────────────
+
+describe('syncOnce — R1: AdoptionPendingError when pendingAdoption is true', () => {
+  it('throws AdoptionPendingError and does not push when pendingAdoption=true (R1)', async () => {
+    const parche = new FakeParche(makeClock());
+    const group = setupGroup(parche);
+    const token = makeToken(parche, group);
+    const hash = new FakeHash();
+    const fs = new MemoryFilesystem();
+    const clock = makeClock();
+
+    // Create vault with a pending adoption state
+    await fs.mkdir(`${VAULT}/.obsidian`);
+    await fs.writeFile(`${VAULT}/note.md`, '# Note\n');
+    await fs.mkdir(`${VAULT}/.chamba-sync`);
+    await fs.writeFile(
+      `${VAULT}/.chamba-sync/state.json`,
+      JSON.stringify({
+        server: SERVER,
+        slug: SLUG,
+        cursor: 0,
+        files: {},
+        pendingAdoption: true,
+        lastSyncAt: '2026-01-01T00:00:00Z',
+      }),
+    );
+
+    const requestsBefore = parche.requestLog.length;
+    await expect(
+      syncOnce(
+        { fs, http: parche, hash, clock },
+        {
+          vaultDir: VAULT,
+          server: SERVER,
+          slug: SLUG,
+          token,
+          localAuthor: LOCAL_AUTHOR,
+          device: 'laptop',
+        },
+      ),
+    ).rejects.toThrow(AdoptionPendingError);
+
+    // No PUT requests (nothing uploaded)
+    const putRequests = parche.requestLog.slice(requestsBefore).filter((r) => r.method === 'PUT');
+    expect(putRequests.length).toBe(0);
+  });
+});
+
+// ─── PARCHE-009 joinOnce skipInitialSync / vaultDir custom ───────────────────
+
+describe('joinOnce — PARCHE-009: custom vaultDir persisted in credential', () => {
+  it('stores dir in credential when custom vaultDir is given', async () => {
+    const parche = new FakeParche(makeClock());
+    const group = parche.seedGroup({ slug: 'team-beta', name: 'Team Beta' });
+    parche.addInvite({ code: 'ZZZZ-1111', groupId: group.id, role: 'editor' });
+    const hash = new FakeHash();
+    const fs = new MemoryFilesystem();
+    const clock = makeClock();
+    const homedir = '/home/test';
+
+    // Pre-create the custom dir so joinOnce finds it
+    await fs.mkdir('/custom/vault');
+
+    await joinOnce(
+      { fs, http: parche, hash, clock },
+      {
+        vaultDir: '/custom/vault',
+        server: SERVER,
+        homedir,
+        joinRequest: { code: 'ZZZZ-1111', name: 'Joys', email: 'j@x.dev' },
+        skipInitialSync: true,
+      },
+    );
+
+    const creds = new CredentialsStore(fs, homedir);
+    const allSlugs = await creds.listSlugs();
+    const found = allSlugs.find((s) => s.slug === 'team-beta');
+    expect(found).toBeDefined();
+    if (!found) throw new Error('Credential not found for team-beta');
+    const cred = await creds.get(found.server, 'team-beta');
+    expect(cred?.dir).toBe('/custom/vault');
+  });
+
+  it('does not store dir in credential when default path is used', async () => {
+    const parche = new FakeParche(makeClock());
+    const group = parche.seedGroup({ slug: 'team-gamma', name: 'Team Gamma' });
+    parche.addInvite({ code: 'WWWW-2222', groupId: group.id, role: 'editor' });
+    const hash = new FakeHash();
+    const fs = new MemoryFilesystem();
+    const clock = makeClock();
+    const homedir = '/home/test';
+
+    const result = await joinOnce(
+      { fs, http: parche, hash, clock },
+      {
+        server: SERVER,
+        homedir,
+        joinRequest: { code: 'WWWW-2222', name: 'Joys', email: 'j@x.dev' },
+        skipInitialSync: true,
+      },
+    );
+
+    const creds = new CredentialsStore(fs, homedir);
+    const cred = await creds.get(SERVER, result.slug);
+    expect(cred?.dir).toBeUndefined();
+  });
+
+  it('sets pendingAdoption=true in state when skipInitialSync=true', async () => {
+    const parche = new FakeParche(makeClock());
+    const group = parche.seedGroup({ slug: 'team-delta', name: 'Team Delta' });
+    parche.addInvite({ code: 'XXXX-3333', groupId: group.id, role: 'editor' });
+    const hash = new FakeHash();
+    const fs = new MemoryFilesystem();
+    const clock = makeClock();
+    const homedir = '/home/test';
+
+    const result = await joinOnce(
+      { fs, http: parche, hash, clock },
+      {
+        server: SERVER,
+        homedir,
+        joinRequest: { code: 'XXXX-3333', name: 'Joys', email: 'j@x.dev' },
+        skipInitialSync: true,
+      },
+    );
+
+    const state = JSON.parse(await fs.readFile(`${result.vaultDir}/.chamba-sync/state.json`));
+    expect(state.pendingAdoption).toBe(true);
   });
 });

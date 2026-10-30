@@ -6,6 +6,11 @@ import { dirname, joinPath } from '../util/path.js';
  * be committed — they're personal notes/memory. Used to keep a vault out of a repo
  * (gitignore backstop) and to explain what to move. Note: `.chamba/workspace.md` is
  * deliberately NOT here — that's project context the team may want to commit.
+ *
+ * NOTE: `.chamba-sync/` is intentionally NOT listed here — it should only be added
+ * to `.gitignore` when the vault is inside a repo (via `ensureVaultGitignored` with
+ * the `extra` parameter). Adding it globally would make `workspace_init` write it
+ * everywhere and `doctor` would report it as missing.
  */
 export const VAULT_ARTIFACTS = [
   '.obsidian/',
@@ -60,14 +65,26 @@ function normalizeIgnore(pattern: string): string {
  * Appends only the patterns not already present, under a chamba-managed header. Returns
  * the patterns it added (empty when nothing was needed). A backstop so a vault that lives
  * inside a git repo can never be committed.
+ *
+ * @param extra - Additional patterns to ensure are gitignored (e.g. `['.chamba-sync/']`
+ *                when the vault dir itself is inside a repo). These are checked and added
+ *                alongside `VAULT_ARTIFACTS`.
  */
 export async function ensureVaultGitignored(
   fs: FilesystemPort,
   repoRoot: string,
+  extra?: readonly string[],
 ): Promise<string[]> {
-  const missing = await vaultGitignoreMissing(fs, repoRoot);
-  if (missing.length === 0) return [];
+  const allArtifacts = extra ? [...VAULT_ARTIFACTS, ...extra] : VAULT_ARTIFACTS;
   const current = await readGitignore(fs, repoRoot);
+  const present = new Set(
+    current
+      .split('\n')
+      .map(normalizeIgnore)
+      .filter((l) => l.length > 0),
+  );
+  const missing = allArtifacts.filter((p) => !present.has(normalizeIgnore(p)));
+  if (missing.length === 0) return [];
   const sep = current.length === 0 ? '' : current.endsWith('\n') ? '\n' : '\n\n';
   const block = `${sep}# chamba vault artifacts (personal notes/memory — kept out of git)\n${missing.join('\n')}\n`;
   await fs.writeFile(joinPath(repoRoot, '.gitignore'), current + block);

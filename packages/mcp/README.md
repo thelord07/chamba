@@ -83,7 +83,8 @@ All commands run via `npx @chamba/mcp vault <subcommand>`.
 
 | Command | Description |
 |---|---|
-| `vault join <code\|link> [--name NAME] [--email EMAIL] [--label LABEL] [--server URL]` | Join a parche group. With a TTY, `--name` and `--email` are prompted. `--label` defaults to the machine hostname. A link like `https://parche.chamba.tools/j/XXXX-XXXX` also sets the server. |
+| `vault join <code\|link> [--name NAME] [--email EMAIL] [--label LABEL] [--server URL] [--dir PATH] [--allow-in-repo] [--yes]` | Join a parche group. With a TTY, `--name` and `--email` are prompted. `--label` defaults to the machine hostname. A link like `https://parche.chamba.tools/j/XXXX-XXXX` also sets the server. Use `--dir` to set a custom vault location. |
+| `vault link <slug> --dir <PATH> [--allow-in-repo] [--yes]` | Re-link an existing vault to a new local directory. Resets the local state and runs the adoption gate. The old directory is kept intact. |
 | `vault sync [slug]` | Sync one vault (by slug) or all vaults. Prints pushed/pulled/conflicts. |
 | `vault status` | Show server, slug, role, last sync, pending changes, and vault path for each vault. |
 | `vault leave <slug>` | Remove the credential for a vault. The files on disk are kept. |
@@ -149,6 +150,77 @@ All commands run via `npx @chamba/mcp vault <subcommand>`.
 
 Credentials are stored in `~/.chamba/credentials.json` with mode `0600`. The token is
 **never** returned by any MCP tool, never written to the vault, and never logged.
+
+## Usar tu propio vault / Use your own vault
+
+### Español
+
+Por defecto, `vault join` guarda el vault en `~/.chamba/vaults/<slug>/`. Puedes usar
+cualquier carpeta con `--dir`:
+
+```bash
+# Apuntar a un vault de Obsidian ya existente
+npx @chamba/mcp vault join K7QX-M2RP \
+  --name "Joys" --email "joys@example.com" \
+  --dir ~/Documents/ObsidianVault \
+  --yes
+
+# Vincular un vault ya unido a una nueva ruta
+npx @chamba/mcp vault link mi-equipo \
+  --dir ~/Documents/ObsidianVault \
+  --yes
+```
+
+**Reglas:**
+- `--dir ~`, `--dir /`, `--dir /etc`, `--dir /Users`, etc. son rechazados.
+- `--dir` dentro de un repositorio git requiere `--allow-in-repo` (agrega `.chamba-sync/` al `.gitignore`).
+- Si el directorio tiene archivos existentes, se muestra un resumen antes de subir nada.  
+  Sin TTY y sin `--yes`, no sube nada, sale con error y el vault queda "pendiente de confirmar" (ni `vault sync` ni el autosync suben) hasta `vault link <slug> --dir <ruta> --yes`.
+- `vault link` no mueve ni borra la ruta anterior — solo cambia la credencial y resetea el estado.
+
+**Autosync con ruta propia:** Para que `chamba_summarize_to_vault`, `chamba_load_context`, `chamba_remember` y
+`chamba_recall` autosincronicen el vault, `CHAMBA_OBSIDIAN_VAULT_PATH` debe apuntar a la
+misma ruta que usaste en `--dir`:
+
+```json
+"env": { "CHAMBA_OBSIDIAN_VAULT_PATH": "/ruta/propia" }
+```
+
+---
+
+### English
+
+By default, `vault join` saves the vault at `~/.chamba/vaults/<slug>/`. You can use any
+folder with `--dir`:
+
+```bash
+# Point at an existing Obsidian vault
+npx @chamba/mcp vault join K7QX-M2RP \
+  --name "Joys" --email "joys@example.com" \
+  --dir ~/Documents/ObsidianVault \
+  --yes
+
+# Re-link an already-joined vault to a new path
+npx @chamba/mcp vault link my-team \
+  --dir ~/Documents/ObsidianVault \
+  --yes
+```
+
+**Rules:**
+- `--dir ~`, `--dir /`, system directories, etc. are rejected.
+- `--dir` inside a git repo requires `--allow-in-repo` (adds `.chamba-sync/` to `.gitignore`).
+- If the directory has existing files, a summary is printed before uploading anything.  
+  Without a TTY and without `--yes`, nothing is uploaded, the command exits with an error and the vault stays "pending confirmation" (neither `vault sync` nor autosync upload) until `vault link <slug> --dir <path> --yes`.
+- `vault link` does not move or delete the old directory — it only updates the credential
+  and resets the local state.
+
+**Autosync with a custom path:** For `chamba_summarize_to_vault`, `chamba_remember` and
+`chamba_recall` to autosync the vault, `CHAMBA_OBSIDIAN_VAULT_PATH` must point to the same
+path you used with `--dir`:
+
+```json
+"env": { "CHAMBA_OBSIDIAN_VAULT_PATH": "/your/custom/path" }
+```
 
 ## License
 
