@@ -204,4 +204,37 @@ describe('runDoctor', () => {
     expect(text).toMatch(/[✓⚠✗]/u);
     expect(text).toMatch(/\d+ ok · \d+ warn · \d+ fail/u);
   });
+
+  // N1: CHAMBA_WORKSPACE_ROOT edge cases
+  it('N1 — CHAMBA_WORKSPACE_ROOT points to non-existent dir → parche check warns', async () => {
+    const fs = new MemoryFilesystem({
+      '/vault/.obsidian/app.json': '{}',
+      '/proj/.chamba/workspace.md': '# Workspace\n',
+    });
+    // /nonexistent does not exist in the MemoryFilesystem
+    const report = await runDoctor(
+      input({ fs, workspaceRoot: '/nonexistent', workspaceRootSource: 'env' }),
+    );
+    const parche = byId(report.checks, 'parche');
+    expect(parche.status).toBe('warn');
+    expect(parche.detail).toContain('CHAMBA_WORKSPACE_ROOT');
+    expect(parche.detail).toContain('no existe');
+    expect(parche.detail).toContain('/nonexistent');
+  });
+
+  it('N1 — CHAMBA_WORKSPACE_ROOT exists but has no workspace.md → parche check warns', async () => {
+    const fs = new MemoryFilesystem({
+      '/vault/.obsidian/app.json': '{}',
+      '/proj/.chamba/workspace.md': '# Workspace\n',
+      '/nomarker/somefile.txt': 'hello',
+    });
+    const report = await runDoctor(
+      input({ fs, workspaceRoot: '/nomarker', workspaceRootSource: 'env' }),
+    );
+    const parche = byId(report.checks, 'parche');
+    expect(parche.status).toBe('warn');
+    expect(parche.detail).toContain('CHAMBA_WORKSPACE_ROOT');
+    expect(parche.detail).toContain('workspace.md');
+    expect(parche.detail).toContain('/nomarker');
+  });
 });

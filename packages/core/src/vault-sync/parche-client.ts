@@ -3,6 +3,7 @@
  * Pure: no Node imports. Uses schemas from protocol.ts for validation.
  */
 
+import { z } from 'zod';
 import type { HttpPort, HttpRequest } from '../ports/http.js';
 import type { PushEntry } from './plan.js';
 import type { ChangesResponse, JoinRequest, JoinResponse, PushResponse } from './protocol.js';
@@ -13,6 +14,24 @@ import {
   pushRequestSchema,
   pushResponseSchema,
 } from './protocol.js';
+
+// ─── checkInvite types (PARCHE-011) ──────────────────────────────────────────
+
+export type CheckInviteResult =
+  | { status: 'valid'; slug: string; name: string }
+  | { status: 'invalid' }
+  | { status: 'not-found' }
+  | { status: 'network-error'; message: string };
+
+const checkInviteResponseSchema = z.object({
+  valid: z.boolean(),
+  group: z
+    .object({
+      name: z.string(),
+      slug: z.string(),
+    })
+    .optional(),
+});
 
 // ─── Error types ──────────────────────────────────────────────────────────────
 
@@ -126,7 +145,7 @@ export class ParcheClient {
       throw new ParcheAlreadyMemberError(
         409,
         json,
-        'Already a member of this group; use `vault login` on this machine (coming soon)',
+        'Already a member of this group (coming soon: vault login for existing members)',
       );
     }
     if (res.status === 429) {
@@ -195,6 +214,53 @@ export class ParcheClient {
     if (res.status === 200) return res.body;
     const json = parseJson(res.body);
     throw new ParcheHttpError(res.status, json, `Unexpected GET blob response: ${res.status}`);
+  }
+
+  /**
+   * GET /api/web/invites/:code/check — non-consuming invite pre-check (PARCHE-011 R4/R12/R13).
+   * Returns a discriminated result; never throws.
+   */
+  static async checkInvite(
+    http: HttpPort,
+    serverUrl: string,
+    code: string,
+  ): Promise<CheckInviteResult> {
+    try {
+      const res = await http.request({
+        method: 'GET',
+        url: `${serverUrl}/api/web/invites/${encodeURIComponent(code)}/check`,
+        headers: {},
+        timeoutMs: 10_000,
+      });
+
+      const json = parseJson(res.body);
+
+      if (res.status === 200) {
+        const parsed = checkInviteResponseSchema.safeParse(json);
+        if (!parsed.success) {
+          return { status: 'network-error', message: `respuesta inválida del servidor` };
+        }
+        if (!parsed.data.valid) return { status: 'invalid' };
+        const group = parsed.data.group;
+        if (!group) {
+          return { status: 'network-error', message: 'respuesta sin datos de grupo' };
+        }
+        return { status: 'valid', slug: group.slug, name: group.name };
+      }
+
+      if (res.status === 404) return { status: 'not-found' };
+
+      // 429, 5xx, unexpected
+      return {
+        status: 'network-error',
+        message: `servidor respondió ${res.status}`,
+      };
+    } catch (err) {
+      return {
+        status: 'network-error',
+        message: err instanceof Error ? err.message : String(err),
+      };
+    }
   }
 
   /** POST /api/g/:slug/push — push a batch of changes (≤500). */

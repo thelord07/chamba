@@ -114,6 +114,10 @@ export class FakeParche implements HttpPort {
   // Whether the abort signal was already aborted when the last request arrived
   lastSignalWasAborted = false;
 
+  // ── PARCHE-011: checkInvite knobs ──────────────────────────────────────────
+  /** When set, GET /api/web/invites/:code/check returns this fixed result instead of the default. */
+  checkInviteOverride: null | { status: number; body: unknown } | 'throw' = null;
+
   corruptBlob(hash: string): void {
     this.corruptedBlobs.add(hash);
   }
@@ -276,6 +280,13 @@ export class FakeParche implements HttpPort {
       return this.handlePush(req, slug);
     }
 
+    // GET /api/web/invites/:code/check (PARCHE-011)
+    const checkInviteMatch = path.match(/^\/api\/web\/invites\/([^/]+)\/check$/);
+    if (method === 'GET' && checkInviteMatch) {
+      const code = decodeURIComponent(checkInviteMatch[1] ?? '');
+      return this.handleCheckInvite(code);
+    }
+
     // HEAD/GET/PUT /api/blob/:hash
     const blobMatch = path.match(/^\/api\/blob\/([a-f0-9]{64})$/);
     if (blobMatch) {
@@ -299,6 +310,29 @@ export class FakeParche implements HttpPort {
   }
 
   // ── Handlers ────────────────────────────────────────────────────────────────
+
+  // ── PARCHE-011: checkInvite handler ──────────────────────────────────────────
+
+  private handleCheckInvite(code: string): HttpResponse {
+    // Override knob: return fixed status/body or throw
+    if (this.checkInviteOverride === 'throw') {
+      throw new Error('Simulated network error from FakeParche.checkInvite');
+    }
+    if (this.checkInviteOverride !== null) {
+      return json(this.checkInviteOverride.body, this.checkInviteOverride.status);
+    }
+
+    const invite = this.invites.get(code.toUpperCase());
+    if (!invite) return json({ error: 'not_found' }, 404);
+
+    const group = this.groups.get(invite.groupId);
+    if (!group) return json({ error: 'not_found' }, 404);
+
+    const isValid = invite.maxUses === null || invite.uses < invite.maxUses;
+    if (!isValid) return json({ valid: false }, 200);
+
+    return json({ valid: true, group: { name: group.name, slug: group.slug } }, 200);
+  }
 
   private handleJoin(req: HttpRequest): HttpResponse {
     if (this.rateLimitJoin) return err(429, 'rate_limited');

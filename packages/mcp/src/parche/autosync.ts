@@ -6,7 +6,7 @@
  * warning string and can append it to its normal response.
  */
 
-import { syncOnce } from '@chamba/core';
+import { syncManualHint, syncOnce } from '@chamba/core';
 import type { Logger } from 'pino';
 import type { Services } from '../services.js';
 import type { ActiveParcheVault } from './active-vault.js';
@@ -21,7 +21,7 @@ import { withVaultLock } from './mutex.js';
  *  - Making it configurable would create an implicit API surface that is hard
  *    to document and test. PARCHE-003 review noted that too many env knobs
  *    complicate reasoning about timing guarantees.
- *  - CLI `vault sync` and the `chamba_vault_sync` tool have no budget and are
+ *  - CLI `npx @chamba/mcp vault sync` and the `chamba_vault_sync` tool have no budget and are
  *    the right choice when a user wants a reliable, unbounded sync.
  */
 export const AUTOSYNC_BUDGET_MS = 10_000;
@@ -49,11 +49,12 @@ export async function maybeAutoSync(
   vault: ActiveParcheVault,
   phase: 'push' | 'pull',
 ): Promise<AutoSyncResult> {
-  // Pull-phase TTL check: skip if last sync is recent enough
+  // Pull-phase TTL check: use vault.autoSync.pullTtlMin when available (PARCHE-011)
+  const ttl = vault.autoSync?.pullTtlMin ?? services.parchePullTtlMin;
   if (phase === 'pull' && vault.lastSyncAt) {
     const elapsed =
       (services.clock.now().getTime() - new Date(vault.lastSyncAt).getTime()) / 60_000;
-    if (elapsed < services.parchePullTtlMin) {
+    if (elapsed < ttl) {
       return { synced: false };
     }
   }
@@ -111,7 +112,7 @@ export async function maybeAutoSync(
   if (!inner?.ok) {
     return {
       synced: false,
-      warning: `auto-sync pausado: ${inner?.msg ?? 'unknown error'}. Usa \`vault sync\` para sincronizar manualmente.`,
+      warning: `auto-sync pausado: ${inner?.msg ?? 'unknown error'}. Usa \`${syncManualHint()}\` para sincronizar manualmente.`,
     };
   }
   return { synced: true };

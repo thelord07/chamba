@@ -4,6 +4,20 @@ import type { ProcessPort } from '../ports/process.js';
 import type { SystemResources } from '../ports/system.js';
 import { computeConcurrencyBudget } from '../resources/budget.js';
 import { joinPath } from '../util/path.js';
+import { CredentialsStore } from '../vault-sync/credentials.js';
+import {
+  joinFirstHint,
+  linkDirPlaceholderHint,
+  linkHint,
+  VAULT_CLI,
+} from '../vault-sync/messages.js';
+import {
+  findWorkspaceRoot,
+  parcheFilePath,
+  readParcheBinding,
+  resolveParcheBinding,
+} from '../vault-sync/parche-binding.js';
+import { resolveVaultDir } from '../vault-sync/vault-dir.js';
 import { ObsidianDetector } from '../workspace/obsidian-detector.js';
 import { findGitRoot, vaultGitignoreMissing } from '../workspace/vault-safety.js';
 import { WORKSPACE_DIR, WORKSPACE_RELATIVE_PATH } from '../workspace/workspace.js';
@@ -47,6 +61,14 @@ export interface DoctorInput {
   nodeVersion?: string;
   /** Live machine resources; when present, adds a `system` capacity line. */
   resources?: SystemResources;
+  /**
+   * Explicit workspace root from CHAMBA_WORKSPACE_ROOT env (O3).
+   * When provided, wins over cwd for workspace resolution.
+   * Source is 'env'; when not provided, findWorkspaceRoot(cwd) is used and source is 'cwd'.
+   */
+  workspaceRoot?: string;
+  /** Whether workspaceRoot came from env ('env') or was detected from cwd ('cwd'). */
+  workspaceRootSource?: 'env' | 'cwd';
 }
 
 const MIN_NODE_MAJOR = 22;
@@ -71,6 +93,7 @@ export async function runDoctor(input: DoctorInput): Promise<DoctorReport> {
   checks.push(await checkWorkspace(input));
   checks.push(await checkConfig(input));
   checks.push(await checkVault(input));
+  checks.push(await checkParche(input));
   checks.push(await checkMcpRegistration(input));
   checks.push(await checkLogDir(input));
   // The worktree list only makes sense inside a single repo's work tree, not on
@@ -269,6 +292,158 @@ async function checkVault(input: DoctorInput): Promise<DoctorCheck> {
     detail: 'no vault connected',
     hint: 'Set CHAMBA_OBSIDIAN_VAULT_PATH, or run chamba_workspace_init to bootstrap one. Memory tools degrade cleanly without it.',
   };
+}
+
+async function checkParche(input: DoctorInput): Promise<DoctorCheck> {
+  const base = { id: 'parche', name: 'Parche (group vault)' };
+
+  try {
+    // Resolve workspace root (O3: env wins over cwd)
+    const wsRoot =
+      input.workspaceRoot ?? (await findWorkspaceRoot(input.fs, input.cwd, input.homedir));
+    const wsSource = input.workspaceRootSource ?? (input.workspaceRoot ? 'env' : 'cwd');
+
+    // N1: CHAMBA_WORKSPACE_ROOT edge cases — env var always wins but warn if dubious
+    if (input.workspaceRootSource === 'env' && input.workspaceRoot) {
+      const envWsRoot = input.workspaceRoot;
+      const envDirExists = await exists(input.fs, envWsRoot);
+      if (!envDirExists) {
+        return {
+          ...base,
+          status: 'warn',
+          detail: `CHAMBA_WORKSPACE_ROOT apunta a un directorio que no existe: ${envWsRoot}`,
+          hint: 'Crea el directorio o corrige CHAMBA_WORKSPACE_ROOT',
+        };
+      }
+      const markerExists = await exists(input.fs, joinPath(envWsRoot, '.chamba', 'workspace.md'));
+      if (!markerExists) {
+        return {
+          ...base,
+          status: 'warn',
+          detail: `CHAMBA_WORKSPACE_ROOT no tiene .chamba/workspace.md: ${envWsRoot}`,
+          hint: `Crea ${envWsRoot}/.chamba/workspace.md o corrige CHAMBA_WORKSPACE_ROOT`,
+        };
+      }
+    }
+
+    const binding = await resolveParcheBinding(
+      { fs: input.fs },
+      { cwd: input.cwd, homedir: input.homedir, workspaceRoot: wsRoot ?? undefined },
+    );
+
+    if (!binding) {
+      // Bug 5: check if there's an invalid binding file and warn about it
+      if (wsRoot) {
+        const wsBindingPath = parcheFilePath(wsRoot);
+        const wsRaw = await readParcheBinding(input.fs, wsBindingPath, {
+          scope: 'workspace',
+          baseDir: wsRoot,
+        });
+        if (!wsRaw.ok && !wsRaw.missing) {
+          return {
+            ...base,
+            status: 'warn',
+            detail: `binding inválido en ${wsBindingPath}: ${wsRaw.error}`,
+            hint: `corrígelo o usa \`${VAULT_CLI} unlink --scope workspace\``,
+          };
+        }
+      }
+      const globalPath = parcheFilePath(input.homedir);
+      const globalRaw = await readParcheBinding(input.fs, globalPath, {
+        scope: 'global',
+        baseDir: input.homedir,
+      });
+      if (!globalRaw.ok && !globalRaw.missing) {
+        return {
+          ...base,
+          status: 'warn',
+          detail: `binding inválido en ${globalPath}: ${globalRaw.error}`,
+          hint: `corrígelo o usa \`${VAULT_CLI} unlink --scope global\``,
+        };
+      }
+      // O3 explicit global message
+      const globalDetail = wsRoot
+        ? `sin vínculo de parche (se usa CHAMBA_OBSIDIAN_VAULT_PATH/detección)`
+        : `usando vínculo global porque no se detectó workspace desde ${input.cwd} (se usa CHAMBA_OBSIDIAN_VAULT_PATH/detección)`;
+      return { ...base, status: 'ok', detail: globalDetail };
+    }
+
+    // Build workspace info string
+    const wsInfo =
+      binding.scope === 'workspace'
+        ? ` (workspace: ${wsRoot ?? binding.baseDir}, fuente: ${wsSource})`
+        : ` (global)`;
+
+    // Look up credential
+    const creds = new CredentialsStore(input.fs, input.homedir);
+    const cred = await creds.get(binding.server, binding.slug);
+
+    if (!cred) {
+      return {
+        ...base,
+        status: 'warn',
+        detail: `vínculo ${binding.scope} a "${binding.slug}"${wsInfo} pero sin credencial`,
+        hint: `${joinFirstHint()} --scope ${binding.scope}`,
+      };
+    }
+
+    const credVaultDir = resolveVaultDir(cred, input.homedir, binding.slug);
+
+    // Check dir existence
+    const dirExists = await exists(input.fs, credVaultDir);
+    if (!dirExists) {
+      return {
+        ...base,
+        status: 'warn',
+        detail: `vínculo ${binding.scope} a "${binding.slug}"${wsInfo} — la carpeta del vault ya no existe`,
+        hint: linkDirPlaceholderHint(binding.slug),
+      };
+    }
+
+    // Guard: realpath mismatch between binding and credential
+    const bindingReal = await tryRealpath(input.fs, binding.vaultDir);
+    const credReal = await tryRealpath(input.fs, credVaultDir);
+    if (bindingReal && credReal && bindingReal !== credReal) {
+      return {
+        ...base,
+        status: 'warn',
+        detail: `vínculo ${binding.scope} a "${binding.slug}"${wsInfo} — el binding apunta a "${binding.vaultDir}" pero la credencial a "${credVaultDir}"; el autosync no corre`,
+        hint: linkHint(binding.slug, credVaultDir),
+      };
+    }
+
+    // AC5: CHAMBA_OBSIDIAN_VAULT_PATH mismatch with workspace binding
+    let envMismatchWarn: DoctorCheck | null = null;
+    if (input.obsidianVaultPath && binding.scope === 'workspace') {
+      const obsReal = await tryRealpath(input.fs, input.obsidianVaultPath);
+      if (obsReal && credReal && obsReal !== credReal) {
+        envMismatchWarn = {
+          ...base,
+          status: 'warn',
+          detail: `CHAMBA_OBSIDIAN_VAULT_PATH="${input.obsidianVaultPath}" difiere del vault del parche del workspace ("${credVaultDir}"); gana el workspace`,
+        };
+      }
+    }
+
+    if (envMismatchWarn) return envMismatchWarn;
+
+    // All ok
+    return {
+      ...base,
+      status: 'ok',
+      detail: `${binding.scope} → ${binding.slug} (${credVaultDir}), autoSync ${binding.autoSync.enabled ? 'on' : 'off'}${wsInfo}`,
+    };
+  } catch {
+    return { ...base, status: 'warn', detail: 'error al verificar el parche' };
+  }
+}
+
+async function tryRealpath(fs: FilesystemPort, path: string): Promise<string | null> {
+  try {
+    return await fs.realpath(path);
+  } catch {
+    return null;
+  }
 }
 
 /** One chamba registration found in an editor's MCP config. */

@@ -3,7 +3,7 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { Logger } from 'pino';
 import { z } from 'zod';
 import { readGitRemote } from '../git-remote.js';
-import { resolveActiveParcheVault } from '../parche/active-vault.js';
+import { resolveActiveParcheVaultFull } from '../parche/active-vault.js';
 import { maybeAutoSync } from '../parche/autosync.js';
 import { obsidianSearchRoots, type Services } from '../services.js';
 
@@ -36,19 +36,49 @@ export function registerSummarizeToVault(
       },
     },
     async ({ title, content, projectSlug }) => {
-      const detection = await new ObsidianDetector(services.fs).detect({
-        explicitPath: services.obsidianVaultPath,
-        searchRoots: obsidianSearchRoots(services),
-      });
+      // O2: full discriminated resolution — never fall through from a binding
+      const vaultResult = await resolveActiveParcheVaultFull(services);
 
-      if (!detection.found || !detection.path) {
+      // O2: bound-unsyncable
+      if (vaultResult.kind === 'bound-unsyncable') {
+        if (!vaultResult.dirExists) {
+          // For invalid-binding/error, vaultDir is '' — use hint directly
+          const errText =
+            vaultResult.reason === 'invalid-binding' || vaultResult.reason === 'error'
+              ? `No se pudo escribir la nota: ${vaultResult.hint}`
+              : `No se pudo escribir la nota: la carpeta del parche (${vaultResult.vaultDir}) no existe. ${vaultResult.hint}`;
+          return {
+            isError: true,
+            content: [{ type: 'text' as const, text: errText }],
+          };
+        }
+        // Dir exists: write there but skip auto-sync
+      }
+
+      const parcheVault = vaultResult.kind === 'ok' ? vaultResult.vault : null;
+
+      // R2: with a parche vault, write to its vaultDir (not the Obsidian detector)
+      let vaultPath: string | undefined;
+      if (vaultResult.kind === 'bound-unsyncable' && vaultResult.dirExists) {
+        vaultPath = vaultResult.vaultDir;
+      } else if (parcheVault) {
+        vaultPath = parcheVault.vaultDir;
+      } else if (vaultResult.kind !== 'bound-unsyncable') {
+        const detection = await new ObsidianDetector(services.fs).detect({
+          explicitPath: services.obsidianVaultPath,
+          searchRoots: obsidianSearchRoots(services),
+        });
+        if (detection.found) vaultPath = detection.path;
+      }
+
+      if (!vaultPath) {
         logger.info({ tool: TOOL_NAME }, 'no vault configured');
         return { isError: true, content: [{ type: 'text' as const, text: NO_VAULT_ERROR }] };
       }
 
       const writer = new VaultWriter(services.fs, services.clock);
       const { notePath } = await writer.write({
-        vaultPath: detection.path,
+        vaultPath,
         title,
         content,
         projectSlug,
@@ -56,10 +86,12 @@ export function registerSummarizeToVault(
       });
       logger.info({ tool: TOOL_NAME, notePath }, 'note written to vault');
 
-      // C5: push auto-sync after writing if active vault is a parche vault
+      // C5: push auto-sync after writing if active vault is a parche vault (and autoSync enabled)
+      // O2: if bound-unsyncable with dir existing, show hint instead
       let syncWarning: string | undefined;
-      const parcheVault = await resolveActiveParcheVault(services);
-      if (parcheVault) {
+      if (vaultResult.kind === 'bound-unsyncable') {
+        syncWarning = `parche no sincronizable: ${vaultResult.hint}`;
+      } else if (parcheVault?.autoSync.enabled) {
         const syncResult = await maybeAutoSync(services, logger, parcheVault, 'push');
         syncWarning = syncResult.warning;
       }

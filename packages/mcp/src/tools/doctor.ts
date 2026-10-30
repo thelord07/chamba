@@ -1,4 +1,4 @@
-import { renderDoctorReport, runDoctor } from '@chamba/core';
+import { findWorkspaceRoot, renderDoctorReport, runDoctor } from '@chamba/core';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { Logger } from 'pino';
 import { obsidianSearchRoots, type Services } from '../services.js';
@@ -22,6 +22,16 @@ export function registerDoctor(server: McpServer, logger: Logger, services: Serv
       inputSchema: {},
     },
     async () => {
+      // O3: resolve workspaceRoot and its source for doctor
+      const wsRoot =
+        services.workspaceRoot ??
+        (await findWorkspaceRoot(services.fs, services.cwd, services.homedir));
+      const wsRootSource: 'env' | 'cwd' | undefined = services.workspaceRoot
+        ? 'env'
+        : wsRoot
+          ? 'cwd'
+          : undefined;
+
       const report = await runDoctor({
         fs: services.fs,
         process: services.process,
@@ -31,6 +41,8 @@ export function registerDoctor(server: McpServer, logger: Logger, services: Serv
         obsidianSearchRoots: obsidianSearchRoots(services),
         nodeVersion: process.version,
         resources: services.system.resources(),
+        workspaceRoot: wsRoot ?? undefined,
+        workspaceRootSource: wsRootSource,
       });
 
       logger.info(

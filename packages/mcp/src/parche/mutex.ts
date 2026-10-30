@@ -44,7 +44,7 @@ export async function withVaultLock<T>(
   if (pending && opts.onBusy === 'skip') {
     opts.logger?.warn(
       { mutexKey: key, label: opts.label },
-      'vault sync skipped: another sync is already running',
+      'parche: sync skipped, another sync is running',
     );
     return { skipped: true };
   }

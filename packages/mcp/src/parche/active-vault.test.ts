@@ -1,12 +1,20 @@
 /**
- * parche/active-vault.test.ts — Tests for resolveActiveParcheVault.
+ * parche/active-vault.test.ts — Tests for resolveActiveParcheVaultFull.
  * PARCHE-009 AC10: custom vault dir is recognized by autosync.
  */
 
 import { FakeHash, FakeParche, MemoryFilesystem } from '@chamba/core';
 import { describe, expect, it } from 'vitest';
 import type { Services } from '../services.js';
-import { resolveActiveParcheVault } from './active-vault.js';
+import { resolveActiveParcheVaultFull } from './active-vault.js';
+
+/** Helper: resolves to vault | null (same contract as old wrapper) */
+async function resolveActiveParcheVault(
+  svc: Services,
+): Promise<import('./active-vault.js').ActiveParcheVault | null> {
+  const r = await resolveActiveParcheVaultFull(svc);
+  return r.kind === 'ok' ? r.vault : null;
+}
 
 const FAKE_NOW = '2026-06-09T10:00:00.000Z';
 
@@ -80,7 +88,7 @@ async function seedCred(
   await fs.writeBytes(`${homedir}/.chamba/credentials.json`, bytes, { mode: 0o600 });
 }
 
-describe('resolveActiveParcheVault (AC10)', () => {
+describe('resolveActiveParcheVaultFull (AC10)', () => {
   it('returns vault when detection.path matches cred.dir', async () => {
     const customDir = '/my/custom/vault';
     const fs = new MemoryFilesystem();
