@@ -3,7 +3,15 @@
  * Syncs one or all parche vaults with the remote server.
  */
 
-import { CredentialsStore, readState, resolveVaultDir, syncOnce } from '@chamba/core';
+import {
+  CredentialsStore,
+  joinFirstHint,
+  linkDirPlaceholderHint,
+  linkHint,
+  readState,
+  resolveVaultDir,
+  syncOnce,
+} from '@chamba/core';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { Logger } from 'pino';
 import { z } from 'zod';
@@ -35,7 +43,7 @@ export function registerVaultSync(server: McpServer, logger: Logger, services: S
       if (targets.length === 0) {
         const msg = slug
           ? `No credential found for vault "${slug}".`
-          : 'No parche credentials found. Use vault join first.';
+          : `No parche credentials found. Use \`${joinFirstHint()}\` first.`;
         return { content: [{ type: 'text' as const, text: msg }] };
       }
 
@@ -57,7 +65,7 @@ export function registerVaultSync(server: McpServer, logger: Logger, services: S
           const dirExists = await services.fs.exists(vaultDir);
           if (!dirExists) {
             results.push(
-              `${sl}: la carpeta "${vaultDir}" ya no existe — usa \`vault link ${sl} --dir <ruta>\``,
+              `${sl}: la carpeta "${vaultDir}" ya no existe — usa \`${linkDirPlaceholderHint(sl)}\``,
             );
             anyError = true;
             continue;
@@ -65,7 +73,7 @@ export function registerVaultSync(server: McpServer, logger: Logger, services: S
 
           const state = await readState(services.fs, vaultDir);
           if (!state) {
-            results.push(`${sl}: no state.json — run vault join first`);
+            results.push(`${sl}: no state.json — run \`${joinFirstHint()}\` first`);
             anyError = true;
             continue;
           }
@@ -73,7 +81,7 @@ export function registerVaultSync(server: McpServer, logger: Logger, services: S
           // PARCHE-009: block if pending adoption
           if (state.pendingAdoption === true) {
             results.push(
-              `${sl}: pendiente de confirmar — corre \`vault link ${sl} --dir "${vaultDir}" --yes\``,
+              `${sl}: pendiente de confirmar — corre \`${linkHint(sl, vaultDir, { yes: true })}\``,
             );
             anyError = true;
             continue;
@@ -111,7 +119,7 @@ export function registerVaultSync(server: McpServer, logger: Logger, services: S
           }
           const summary = lockResult.result;
 
-          logger.info({ tool: TOOL_NAME, slug: sl, ...summary }, 'vault synced');
+          logger.info({ tool: TOOL_NAME, slug: sl, ...summary }, 'parche: synced');
           results.push(
             `${sl}: pushed ${summary.pushed}, pulled ${summary.pulled}, conflicts ${summary.conflicts.length}`,
           );
@@ -121,7 +129,7 @@ export function registerVaultSync(server: McpServer, logger: Logger, services: S
           }
         } catch (err) {
           const msg = err instanceof Error ? err.message : String(err);
-          logger.warn({ tool: TOOL_NAME, slug: sl, err: msg }, 'vault sync failed');
+          logger.warn({ tool: TOOL_NAME, slug: sl, err: msg }, 'parche: sync failed');
           results.push(`${sl}: error — ${msg}`);
           anyError = true;
         }

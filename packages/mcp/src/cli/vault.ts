@@ -17,15 +17,22 @@ import {
   AdoptionPendingError,
   buildAdoptionSummary,
   CredentialsStore,
+  findWorkspaceRoot,
+  joinFirstHint,
   joinOnce,
   joinPath,
+  linkDirPlaceholderHint,
+  linkHint,
   MEMORY_DIR,
   ParcheAlreadyMemberError,
+  ParcheClient,
   ParcheNotFoundError,
   ParcheRateLimitedError,
+  parcheFilePath,
   parseJoinInput,
   planPush,
   prepareVaultDir,
+  readParcheBinding,
   readState,
   resetVaultState,
   resolveServerUrl,
@@ -33,8 +40,10 @@ import {
   scanLocal,
   syncOnce,
   toSyncState,
+  unlinkWorkspaceHint,
   VaultDirMissingError,
   VaultDirValidationError,
+  writeParcheBinding,
   writeState,
 } from '@chamba/core';
 import type { Services } from '../services.js';
@@ -103,7 +112,7 @@ async function runAdoptionGate(
     );
     if (answer.trim().toLowerCase() === 's') return true;
     stdout(
-      `No se subió nada. Para confirmar más tarde: vault link ${slug} --dir "${vaultDir}" --yes`,
+      `No se subió nada. Para confirmar más tarde: ${linkHint(slug, vaultDir, { yes: true })}`,
     );
     return false;
   }
@@ -112,7 +121,7 @@ async function runAdoptionGate(
   stderr(
     `Hay ${summary.syncableCount} archivo(s) en "${vaultDir}" que se subirían al parche "${slug}".`,
   );
-  stderr(`Para confirmar: vault link ${slug} --dir "${vaultDir}" --yes`);
+  stderr(`Para confirmar: ${linkHint(slug, vaultDir, { yes: true })}`);
   exit(1);
   return false;
 }
@@ -126,7 +135,7 @@ async function runJoin(argv: string[], deps: VaultCliDeps): Promise<void> {
   if (!codeOrLink) {
     stderr(
       'Usage: vault join <code|link> [--name <name>] [--email <email>] [--label <label>] ' +
-        '[--server <url>] [--dir <ruta>] [--allow-in-repo] [--yes]',
+        '[--server <url>] [--dir <ruta>] [--scope workspace|global] [--allow-in-repo] [--yes]',
     );
     exit(1);
     return;
@@ -138,10 +147,129 @@ async function runJoin(argv: string[], deps: VaultCliDeps): Promise<void> {
   const labelFlag = parseFlag(argv, '--label');
   const serverFlag = parseFlag(argv, '--server');
   const dirFlag = parseFlag(argv, '--dir');
+  const scopeFlag = parseFlag(argv, '--scope') as 'workspace' | 'global' | undefined;
   const allowInRepo = hasFlag(argv, '--allow-in-repo');
   const hasYes = hasFlag(argv, '--yes');
 
-  // TTY prompting
+  // ── PARCHE-011: workspace scope resolution ─────────────────────────────────
+  const wsRoot =
+    services.workspaceRoot ??
+    (await findWorkspaceRoot(services.fs, services.cwd, services.homedir));
+
+  // Determine scope
+  let scope: 'workspace' | 'global';
+  if (scopeFlag === 'workspace' || scopeFlag === 'global') {
+    scope = scopeFlag;
+    if (scope === 'workspace' && !wsRoot) {
+      stderr(
+        `--scope workspace requiere estar dentro de un workspace (con .chamba/workspace.md). ` +
+          `No se detectó workspace desde ${services.cwd}.`,
+      );
+      exit(1);
+      return;
+    }
+  } else if (!scopeFlag) {
+    if (!wsRoot) {
+      // No workspace found → global
+      scope = 'global';
+    } else if (!isTTY) {
+      // AC3: no TTY + in workspace + no --scope → exit 1
+      stderr(
+        `Estás dentro de un workspace (${wsRoot}). ` +
+          `Usa --scope workspace o --scope global para especificar dónde guardar el vínculo. ` +
+          `Sin --scope, este comando requiere TTY interactivo.`,
+      );
+      exit(1);
+      return;
+    } else {
+      // TTY prompt
+      const answer = await prompt(
+        `¿Vincular este parche a este workspace (${wsRoot}/.chamba/parche.json) o como global? [workspace/global] `,
+      );
+      scope = answer.trim().toLowerCase().startsWith('w') ? 'workspace' : 'global';
+    }
+  } else {
+    stderr(`--scope debe ser "workspace" o "global" (recibido: "${scopeFlag}")`);
+    exit(1);
+    return;
+  }
+
+  // AC4/R4: if workspace scope and binding already exists, pre-check invite via GET endpoint
+  if (scope === 'workspace' && wsRoot) {
+    const existingBindingPath = parcheFilePath(wsRoot);
+    const existingBindingResult = await readParcheBinding(services.fs, existingBindingPath, {
+      scope: 'workspace',
+      baseDir: wsRoot,
+    });
+    if (existingBindingResult.ok) {
+      // Pre-validate the invite code to see if slug matches
+      // (requires server to be known — parse it first)
+      let preServer: string | undefined;
+      try {
+        const preParsed = parseJoinInput(codeOrLink);
+        preServer = resolveServerUrl({
+          linkServer: preParsed.server,
+          envUrl: services.parcheServerUrl,
+          flagServer: serverFlag,
+        });
+      } catch {
+        // If server can't be resolved yet, fall through to later error
+      }
+
+      if (preServer) {
+        // Parse the code from codeOrLink (inline, before the outer parseJoinInput call)
+        let preCode = codeOrLink;
+        try {
+          const preParsed2 = parseJoinInput(codeOrLink);
+          preCode = preParsed2.code;
+        } catch {
+          // Use raw codeOrLink as code
+        }
+        const checkResult = await ParcheClient.checkInvite(services.http, preServer, preCode);
+        if (checkResult.status === 'invalid') {
+          stderr('código inválido, vencido o agotado');
+          exit(1);
+          return;
+        }
+        if (checkResult.status === 'not-found') {
+          // Conservative: don't reveal workspace state; hint to unlink
+          stderr(
+            `No se pudo verificar el código — el servidor no reconoce la invitación. ` +
+              `Si quieres vincular a otro parche, primero usa \`${unlinkWorkspaceHint()}\`.`,
+          );
+          exit(1);
+          return;
+        }
+        if (checkResult.status === 'network-error') {
+          // R13: no hint on transient errors
+          stderr(`No pude verificar el código (red/servidor): ${checkResult.message}. Reintenta.`);
+          exit(1);
+          return;
+        }
+        // valid: check slug
+        if (checkResult.slug !== existingBindingResult.binding.slug) {
+          stderr(
+            `Este workspace ya está vinculado al parche "${existingBindingResult.binding.slug}", ` +
+              `pero el código es para "${checkResult.slug}". ` +
+              `Usa \`${unlinkWorkspaceHint()}\` para desvincular primero.`,
+          );
+          exit(1);
+          return;
+        }
+        // Same slug → allow re-join (e.g. new device)
+      } else {
+        // Can't resolve server yet → reject conservatively
+        stderr(
+          `Este workspace ya está vinculado al parche "${existingBindingResult.binding.slug}". ` +
+            `Usa \`${unlinkWorkspaceHint()}\` para re-vincular.`,
+        );
+        exit(1);
+        return;
+      }
+    }
+  }
+
+  // TTY prompting for name/email
   if (!name || !email) {
     if (!isTTY) {
       stderr('--name y --email son obligatorios sin TTY');
@@ -196,9 +324,19 @@ async function runJoin(argv: string[], deps: VaultCliDeps): Promise<void> {
     // Ignore
   }
 
+  // ── vaultDir default for workspace scope ───────────────────────────────────
+  // If no --dir and scope=workspace: try <wsRoot>/vault
+  let effectiveDirFlag = dirFlag;
+  if (!effectiveDirFlag && scope === 'workspace' && wsRoot) {
+    const wsVaultDir = joinPath(wsRoot, 'vault');
+    if (await services.fs.exists(wsVaultDir)) {
+      effectiveDirFlag = wsVaultDir;
+    }
+  }
+
   // If --dir: validate the directory first
   let canonicalDir: string | undefined;
-  if (dirFlag) {
+  if (effectiveDirFlag) {
     const creds = new CredentialsStore(services.fs, services.homedir);
     const existingSlugs = await creds.listSlugs();
     const existingLinks: Array<{ server: string; slug: string; dir: string }> = [];
@@ -217,7 +355,7 @@ async function runJoin(argv: string[], deps: VaultCliDeps): Promise<void> {
       const prepared = await prepareVaultDir(
         { fs: services.fs },
         {
-          input: dirFlag,
+          input: effectiveDirFlag,
           homedir: services.homedir,
           cwd: services.cwd,
           slug: 'temp', // slug not known yet
@@ -255,8 +393,7 @@ async function runJoin(argv: string[], deps: VaultCliDeps): Promise<void> {
           email,
           ...(label ? { deviceLabel: label } : {}),
         },
-        // D1: universal gate — always skipInitialSync if there's a custom dir
-        // For default dir join, also skipInitialSync (apply gate universally)
+        // D1: universal gate — always skipInitialSync
         skipInitialSync: true,
       },
     );
@@ -272,7 +409,19 @@ async function runJoin(argv: string[], deps: VaultCliDeps): Promise<void> {
       // User declined — state stays with pendingAdoption=true
       stdout(`Vault "${result.slug}" creado en ${result.vaultDir} (sin sincronizar).`);
       stdout(
-        `Para sincronizar más tarde: vault link ${result.slug} --dir "${result.vaultDir}" --yes`,
+        `Para sincronizar más tarde: ${linkHint(result.slug, result.vaultDir, { yes: true })}`,
+      );
+      // Still write parche.json (binding exists even if not synced)
+      await writeParcheJsonAfterJoin(
+        services,
+        scope,
+        wsRoot,
+        server_,
+        result.slug,
+        result.vaultDir,
+        stdout,
+        stderr,
+        exit,
       );
       return;
     }
@@ -307,18 +456,86 @@ async function runJoin(argv: string[], deps: VaultCliDeps): Promise<void> {
     stdout(
       `Primer sync: pushed ${syncResult.pushed}, pulled ${syncResult.pulled}, conflicts ${syncResult.conflicts.length}`,
     );
+
+    // Write parche.json after successful join (R6: atomic write after joinOnce success)
+    await writeParcheJsonAfterJoin(
+      services,
+      scope,
+      wsRoot,
+      server_,
+      result.slug,
+      result.vaultDir,
+      stdout,
+      stderr,
+      exit,
+    );
   } catch (err) {
     let msg: string;
     if (err instanceof ParcheNotFoundError) {
       msg = 'código inválido, vencido o agotado';
     } else if (err instanceof ParcheAlreadyMemberError) {
-      msg = 'ya eres miembro: usa `vault login` en esta máquina (próximamente)';
+      msg = 'ya eres miembro en este grupo (próximamente: vault login para máquinas existentes)';
     } else if (err instanceof ParcheRateLimitedError) {
       msg = 'demasiados intentos, espera un minuto';
     } else {
       msg = err instanceof Error ? err.message : String(err);
     }
     stderr(msg);
+    exit(1);
+  }
+}
+
+/**
+ * Write parche.json after a successful join (R6).
+ * Returns false and writes to stderr + exits 1 on failure.
+ */
+async function writeParcheJsonAfterJoin(
+  services: Services,
+  scope: 'workspace' | 'global',
+  wsRoot: string | null,
+  server: string,
+  slug: string,
+  vaultDir: string,
+  stdout: (msg: string) => void,
+  stderr: (msg: string) => void,
+  exit: (code: number) => void,
+): Promise<void> {
+  const bindingRoot = scope === 'workspace' ? wsRoot : services.homedir;
+  if (!bindingRoot) return;
+
+  // Determine vaultDir to persist: relative if inside the workspace, absolute otherwise
+  let persistVaultDir = vaultDir;
+  if (scope === 'workspace' && wsRoot && vaultDir.startsWith(`${wsRoot}/`)) {
+    persistVaultDir = vaultDir.slice(wsRoot.length + 1);
+  }
+
+  const bindingPath = parcheFilePath(bindingRoot);
+  const bindingContent = JSON.stringify(
+    {
+      version: 1,
+      server,
+      slug,
+      vaultDir: persistVaultDir,
+      autoSync: { enabled: true, pullTtlMin: 5 },
+    },
+    null,
+    2,
+  );
+  try {
+    await writeParcheBinding(services.fs, bindingPath, {
+      version: 1,
+      server,
+      slug,
+      vaultDir: persistVaultDir,
+      autoSync: { enabled: true, pullTtlMin: 5 },
+    });
+    stdout(`Vínculo ${scope} guardado en ${bindingPath}.`);
+  } catch (e) {
+    // R6: fail hard — show exact content so user can create it manually
+    stderr(
+      `Te uniste a ${slug} pero no se pudo escribir ${bindingPath}: ${e instanceof Error ? e.message : String(e)}.\n` +
+        `Crea el archivo manualmente con este contenido:\n${bindingContent}`,
+    );
     exit(1);
   }
 }
@@ -455,7 +672,7 @@ async function runLink(argv: string[], deps: VaultCliDeps): Promise<void> {
 
   if (!confirmed) {
     stdout(`Vault "${slug}" re-vinculado a "${canonicalDir}" (sin sincronizar).`);
-    stdout(`Para sincronizar: vault link ${slug} --dir "${canonicalDir}" --yes`);
+    stdout(`Para sincronizar: ${linkHint(slug, canonicalDir, { yes: true })}`);
     return;
   }
 
@@ -483,21 +700,108 @@ async function runLink(argv: string[], deps: VaultCliDeps): Promise<void> {
   stdout(
     `Sync: pushed ${syncResult.pushed}, pulled ${syncResult.pulled}, conflicts ${syncResult.conflicts.length}`,
   );
+
+  // O1: if workspace or global binding exists for this slug, update its vaultDir
+  await updateBindingVaultDir(services, slug, canonicalDir, stdout);
+}
+
+/**
+ * O1: When vault link changes the vaultDir, update any parche.json binding
+ * that references the same slug (workspace binding wins over global).
+ */
+async function updateBindingVaultDir(
+  services: Services,
+  slug: string,
+  newVaultDir: string,
+  stdout: (msg: string) => void,
+): Promise<void> {
+  const wsRoot =
+    services.workspaceRoot ??
+    (await findWorkspaceRoot(services.fs, services.cwd, services.homedir));
+
+  let updated = 0;
+
+  // Try workspace binding (no early return — always check global too)
+  if (wsRoot) {
+    const bindingPath = parcheFilePath(wsRoot);
+    const result = await readParcheBinding(services.fs, bindingPath, {
+      scope: 'workspace',
+      baseDir: wsRoot,
+    });
+    if (result.ok && result.binding.slug === slug) {
+      // Store relative path if inside workspace, absolute otherwise
+      let persistVaultDir = newVaultDir;
+      if (newVaultDir.startsWith(`${wsRoot}/`)) {
+        persistVaultDir = newVaultDir.slice(wsRoot.length + 1);
+      }
+      try {
+        await writeParcheBinding(services.fs, bindingPath, {
+          ...result.binding,
+          vaultDir: persistVaultDir,
+        });
+        stdout(`Vínculo workspace actualizado con nueva ruta: ${persistVaultDir}`);
+        updated++;
+      } catch {
+        // Best-effort: don't fail the link operation
+      }
+    }
+  }
+
+  // Try global binding (always checked, independent of workspace)
+  const globalBindingPath = parcheFilePath(services.homedir);
+  const globalResult = await readParcheBinding(services.fs, globalBindingPath, {
+    scope: 'global',
+    baseDir: services.homedir,
+  });
+  if (globalResult.ok && globalResult.binding.slug === slug) {
+    try {
+      await writeParcheBinding(services.fs, globalBindingPath, {
+        ...globalResult.binding,
+        vaultDir: newVaultDir,
+      });
+      stdout(`Vínculo global actualizado con nueva ruta: ${newVaultDir}`);
+      updated++;
+    } catch {
+      // Best-effort
+    }
+  }
+
+  if (updated === 0) {
+    stdout('ningún parche.json actualizado');
+  }
 }
 
 async function runSync(argv: string[], deps: VaultCliDeps): Promise<void> {
   const { services, stdout, stderr, exit } = deps;
   const slugArg = argv[0] && !argv[0].startsWith('--') ? argv[0] : undefined;
 
+  // PARCHE-011: if no explicit slug and inside a workspace with a binding, sync only binding slug
+  let effectiveSlugArg = slugArg;
+  if (!effectiveSlugArg) {
+    const wsRoot =
+      services.workspaceRoot ??
+      (await findWorkspaceRoot(services.fs, services.cwd, services.homedir));
+    if (wsRoot) {
+      const wsBindingPath = parcheFilePath(wsRoot);
+      const wsBindingResult = await readParcheBinding(services.fs, wsBindingPath, {
+        scope: 'workspace',
+        baseDir: wsRoot,
+      });
+      if (wsBindingResult.ok) {
+        effectiveSlugArg = wsBindingResult.binding.slug;
+      }
+    }
+  }
+
   const creds = new CredentialsStore(services.fs, services.homedir);
   const allSlugs = await creds.listSlugs();
-  const targets = slugArg ? allSlugs.filter((s) => s.slug === slugArg) : allSlugs;
+  const targets = effectiveSlugArg ? allSlugs.filter((s) => s.slug === effectiveSlugArg) : allSlugs;
 
   if (targets.length === 0) {
     stderr(
       slugArg
         ? `No credential found for vault "${slugArg}".`
-        : 'No parche credentials found. Use vault join first.',
+        : `No parche credentials found. Use \`${joinFirstHint()}\` first.`,
     );
     exit(1);
     return;
@@ -519,7 +823,7 @@ async function runSync(argv: string[], deps: VaultCliDeps): Promise<void> {
       const dirExists = await services.fs.exists(vaultDir);
       if (!dirExists) {
         stderr(
-          `La carpeta ${vaultDir} del parche ${slug} ya no existe. Usa \`chamba vault link ${slug} --dir <ruta>\`.`,
+          `La carpeta ${vaultDir} del parche ${slug} ya no existe. Usa \`${linkDirPlaceholderHint(slug)}\`.`,
         );
         anyError = true;
         continue;
@@ -527,7 +831,7 @@ async function runSync(argv: string[], deps: VaultCliDeps): Promise<void> {
 
       const state = await readState(services.fs, vaultDir);
       if (!state) {
-        stderr(`${slug}: no state.json — run vault join first`);
+        stderr(`${slug}: no state.json — run \`${joinFirstHint()}\` first`);
         anyError = true;
         continue;
       }
@@ -535,7 +839,7 @@ async function runSync(argv: string[], deps: VaultCliDeps): Promise<void> {
       // PARCHE-009: check pending adoption
       if (state.pendingAdoption === true) {
         stderr(
-          `${slug}: pendiente de confirmar — corre \`vault link ${slug} --dir "${vaultDir}" --yes\``,
+          `${slug}: pendiente de confirmar — corre \`${linkHint(slug, vaultDir, { yes: true })}\``,
         );
         anyError = true;
         continue;
@@ -582,7 +886,7 @@ async function runStatus(deps: VaultCliDeps): Promise<void> {
   const allSlugs = await creds.listSlugs();
 
   if (allSlugs.length === 0) {
-    stdout('No parche vaults found. Use vault join first.');
+    stdout(`No parche vaults found. Use \`${joinFirstHint()}\` first.`);
     return;
   }
 
@@ -615,7 +919,7 @@ async function runStatus(deps: VaultCliDeps): Promise<void> {
 
       let pending = '?';
       if (!dirExists) {
-        pending = `[carpeta ya no existe — chamba vault link ${slug} --dir <ruta>]`;
+        pending = `[carpeta ya no existe — ${linkDirPlaceholderHint(slug)}]`;
       } else if (state) {
         if (state.pendingAdoption === true) {
           pending = 'pendiente de confirmar';
@@ -685,6 +989,78 @@ async function runLeave(argv: string[], deps: VaultCliDeps): Promise<void> {
   }
 }
 
+// ─── runUnlink ────────────────────────────────────────────────────────────────
+
+/**
+ * Removes the parche.json binding for the specified scope.
+ * Does NOT remove credentials or vault files — only the binding file.
+ * Usage: npx @chamba/mcp vault unlink [--scope workspace|global]
+ */
+async function runUnlink(argv: string[], deps: VaultCliDeps): Promise<void> {
+  const { services, stdout, stderr, exit } = deps;
+
+  const scopeFlag = parseFlag(argv, '--scope') as 'workspace' | 'global' | undefined;
+
+  // Resolve workspace root
+  const wsRoot =
+    services.workspaceRoot ??
+    (await findWorkspaceRoot(services.fs, services.cwd, services.homedir));
+
+  let scope: 'workspace' | 'global';
+  if (scopeFlag === 'workspace' || scopeFlag === 'global') {
+    scope = scopeFlag;
+  } else if (scopeFlag) {
+    stderr(`--scope debe ser "workspace" o "global" (recibido: "${scopeFlag}")`);
+    exit(1);
+    return;
+  } else {
+    // Default: workspace if inside one, else global
+    scope = wsRoot ? 'workspace' : 'global';
+  }
+
+  if (scope === 'workspace' && !wsRoot) {
+    stderr(
+      `--scope workspace requiere estar dentro de un workspace (con .chamba/workspace.md). ` +
+        `No se detectó workspace desde ${services.cwd}.`,
+    );
+    exit(1);
+    return;
+  }
+
+  // wsRoot is non-null here because we've already validated scope=workspace→wsRoot exists
+  const bindingRoot = scope === 'workspace' ? (wsRoot as string) : services.homedir;
+  const bindingPath = parcheFilePath(bindingRoot);
+
+  // Check that binding exists
+  const exists = await services.fs.exists(bindingPath);
+  if (!exists) {
+    stdout(`No hay vínculo ${scope} en ${bindingPath}.`);
+    exit(0);
+    return;
+  }
+
+  // Read first so we can show the slug in the success message
+  const bindingResult = await readParcheBinding(services.fs, bindingPath, {
+    scope,
+    baseDir: bindingRoot,
+  });
+  const slugDesc = bindingResult.ok ? ` (${bindingResult.binding.slug})` : '';
+
+  // Delete the binding file
+  try {
+    await services.fs.remove(bindingPath);
+  } catch (e) {
+    stderr(`No se pudo eliminar ${bindingPath}: ${e instanceof Error ? e.message : String(e)}`);
+    exit(1);
+    return;
+  }
+
+  stdout(
+    `Vínculo ${scope}${slugDesc} eliminado (${bindingPath}). ` +
+      `Las credenciales y archivos del vault siguen intactos.`,
+  );
+}
+
 // ─── Main dispatcher ──────────────────────────────────────────────────────────
 
 /**
@@ -713,9 +1089,16 @@ export async function runVaultCli(argv: string[], deps: VaultCliDeps): Promise<v
     case 'leave':
       await runLeave(rest, deps);
       break;
+    case 'unlink':
+      // PARCHE-011: remove parche.json workspace/global binding
+      await runUnlink(rest, deps);
+      break;
     default: {
       const { stderr, exit } = deps;
-      stderr('Usage: vault <subcommand> [args]\n' + 'Subcommands: join, link, sync, status, leave');
+      stderr(
+        'Usage: vault <subcommand> [args]\n' +
+          'Subcommands: join, link, sync, status, leave, unlink',
+      );
       exit(1);
     }
   }

@@ -60,6 +60,12 @@ export interface Services {
    * Injectable for tests to exercise the timeout path without real waiting.
    */
   autosyncBudgetMs?: number;
+  /**
+   * Explicit workspace root from CHAMBA_WORKSPACE_ROOT env (O3 / PARCHE-011).
+   * When set, wins over cwd for workspace binding resolution. Injected so
+   * core (pure) doesn't read process.env.
+   */
+  workspaceRoot?: string;
 }
 
 export function createNodeServices(): Services {
@@ -77,6 +83,7 @@ export function createNodeServices(): Services {
     parcheServerUrl: process.env.CHAMBA_PARCHE_URL,
     parchePullTtlMin: Number(process.env.CHAMBA_PARCHE_PULL_TTL_MIN ?? '5') || 5,
     vaultMutex: new Map(),
+    workspaceRoot: process.env.CHAMBA_WORKSPACE_ROOT,
   };
 }
 

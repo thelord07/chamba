@@ -11,6 +11,7 @@ import {
   buildAdoptionSummary,
   CredentialsStore,
   expandTilde,
+  joinInRepoHint,
   joinOnce,
   joinPath,
   lexicalNormalize,
@@ -154,7 +155,7 @@ export function registerVaultJoin(server: McpServer, logger: Logger, services: S
               },
             );
 
-            logger.info({ tool: TOOL_NAME, slug: sl, vault: existingVaultDir }, 'vault adopted');
+            logger.info({ tool: TOOL_NAME, slug: sl, vault: existingVaultDir }, 'parche: adopted');
             const { pushed, pulled, conflicts } = syncResult;
             const adoptText = [
               `Joined group vault: ${sl}`,
@@ -219,7 +220,7 @@ export function registerVaultJoin(server: McpServer, logger: Logger, services: S
                       text:
                         `La ruta "${dir}" está dentro de un repositorio git. ` +
                         `Usa la CLI con --allow-in-repo para permitirlo:\n` +
-                        `  chamba vault join <code> --dir "${dir}" --allow-in-repo`,
+                        `  ${joinInRepoHint(dir)}`,
                     },
                   ],
                 };
@@ -257,7 +258,7 @@ export function registerVaultJoin(server: McpServer, logger: Logger, services: S
         if (summary.syncableCount > 0 && confirmUpload !== true) {
           logger.info(
             { tool: TOOL_NAME, slug: result.slug, syncableCount: summary.syncableCount },
-            'vault join needs confirmation',
+            'parche: join needs confirmation',
           );
           return {
             content: [
@@ -313,7 +314,10 @@ export function registerVaultJoin(server: McpServer, logger: Logger, services: S
           },
         );
 
-        logger.info({ tool: TOOL_NAME, slug: result.slug, vault: result.vaultDir }, 'vault joined');
+        logger.info(
+          { tool: TOOL_NAME, slug: result.slug, vault: result.vaultDir },
+          'parche: joined',
+        );
 
         const { pushed, pulled, conflicts } = syncResult;
         const text = [
@@ -337,13 +341,14 @@ export function registerVaultJoin(server: McpServer, logger: Logger, services: S
         if (err instanceof ParcheNotFoundError) {
           msg = 'código inválido, vencido o agotado';
         } else if (err instanceof ParcheAlreadyMemberError) {
-          msg = 'ya eres miembro: usa `vault login` en esta máquina (próximamente)';
+          msg =
+            'ya eres miembro en este grupo (próximamente: vault login para máquinas existentes)';
         } else if (err instanceof ParcheRateLimitedError) {
           msg = 'demasiados intentos, espera un minuto';
         } else {
           msg = err instanceof Error ? err.message : String(err);
         }
-        logger.warn({ tool: TOOL_NAME, err: msg }, 'vault join failed');
+        logger.warn({ tool: TOOL_NAME, err: msg }, 'parche: join failed');
         return {
           isError: true,
           content: [{ type: 'text' as const, text: msg }],

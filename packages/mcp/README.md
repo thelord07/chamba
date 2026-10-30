@@ -222,6 +222,138 @@ path you used with `--dir`:
 "env": { "CHAMBA_OBSIDIAN_VAULT_PATH": "/your/custom/path" }
 ```
 
+## Workspace-aware parche binding (PARCHE-011) / Vínculo de parche por workspace
+
+### English
+
+Each workspace (any directory that contains `.chamba/workspace.md`) can keep its own
+**parche binding** in `.chamba/parche.json`. That binding overrides everything else —
+including `CHAMBA_OBSIDIAN_VAULT_PATH` and the global `~/.chamba/parche.json` — and is
+**authoritative**: if it exists but cannot be synced (wrong path, missing credential, etc.)
+the tools stop and tell you what's wrong instead of falling back silently.
+
+**Precedence (D3):**
+
+1. Workspace `.chamba/parche.json` — authoritative
+2. `CHAMBA_OBSIDIAN_VAULT_PATH` env var (discovery only, no binding)
+3. Global `~/.chamba/parche.json` — authoritative
+4. Obsidian auto-detection (no binding)
+
+**Joining with a workspace scope:**
+
+```sh
+# Inside a workspace directory:
+npx @chamba/mcp vault join K7QX-M2RP \
+  --name "Joys" --email "joys@example.com" \
+  --scope workspace \
+  --yes
+```
+
+If `--scope` is omitted inside a workspace, a TTY prompt asks which scope to use.
+Without a TTY and without `--scope`, the command exits with code 1.
+
+**`autoSync` in the binding file (`.chamba/parche.json`):**
+
+```json
+{
+  "version": 1,
+  "server": "https://parche.example.com",
+  "slug": "my-team",
+  "vaultDir": "vault",
+  "autoSync": { "enabled": true, "pullTtlMin": 5 }
+}
+```
+
+`vaultDir` is relative to the workspace root. Set `autoSync.enabled: false` to disable
+background syncs without losing the binding.
+
+**Unlinking:**
+
+```sh
+npx @chamba/mcp vault unlink --scope workspace   # remove workspace binding
+npx @chamba/mcp vault unlink --scope global      # remove global binding
+```
+
+Credentials and vault files are never touched — only the `.chamba/parche.json` file is deleted.
+
+**`CHAMBA_WORKSPACE_ROOT` env var:**
+
+Inject the workspace root explicitly (useful in CI or when the MCP server is started from
+outside the workspace):
+
+```json
+"env": { "CHAMBA_WORKSPACE_ROOT": "/path/to/workspace" }
+```
+
+When set, it wins over cwd-based detection. The `chamba_doctor` and `chamba_vault_status`
+tools report the workspace root and whether it came from `env` or `cwd`.
+
+---
+
+### Español
+
+Cada workspace (cualquier directorio que contenga `.chamba/workspace.md`) puede tener su
+propio **vínculo de parche** en `.chamba/parche.json`. Ese vínculo tiene prioridad sobre
+todo lo demás — incluyendo `CHAMBA_OBSIDIAN_VAULT_PATH` y el global `~/.chamba/parche.json`
+— y es **autoritativo**: si existe pero no se puede sincronizar, las tools se detienen y
+explican el problema, sin caer silenciosamente a otra opción.
+
+**Precedencia (D3):**
+
+1. Workspace `.chamba/parche.json` — autoritativo
+2. Variable de entorno `CHAMBA_OBSIDIAN_VAULT_PATH` (solo descubrimiento)
+3. Global `~/.chamba/parche.json` — autoritativo
+4. Auto-detección de Obsidian
+
+**Unirse con scope workspace:**
+
+```sh
+# Dentro de un directorio workspace:
+npx @chamba/mcp vault join K7QX-M2RP \
+  --name "Joys" --email "joys@example.com" \
+  --scope workspace \
+  --yes
+```
+
+Si se omite `--scope` dentro de un workspace, se hace prompt por TTY para elegir.
+Sin TTY y sin `--scope`, el comando sale con código 1.
+
+**`autoSync` en el archivo de vínculo (`.chamba/parche.json`):**
+
+```json
+{
+  "version": 1,
+  "server": "https://parche.example.com",
+  "slug": "mi-equipo",
+  "vaultDir": "vault",
+  "autoSync": { "enabled": true, "pullTtlMin": 5 }
+}
+```
+
+`vaultDir` es relativo a la raíz del workspace. Poniendo `autoSync.enabled: false` se
+deshabilita la sincronización automática sin perder el vínculo.
+
+**Desvincular:**
+
+```sh
+npx @chamba/mcp vault unlink --scope workspace   # elimina el vínculo workspace
+npx @chamba/mcp vault unlink --scope global      # elimina el vínculo global
+```
+
+Las credenciales y archivos del vault nunca se tocan — solo se elimina el archivo `.chamba/parche.json`.
+
+**Variable de entorno `CHAMBA_WORKSPACE_ROOT`:**
+
+Inyecta el workspace root explícitamente (útil en CI o cuando el MCP server se inicia
+fuera del workspace):
+
+```json
+"env": { "CHAMBA_WORKSPACE_ROOT": "/ruta/al/workspace" }
+```
+
+Cuando está presente, gana sobre la detección por cwd. Las tools `chamba_doctor` y
+`chamba_vault_status` reportan el workspace root y si vino de `env` o `cwd`.
+
 ## License
 
 MIT

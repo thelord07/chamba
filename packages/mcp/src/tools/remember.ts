@@ -2,7 +2,7 @@ import { FilesystemMemoryStore } from '@chamba/core';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { Logger } from 'pino';
 import { z } from 'zod';
-import { resolveActiveParcheVault } from '../parche/active-vault.js';
+import { resolveActiveParcheVaultFull } from '../parche/active-vault.js';
 import { maybeAutoSync } from '../parche/autosync.js';
 import type { Services } from '../services.js';
 
@@ -27,8 +27,39 @@ export function registerRemember(server: McpServer, logger: Logger, services: Se
       },
     },
     async ({ key, content, tags }) => {
-      // C5 gate decision 4a: with a parche vault, write to <vault>/memory/
-      const parcheVault = await resolveActiveParcheVault(services);
+      // O2: resolve full discriminated result — never fall through from bound-unsyncable
+      const vaultResult = await resolveActiveParcheVaultFull(services);
+
+      // O2: bound but unsyncable
+      if (vaultResult.kind === 'bound-unsyncable') {
+        if (!vaultResult.dirExists) {
+          const dirMsg =
+            vaultResult.reason === 'invalid-binding' || vaultResult.reason === 'error'
+              ? `No se pudo guardar la memoria: ${vaultResult.hint}`
+              : `No se pudo guardar la memoria: la carpeta del parche (${vaultResult.vaultDir}) no existe. ${vaultResult.hint}`;
+          return {
+            isError: true,
+            content: [{ type: 'text' as const, text: dirMsg }],
+          };
+        }
+        // Dir exists: write there but skip sync, add warning
+        const store = new FilesystemMemoryStore(services.fs, services.clock, vaultResult.vaultDir, {
+          dir: 'memory',
+        });
+        const memory = await store.remember({ key, content, tags });
+        logger.info({ tool: TOOL_NAME, key, path: memory.path }, 'memory saved (bound-unsyncable)');
+        return {
+          content: [
+            {
+              type: 'text' as const,
+              text: `Saved memory '${key}' to ${memory.path}\n\n⚠ parche no sincronizable: ${vaultResult.hint}`,
+            },
+          ],
+          structuredContent: { saved: true, path: memory.path } as Record<string, unknown>,
+        };
+      }
+
+      const parcheVault = vaultResult.kind === 'ok' ? vaultResult.vault : null;
 
       let store: FilesystemMemoryStore;
       if (parcheVault) {
@@ -43,9 +74,9 @@ export function registerRemember(server: McpServer, logger: Logger, services: Se
       const memory = await store.remember({ key, content, tags });
       logger.info({ tool: TOOL_NAME, key, path: memory.path }, 'memory saved');
 
-      // C5: push sync after writing (only with parche vault)
+      // C5: push sync after writing (only with parche vault and autoSync enabled)
       let syncWarning: string | undefined;
-      if (parcheVault) {
+      if (parcheVault?.autoSync.enabled) {
         const syncResult = await maybeAutoSync(services, logger, parcheVault, 'push');
         syncWarning = syncResult.warning;
       }

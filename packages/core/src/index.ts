@@ -174,6 +174,35 @@ export {
 // Vault sync — client (PARCHE-004)
 export type { CredentialEntry, CredentialsFile } from './vault-sync/credentials.js';
 export { CredentialsStore, credentialsFileSchema } from './vault-sync/credentials.js';
+// Vault-sync messages and helpers (PARCHE-011)
+export {
+  joinFirstHint,
+  joinInRepoHint,
+  linkDirPlaceholderHint,
+  linkHint,
+  syncManualHint,
+  unlinkWorkspaceHint,
+  VAULT_CLI,
+} from './vault-sync/messages.js';
+// Vault-sync parche binding (PARCHE-011)
+export type {
+  ParcheBinding,
+  ParcheBindingFile,
+  ParcheScope,
+  ReadParcheBindingResult,
+} from './vault-sync/parche-binding.js';
+export {
+  CHAMBA_DIR,
+  findWorkspaceRoot,
+  PARCHE_FILE,
+  parcheBindingFileSchema,
+  parcheFilePath,
+  readParcheBinding,
+  resolveParcheBinding,
+  WORKSPACE_MARKER,
+  writeParcheBinding,
+} from './vault-sync/parche-binding.js';
+export type { CheckInviteResult } from './vault-sync/parche-client.js';
 export {
   ParcheAlreadyMemberError,
   ParcheCaseCollisionError,

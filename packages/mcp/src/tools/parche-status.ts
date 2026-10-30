@@ -6,7 +6,9 @@
 
 import {
   CredentialsStore,
+  joinFirstHint,
   joinPath,
+  linkDirPlaceholderHint,
   MEMORY_DIR,
   planPush,
   readState,
@@ -39,7 +41,10 @@ export function registerParcheStatus(server: McpServer, logger: Logger, services
       if (allSlugs.length === 0) {
         return {
           content: [
-            { type: 'text' as const, text: 'No parche vaults found. Use vault join first.' },
+            {
+              type: 'text' as const,
+              text: `No parche vaults found. Use \`${joinFirstHint()}\` first.`,
+            },
           ],
         };
       }
@@ -73,7 +78,7 @@ export function registerParcheStatus(server: McpServer, logger: Logger, services
 
           let pending = '?';
           if (!dirExists) {
-            pending = `[carpeta ya no existe — chamba vault link ${sl} --dir <ruta>]`;
+            pending = `[carpeta ya no existe — ${linkDirPlaceholderHint(sl)}]`;
           } else if (state?.pendingAdoption === true) {
             pending = 'pendiente de confirmar';
           } else if (state) {

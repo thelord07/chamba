@@ -86,7 +86,7 @@ export async function ensureVaultGitignored(
   const missing = allArtifacts.filter((p) => !present.has(normalizeIgnore(p)));
   if (missing.length === 0) return [];
   const sep = current.length === 0 ? '' : current.endsWith('\n') ? '\n' : '\n\n';
-  const block = `${sep}# chamba vault artifacts (personal notes/memory — kept out of git)\n${missing.join('\n')}\n`;
+  const block = `${sep}# chamba: artefactos del vault (notas/memoria personal — se excluyen del git)\n${missing.join('\n')}\n`;
   await fs.writeFile(joinPath(repoRoot, '.gitignore'), current + block);
   return missing;
 }

@@ -2,7 +2,7 @@ import { ContextBuilder, ObsidianDetector, WorkspaceScanner } from '@chamba/core
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { Logger } from 'pino';
 import { z } from 'zod';
-import { resolveActiveParcheVault } from '../parche/active-vault.js';
+import { resolveActiveParcheVaultFull } from '../parche/active-vault.js';
 import { maybeAutoSync } from '../parche/autosync.js';
 import { obsidianSearchRoots, type Services } from '../services.js';
 
@@ -33,10 +33,19 @@ export function registerLoadContext(server: McpServer, logger: Logger, services:
       },
     },
     async ({ task, includeObsidian, includeRules }) => {
-      // C5: pull auto-sync before reading if active vault is a parche vault
+      // O2: full discriminated resolution
+      const vaultResult = await resolveActiveParcheVaultFull(services);
+
+      // O2: bound-unsyncable → skip notes, include warning in context
       let syncWarning: string | undefined;
-      const parcheVault = await resolveActiveParcheVault(services);
-      if (parcheVault) {
+      if (vaultResult.kind === 'bound-unsyncable') {
+        syncWarning = `parche no sincronizable: ${vaultResult.hint}`;
+      }
+
+      const parcheVault = vaultResult.kind === 'ok' ? vaultResult.vault : null;
+
+      // C5: pull auto-sync before reading if active vault is a parche vault
+      if (parcheVault?.autoSync.enabled) {
         const syncResult = await maybeAutoSync(services, logger, parcheVault, 'pull');
         syncWarning = syncResult.warning;
       }
@@ -45,11 +54,20 @@ export function registerLoadContext(server: McpServer, logger: Logger, services:
 
       let vaultPath: string | undefined;
       if (includeObsidian !== false) {
-        const detection = await new ObsidianDetector(services.fs).detect({
-          explicitPath: services.obsidianVaultPath,
-          searchRoots: obsidianSearchRoots(services),
-        });
-        if (detection.found) vaultPath = detection.path;
+        if (vaultResult.kind === 'bound-unsyncable' && vaultResult.dirExists) {
+          // O2: dir exists but can't sync — still read from it
+          vaultPath = vaultResult.vaultDir;
+        } else if (parcheVault) {
+          // R2: when there's a parche vault, use its vaultDir directly (no Obsidian detection)
+          vaultPath = parcheVault.vaultDir;
+        } else if (vaultResult.kind !== 'bound-unsyncable') {
+          // No binding → use Obsidian detector
+          const detection = await new ObsidianDetector(services.fs).detect({
+            explicitPath: services.obsidianVaultPath,
+            searchRoots: obsidianSearchRoots(services),
+          });
+          if (detection.found) vaultPath = detection.path;
+        }
       }
 
       const built = await new ContextBuilder(services.fs).build({

@@ -17,6 +17,7 @@ import type { HttpPort } from '../ports/http.js';
 import { joinPath } from '../util/path.js';
 import { addConflictFrontmatter, readConflictMeta } from './conflict.js';
 import { CredentialsStore } from './credentials.js';
+import { linkDirPlaceholderHint, linkHint } from './messages.js';
 import {
   ParcheCaseCollisionError,
   ParcheClient,
@@ -93,7 +94,7 @@ export class BlobHashMismatchError extends Error {
 
 /**
  * PARCHE-009: thrown when the vault directory stored in the credential no longer
- * exists on disk. Never recreated — the user must run `chamba vault link <slug> --dir <ruta>`.
+ * exists on disk. Never recreated — the user must run the link command.
  */
 export class VaultDirMissingError extends Error {
   override name = 'VaultDirMissingError';
@@ -103,7 +104,7 @@ export class VaultDirMissingError extends Error {
   ) {
     super(
       `La carpeta "${vaultDir}" del parche "${slug}" ya no existe. ` +
-        `Usa \`chamba vault link ${slug} --dir <ruta>\`.`,
+        `Usa \`${linkDirPlaceholderHint(slug)}\`.`,
     );
   }
 }
@@ -120,7 +121,7 @@ export class AdoptionPendingError extends Error {
   ) {
     super(
       `La ruta "${vaultDir}" está pendiente de confirmar. ` +
-        `Corre \`chamba vault link ${slug} --dir "${vaultDir}" --yes\`.`,
+        `Corre \`${linkHint(slug, vaultDir, { yes: true })}\`.`,
     );
   }
 }
