@@ -1544,6 +1544,7 @@ describe('PARCHE-009 D2 CLI — vault dir deleted', () => {
     const creds = new CredentialsStore(fs, svc.homedir);
     const allSlugs = await creds.listSlugs();
     const found = allSlugs[0];
+    if (!found) throw new Error('slug not found');
     const cred = await creds.get(found.server, found.slug);
     // Point cred to a non-existent dir
     if (!cred) throw new Error('credential not found');
@@ -1570,6 +1571,7 @@ describe('PARCHE-009 D2 CLI — vault dir deleted', () => {
     const creds = new CredentialsStore(fs, svc.homedir);
     const allSlugs = await creds.listSlugs();
     const found = allSlugs[0];
+    if (!found) throw new Error('slug not found');
     const cred = await creds.get(found.server, found.slug);
     if (!cred) throw new Error('credential not found');
     await creds.set(found.server, found.slug, { ...cred, dir: '/deleted/vault' });
@@ -1743,6 +1745,7 @@ describe('PARCHE-009 D2 MCP tool — chamba_vault_sync isError when dir missing'
     const creds = new CredentialsStore(fs, svc.homedir);
     const allSlugs = await creds.listSlugs();
     const found = allSlugs[0];
+    if (!found) throw new Error('slug not found');
     const cred = await creds.get(found.server, found.slug);
     if (!cred) throw new Error('credential not found');
     await creds.set(found.server, found.slug, { ...cred, dir: '/deleted/vault' });
@@ -1897,6 +1900,7 @@ describe('vault leave — message when vault dir no longer exists', () => {
     const creds = new CredentialsStore(fs, svc.homedir);
     const allSlugs = await creds.listSlugs();
     const found = allSlugs[0];
+    if (!found) throw new Error('slug not found');
     const cred = await creds.get(found.server, found.slug);
     if (!cred) throw new Error('credential not found');
     await creds.set(found.server, found.slug, { ...cred, dir: '/deleted/vault' });
@@ -1956,6 +1960,7 @@ describe('vault link same dir — idempotent when not pending, recovery when pen
     const creds = new CredentialsStore(fs, svc.homedir);
     const allSlugs = await creds.listSlugs();
     const found = allSlugs[0];
+    if (!found) throw new Error('slug not found');
     const currentVaultDir = `/home/test/.chamba/vaults/${found.slug}`;
 
     const putsBefore = parche.requestLog.filter((r) => r.method === 'PUT').length;

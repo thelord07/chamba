@@ -107,7 +107,7 @@ the log directory and worktrees.
 | `chamba_summarize_to_vault` | `{ title, content, projectSlug? }` | Writes a run summary to `proyectos/` — grouped per project (git remote) + a per-folder `INDEX.md` for cheap recall |
 | `chamba_save_plan` | `{ title, content, projectSlug? }` | Saves a plan to `plans/` — same per-project grouping + index |
 | `chamba_vault_status` | `{}` | Resolved vault path + the notes chamba can see (diagnostic) |
-| `chamba_vault_join` | `{ code, name, email, deviceLabel? }` | Joins a **parche** group vault with an invite code or link: creates the local vault, saves credentials (0600, outside the vault) and runs the first sync. Never returns the token |
+| `chamba_vault_join` | `{ code, name, email, deviceLabel?, dir?, confirmUpload? }` | Joins a **parche** group vault with an invite code or link: creates the local vault (or uses your own folder via `dir`), saves credentials (0600, outside the vault) and runs the first sync. If the folder already has files it returns a summary and uploads nothing until `confirmUpload: true`. Never returns the token |
 | `chamba_vault_sync` | `{ slug? }` | Syncs one parche vault (or all) with the server → pushed / pulled / conflicts. Conflicts become copies, never overwrites |
 | `chamba_parche_status` | `{}` | Per vault: server, slug, role, last sync, pending changes, path. No token |
 | `chamba_doctor` | `{}` | Environment health check (no LLM): Node, system (RAM/CPU), git (multi-repo aware), workspace, config, vault, MCP registration (warns on duplicate/inconsistent chamba entries), logs, worktrees → pass/warn/fail. Also `npx @chamba/mcp doctor` |
@@ -289,6 +289,7 @@ no single-machine RAM ceiling, less waiting. **Guide:
 - ✅ **1.6.0 — Per-repo base branches:** `worktrees.baseBranch` accepts a per-repo map so each repo forks from its own integration branch (e.g. `web`=main, `api`=develop)
 - ✅ **1.7.0 — Vault sync protocol:** `@chamba/core` ships the v1 sync protocol for parche (private Obsidian vault sync across a group): schemas, roles, conflict copies and a pure push/pull planner. Groundwork only, no new tools
 - ✅ **1.8.0 — Group vaults (parche client):** `vault join/sync/status/leave` CLI + `chamba_vault_join` / `chamba_vault_sync` / `chamba_parche_status`; context and memory tools auto-sync in the background (10 s cap). Group memories in the vault, personal ones never uploaded. Details in the [`@chamba/mcp` README](./packages/mcp/README.md#parche--group-vaults)
+- ✅ **1.9.0 — Your own vault folder:** `vault join --dir` / `vault link <slug> --dir` use any folder as the parche vault; a safe-adoption gate shows what would be uploaded and waits for `--yes` (or `confirmUpload`) before syncing existing files
 - 🔭 V2: semantic vault search, MCP sampling, more knowledge bases
 
 See [`PLAN.md`](./PLAN.md) for the full phase plan.

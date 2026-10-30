@@ -1,5 +1,13 @@
 # @chamba/opencode-extras
 
+## 1.9.0
+
+### Patch Changes
+
+- Updated dependencies [375d9c6]
+  - @chamba/core@1.9.0
+  - @chamba/adapters@1.9.0
+
 ## 1.8.0
 
 ### Patch Changes

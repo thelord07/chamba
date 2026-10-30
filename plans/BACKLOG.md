@@ -173,6 +173,9 @@ Encontrado dogfooding en **finalis**. El check "Git repo" corría `git rev-parse
   CLI `vault join|sync|status|leave`, tools `chamba_vault_join` / `chamba_vault_sync` / `chamba_parche_status`,
   auto-sync no bloqueante (10 s) en las tools de contexto y memoria, memoria de grupo en `<vault>/memory/`.
   Ports `HttpPort` / `HashPort` en core; `NodeHttp` / `NodeHash` en adapters. Sin LLM.
+- **PARCHE-009 — vault en ruta propia + adopción segura (✅ HECHO — 1.9.0)**
+  `vault join --dir`, `vault link <slug> --dir`, `pendingAdoption` bloquea sync/autosync hasta confirmar,
+  `VaultDirMissingError`, `realpath` en `FilesystemPort`. Sin LLM.
 
 ---
 
@@ -208,6 +211,7 @@ Encontrado dogfooding en **finalis**. El check "Git repo" corría `git rev-parse
 - ✅ **1.0.0** — primer estable: el server MCP reporta su versión real en el handshake, superficie de 24 tools revisada, docs endurecidas (grid de la landing 24/24), catálogo de modelos re-verificado. Sin features nuevas.
 - ✅ **1.7.0** — protocolo de sync de vault v1 (parche) en `@chamba/core`: schemas, roles, conflictos, planificador puro. Sin tools nuevas.
 - ✅ **1.8.0** — cliente de parche: vault join/sync/status/leave (CLI + 3 tools MCP) + sync automático; memoria de grupo en el vault.
+- ✅ **1.9.0** — parche: vault en ruta propia (`--dir`, `vault link`) + gate de adopción segura antes de subir archivos existentes.
 
 ## Orden sugerido (lo que sigue)
 1. ✅ **1.0.0** — Tier 3 completo. Pulido y estabilización: superficie de tools revisada, docs
