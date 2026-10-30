@@ -1,5 +1,15 @@
 import { randomBytes } from 'node:crypto';
-import { chmod, mkdir, readdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
+import {
+  chmod,
+  mkdir,
+  readdir,
+  readFile,
+  realpath,
+  rename,
+  rm,
+  stat,
+  writeFile,
+} from 'node:fs/promises';
 import type { DirEntry, FileStat, FilesystemPort, WriteBytesOptions } from '@chamba/core';
 
 /** Node-backed `FilesystemPort`. */
@@ -117,6 +127,41 @@ export class NodeFilesystem implements FilesystemPort {
         (err as NodeJS.ErrnoException).code === 'ENOENT'
       ) {
         return null;
+      }
+      throw err;
+    }
+  }
+
+  /**
+   * Resolve symlinks to a canonical path. ENOENT-tolerant: walks up to the
+   * nearest existing ancestor and re-appends the remaining path segments.
+   */
+  async realpath(path: string): Promise<string> {
+    try {
+      return await realpath(path);
+    } catch (err) {
+      if (
+        err instanceof Error &&
+        'code' in err &&
+        (err as NodeJS.ErrnoException).code === 'ENOENT'
+      ) {
+        // Find the nearest ancestor that exists
+        const sep = '/';
+        const parts = path.split(sep).filter(Boolean);
+        let candidate = sep;
+        let resolved = sep;
+        for (let i = 0; i < parts.length; i++) {
+          const next = candidate === sep ? `/${parts[i]}` : `${candidate}/${parts[i]}`;
+          try {
+            resolved = await realpath(next);
+            candidate = next;
+          } catch {
+            // This segment doesn't exist — append remaining parts lexically
+            const remaining = parts.slice(i).join(sep);
+            return `${resolved === sep ? '' : resolved}/${remaining}`;
+          }
+        }
+        return resolved;
       }
       throw err;
     }

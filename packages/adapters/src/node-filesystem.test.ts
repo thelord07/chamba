@@ -79,6 +79,41 @@ describe('NodeFilesystem — rename', () => {
   });
 });
 
+describe('NodeFilesystem — realpath (PARCHE-009 adapters)', () => {
+  it('resolves an existing dir to its real path', async () => {
+    const result = await fs.realpath(dir);
+    // Result should be an absolute path containing the temp dir base name
+    expect(result).toBeTruthy();
+    expect(result.startsWith('/')).toBe(true);
+    // On macOS /var/folders/... is /private/var/folders/... after realpath
+    // Just verify it ends with the same basename
+    const { basename } = await import('node:path');
+    expect(basename(result)).toBe(basename(dir));
+  });
+
+  it('resolves a symlink to its target (PARCHE-009 adapters)', async () => {
+    const { symlink, mkdir: mkdirFs, realpath: nodeRealpath } = await import('node:fs/promises');
+    const target = join(dir, 'real-dir');
+    const link = join(dir, 'symlink-to-dir');
+    await mkdirFs(target);
+    await symlink(target, link);
+
+    const result = await fs.realpath(link);
+    const expected = await nodeRealpath(target);
+    expect(result).toBe(expected);
+  });
+
+  it('resolves a non-existent leaf to realpath(ancestor)+rest (PARCHE-009 adapters)', async () => {
+    const { realpath: nodeRealpath } = await import('node:fs/promises');
+    const nonExistentLeaf = join(dir, 'does-not-exist', 'sub');
+    const result = await fs.realpath(nonExistentLeaf);
+    // The ancestor (dir) exists; result should be realpath(dir)+/does-not-exist/sub
+    const resolvedAncestor = await nodeRealpath(dir);
+    const { join: pathJoin } = await import('node:path');
+    expect(result).toBe(pathJoin(resolvedAncestor, 'does-not-exist', 'sub'));
+  });
+});
+
 describe('NodeHash', () => {
   it('sha256 matches FakeHash on the same input', async () => {
     const { NodeHash } = await import('./node-hash.js');

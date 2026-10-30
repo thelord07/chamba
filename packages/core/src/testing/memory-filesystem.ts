@@ -184,6 +184,26 @@ export class MemoryFilesystem implements FilesystemPort {
     return null;
   }
 
+  /**
+   * Resolve realpath lexically (no actual symlinks in memory).
+   * Normalises `.` / `..` and double slashes. ENOENT-tolerant.
+   */
+  async realpath(path: string): Promise<string> {
+    // Normalise: resolve . and .. segments
+    const parts = path.split('/');
+    const out: string[] = [];
+    for (const p of parts) {
+      if (p === '' || p === '.') continue;
+      if (p === '..') {
+        out.pop();
+      } else {
+        out.push(p);
+      }
+    }
+    const norm = `/${out.join('/')}`;
+    return norm === '/' ? '/' : norm;
+  }
+
   /** Test helper: get the recorded file mode (undefined if not set). */
   getMode(path: string): number | undefined {
     return this.modes.get(this.norm(path));

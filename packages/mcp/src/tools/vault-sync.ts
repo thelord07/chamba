@@ -3,7 +3,7 @@
  * Syncs one or all parche vaults with the remote server.
  */
 
-import { CredentialsStore, readState, syncOnce } from '@chamba/core';
+import { CredentialsStore, readState, resolveVaultDir, syncOnce } from '@chamba/core';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { Logger } from 'pino';
 import { z } from 'zod';
@@ -51,10 +51,30 @@ export function registerVaultSync(server: McpServer, logger: Logger, services: S
             continue;
           }
 
-          const vaultDir = `${services.homedir}/.chamba/vaults/${sl}`;
+          const vaultDir = resolveVaultDir(cred, services.homedir, sl);
+
+          // PARCHE-009: check if vault dir exists
+          const dirExists = await services.fs.exists(vaultDir);
+          if (!dirExists) {
+            results.push(
+              `${sl}: la carpeta "${vaultDir}" ya no existe — usa \`vault link ${sl} --dir <ruta>\``,
+            );
+            anyError = true;
+            continue;
+          }
+
           const state = await readState(services.fs, vaultDir);
           if (!state) {
             results.push(`${sl}: no state.json — run vault join first`);
+            anyError = true;
+            continue;
+          }
+
+          // PARCHE-009: block if pending adoption
+          if (state.pendingAdoption === true) {
+            results.push(
+              `${sl}: pendiente de confirmar — corre \`vault link ${sl} --dir "${vaultDir}" --yes\``,
+            );
             anyError = true;
             continue;
           }

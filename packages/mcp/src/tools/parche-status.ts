@@ -10,6 +10,7 @@ import {
   MEMORY_DIR,
   planPush,
   readState,
+  resolveVaultDir,
   scanLocal,
   toSyncState,
 } from '@chamba/core';
@@ -64,11 +65,18 @@ export function registerParcheStatus(server: McpServer, logger: Logger, services
           const cred = await creds.get(srv, sl);
           if (!cred) continue;
 
-          const vaultDir = `${services.homedir}/.chamba/vaults/${sl}`;
-          const state = await readState(services.fs, vaultDir);
+          const vaultDir = resolveVaultDir(cred, services.homedir, sl);
+
+          // PARCHE-009: check dir existence
+          const dirExists = await services.fs.exists(vaultDir);
+          const state = dirExists ? await readState(services.fs, vaultDir) : null;
 
           let pending = '?';
-          if (state) {
+          if (!dirExists) {
+            pending = `[carpeta ya no existe — chamba vault link ${sl} --dir <ruta>]`;
+          } else if (state?.pendingAdoption === true) {
+            pending = 'pendiente de confirmar';
+          } else if (state) {
             try {
               const { snapshot } = await scanLocal(
                 { fs: services.fs, hash: services.hash },
@@ -82,12 +90,13 @@ export function registerParcheStatus(server: McpServer, logger: Logger, services
           }
 
           const lastSync = state?.lastSyncAt ?? 'never';
+          const adoptionNote = state?.pendingAdoption === true ? ' [pendiente de confirmar]' : '';
           const line = [
             `slug:      ${sl}`,
             `server:    ${srv}`,
             `role:      ${cred.role}`,
-            `last sync: ${lastSync}`,
-            `pending:   ${pending} change(s)`,
+            `last sync: ${lastSync}${adoptionNote}`,
+            `pending:   ${pending}${dirExists ? ' change(s)' : ''}`,
             `path:      ${vaultDir}`,
           ].join('\n');
 

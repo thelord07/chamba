@@ -4,7 +4,14 @@
  * data needed to sync.
  */
 
-import { CredentialsStore, ObsidianDetector, readState } from '@chamba/core';
+import {
+  AdoptionPendingError,
+  CredentialsStore,
+  ObsidianDetector,
+  readState,
+  resolveVaultDir,
+  VaultDirMissingError,
+} from '@chamba/core';
 import { obsidianSearchRoots, type Services } from '../services.js';
 
 export interface ActiveParcheVault {
@@ -38,16 +45,31 @@ export async function resolveActiveParcheVault(
     });
     if (!detection.found || !detection.path) return null;
 
-    const vaultDir = detection.path;
-    const state = await readState(services.fs, vaultDir);
+    const state = await readState(services.fs, detection.path);
     if (!state) return null;
+
+    // PARCHE-009: block autosync when vault is pending adoption confirmation
+    if (state.pendingAdoption === true) return null;
 
     const creds = new CredentialsStore(services.fs, services.homedir);
     const cred = await creds.get(state.server, state.slug);
     if (!cred) return null;
 
+    // PARCHE-009: use resolveVaultDir as the canonical source of the vault dir,
+    // then compare realpaths to guard against stale dirs after vault link.
+    const credVaultDir = resolveVaultDir(cred, services.homedir, state.slug);
+
+    // PARCHE-009: block autosync if the vault dir no longer exists
+    const dirExists = await services.fs.exists(credVaultDir);
+    if (!dirExists) return null;
+
+    // Guard: ensure the detected path resolves to the same canonical path as the credential
+    const a = await services.fs.realpath(detection.path);
+    const b = await services.fs.realpath(credVaultDir);
+    if (a !== b) return null;
+
     return {
-      vaultDir,
+      vaultDir: credVaultDir,
       server: state.server,
       slug: state.slug,
       token: cred.token,
@@ -55,7 +77,9 @@ export async function resolveActiveParcheVault(
       device: cred.device.label,
       lastSyncAt: state.lastSyncAt,
     };
-  } catch {
+  } catch (err) {
+    // Suppress known PARCHE-009 errors gracefully
+    if (err instanceof VaultDirMissingError || err instanceof AdoptionPendingError) return null;
     return null;
   }
 }

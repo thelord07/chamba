@@ -161,6 +161,9 @@ export {
 } from './triage/ticket-completeness.js';
 // Path helpers
 export { basename, dirname, extname, joinPath } from './util/path.js';
+// Vault dir resolution and validation (PARCHE-009)
+export type { AdoptionSummary } from './vault-sync/adoption.js';
+export { buildAdoptionSummary } from './vault-sync/adoption.js';
 export type { ConflictMeta } from './vault-sync/conflict.js';
 export {
   addConflictFrontmatter,
@@ -237,11 +240,13 @@ export type {
   SyncSummary,
 } from './vault-sync/runner.js';
 export {
+  AdoptionPendingError,
   BlobHashMismatchError,
   CaseCollisionError,
   joinOnce,
   scanLocal,
   syncOnce,
+  VaultDirMissingError,
 } from './vault-sync/runner.js';
 export type { ParsedJoinInput, ResolveServerUrlOptions } from './vault-sync/server-url.js';
 export {
@@ -256,11 +261,25 @@ export type { SyncStateFile } from './vault-sync/state-store.js';
 export {
   mergeIntoStateFile,
   readState,
+  resetVaultState,
   syncStateFileSchema,
   toSyncState,
   writeState,
 } from './vault-sync/state-store.js';
 export { isSyncable } from './vault-sync/sync-filter.js';
+export type {
+  PrepareVaultDirOpts,
+  PrepareVaultDirResult,
+  VaultDirValidationCode,
+} from './vault-sync/vault-dir.js';
+export {
+  expandTilde,
+  lexicalNormalize,
+  prepareVaultDir,
+  resolveVaultDir,
+  SYSTEM_DIRS,
+  VaultDirValidationError,
+} from './vault-sync/vault-dir.js';
 export type { BuiltContext, ContextBuildInput, RelevantNote } from './workspace/context-builder.js';
 export { ContextBuilder, listVaultNotes } from './workspace/context-builder.js';
 export { diffLines, textsEqual } from './workspace/diff.js';
