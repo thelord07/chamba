@@ -28,7 +28,14 @@ import type { PullAction, PushEntry, SyncState } from './plan.js';
 import { applyPullPlan, applyPushResults, planPull, planPush } from './plan.js';
 import type { ChangeEntry, JoinRequest } from './protocol.js';
 import type { SyncStateFile } from './state-store.js';
-import { mergeIntoStateFile, readState, resetVaultState, writeState } from './state-store.js';
+import {
+  clearPendingAdoption,
+  mergeIntoStateFile,
+  pendingJoinCodeHashOf,
+  readState,
+  resetVaultState,
+  writeState,
+} from './state-store.js';
 import { isSyncable } from './sync-filter.js';
 import { resolveVaultDir } from './vault-dir.js';
 
@@ -65,6 +72,12 @@ export interface SyncSummary {
   pulled: number;
   conflicts: Array<{ path: string; copyPath: string }>;
   movedToTrash: string[];
+  /**
+   * PARCHE-010 O2: additive field with the same entries as `movedToTrash` but
+   * enriched with the trash destination path. Kept alongside `movedToTrash`
+   * to avoid breaking existing consumers.
+   */
+  movedToTrashEntries: Array<{ path: string; trashPath: string }>;
   errors: string[];
 }
 
@@ -480,12 +493,14 @@ async function executePullActions(
 ): Promise<{
   conflicts: Array<{ path: string; copyPath: string }>;
   movedToTrash: string[];
+  movedToTrashEntries: Array<{ path: string; trashPath: string }>;
   errors: string[];
   conflictBlobSource: Map<string, string>;
 }> {
   const { fs, hash } = deps;
   const conflicts: Array<{ path: string; copyPath: string }> = [];
   const movedToTrash: string[] = [];
+  const movedToTrashEntries: Array<{ path: string; trashPath: string }> = [];
   const errors: string[] = [];
   const conflictBlobSource = new Map<string, string>();
 
@@ -506,6 +521,7 @@ async function executePullActions(
           await fs.mkdir(trashParentDir);
           await fs.rename(absPath, trashAbsPath);
           movedToTrash.push(action.path);
+          movedToTrashEntries.push({ path: action.path, trashPath: trashRelPath });
         }
         break;
       }
@@ -585,13 +601,14 @@ async function executePullActions(
           // Copy is already written above; move the original
           await fs.rename(localAbsPath, trashAbsPath);
           movedToTrash.push(path);
+          movedToTrashEntries.push({ path, trashPath: trashRelPath });
         }
         break;
       }
     }
   }
 
-  return { conflicts, movedToTrash, errors, conflictBlobSource };
+  return { conflicts, movedToTrash, movedToTrashEntries, errors, conflictBlobSource };
 }
 
 // ─── syncOnce ─────────────────────────────────────────────────────────────────
@@ -679,14 +696,8 @@ export async function syncOnce(deps: SyncDeps, opts: SyncOpts): Promise<SyncSumm
   const pullPlan = planPull(syncState, localSnapshot, allChanges, { localAuthor });
 
   // Execute actions in order
-  const { conflicts, movedToTrash, errors, conflictBlobSource } = await executePullActions(
-    client,
-    deps,
-    vaultDir,
-    pullPlan.actions,
-    localAuthor,
-    signal,
-  );
+  const { conflicts, movedToTrash, movedToTrashEntries, errors, conflictBlobSource } =
+    await executePullActions(client, deps, vaultDir, pullPlan.actions, localAuthor, signal);
 
   const pulledCount = pullPlan.actions.filter(
     (a) => a.type === 'write' || a.type === 'conflict',
@@ -749,6 +760,7 @@ export async function syncOnce(deps: SyncDeps, opts: SyncOpts): Promise<SyncSumm
     pulled: pulledCount,
     conflicts,
     movedToTrash,
+    movedToTrashEntries,
     errors,
   };
 }
@@ -786,11 +798,12 @@ const ZERO_SUMMARY: SyncSummary = {
   pulled: 0,
   conflicts: [],
   movedToTrash: [],
+  movedToTrashEntries: [],
   errors: [],
 };
 
 export async function joinOnce(deps: SyncDeps, opts: JoinOnceOpts): Promise<JoinOnceResult> {
-  const { fs, http, clock } = deps;
+  const { fs, http, hash, clock } = deps;
   const { server, homedir, joinRequest, signal, skipInitialSync } = opts;
 
   const client = new ParcheClient(http, server, '');
@@ -819,8 +832,16 @@ export async function joinOnce(deps: SyncDeps, opts: JoinOnceOpts): Promise<Join
     ...(customDir ? { dir: customDir } : {}),
   });
 
-  // Reset state (cursor=0, files={}, pendingAdoption=true) with the new groupId
-  await resetVaultState(fs, vaultDir, { server, slug, groupId }, clock);
+  // Reset state (cursor=0, files={}, pendingAdoption=true) with the new groupId.
+  // PARCHE-010 R15: compute and persist the pendingJoinCodeHash so resume paths
+  // can verify the caller is using the same invite code without storing the code.
+  const joinCodeHash = await pendingJoinCodeHashOf(hash, server, joinRequest.code);
+  await resetVaultState(
+    fs,
+    vaultDir,
+    { server, slug, groupId, pendingJoinCodeHash: joinCodeHash },
+    clock,
+  );
 
   if (skipInitialSync) {
     // Caller will handle the gate and then call syncOnce explicitly.
@@ -833,9 +854,7 @@ export async function joinOnce(deps: SyncDeps, opts: JoinOnceOpts): Promise<Join
   // or the vault is empty so the gate passed automatically).
   const stateFile = await readState(fs, vaultDir);
   if (stateFile?.pendingAdoption === true) {
-    const cleared = { ...stateFile };
-    delete cleared.pendingAdoption;
-    await writeState(fs, vaultDir, cleared);
+    await writeState(fs, vaultDir, clearPendingAdoption(stateFile));
   }
 
   // First sync

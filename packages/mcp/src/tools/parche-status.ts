@@ -18,6 +18,7 @@ import {
 } from '@chamba/core';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { Logger } from 'pino';
+import { redactSecrets, resolveBindingHeader } from '../parche/binding-ops.js';
 import type { Services } from '../services.js';
 
 const TOOL_NAME = 'chamba_parche_status';
@@ -35,6 +36,34 @@ export function registerParcheStatus(server: McpServer, logger: Logger, services
       inputSchema: {},
     },
     async (_args) => {
+      // PARCHE-010: resolve binding header (workspace root + active binding)
+      const header = await resolveBindingHeader(services);
+      const {
+        workspaceRoot: wsRoot,
+        workspaceRootSource: wsRootSource,
+        binding,
+        invalidWarning,
+      } = header;
+
+      const headerLines: string[] = [];
+      if (wsRoot) {
+        headerLines.push(
+          `Workspace: ${wsRoot} (origen: ${wsRootSource === 'env' ? 'CHAMBA_WORKSPACE_ROOT' : 'cwd'})`,
+        );
+      } else {
+        headerLines.push('Workspace: none detected');
+      }
+      if (binding) {
+        headerLines.push(
+          `Parche binding: ${binding.scope} — slug="${binding.slug}", server=${binding.server}, dir=${binding.vaultDir}, autoSync=${binding.autoSync.enabled ? `enabled (pullTtlMin=${binding.autoSync.pullTtlMin})` : 'disabled'}`,
+        );
+      } else if (invalidWarning) {
+        headerLines.push(invalidWarning);
+      } else {
+        headerLines.push('Parche binding: none');
+      }
+      headerLines.push('');
+
       const creds = new CredentialsStore(services.fs, services.homedir);
       const allSlugs = await creds.listSlugs();
 
@@ -43,9 +72,26 @@ export function registerParcheStatus(server: McpServer, logger: Logger, services
           content: [
             {
               type: 'text' as const,
-              text: `No parche vaults found. Use \`${joinFirstHint()}\` first.`,
+              text:
+                headerLines.join('\n') +
+                `No parche vaults found. Use \`${joinFirstHint()}\` first.`,
             },
           ],
+          structuredContent: {
+            workspaceRoot: wsRoot,
+            workspaceRootSource: wsRootSource,
+            binding: binding
+              ? {
+                  scope: binding.scope,
+                  slug: binding.slug,
+                  server: binding.server,
+                  vaultDir: binding.vaultDir,
+                  autoSync: binding.autoSync,
+                }
+              : null,
+            vaults: [],
+            personalMemoryCount: 0,
+          } as Record<string, unknown>,
         };
       }
 
@@ -115,7 +161,7 @@ export function registerParcheStatus(server: McpServer, logger: Logger, services
             vaultDir,
           });
         } catch (err) {
-          const msg = err instanceof Error ? err.message : String(err);
+          const msg = redactSecrets(err instanceof Error ? err.message : String(err));
           rows.push(`${sl}: error — ${msg}`);
         }
       }
@@ -128,8 +174,27 @@ export function registerParcheStatus(server: McpServer, logger: Logger, services
       logger.info({ tool: TOOL_NAME, vaults: allSlugs.length }, 'parche status');
 
       return {
-        content: [{ type: 'text' as const, text: rows.join('\n\n') + personalNote }],
-        structuredContent: { vaults: structured, personalMemoryCount } as Record<string, unknown>,
+        content: [
+          {
+            type: 'text' as const,
+            text: headerLines.join('\n') + rows.join('\n\n') + personalNote,
+          },
+        ],
+        structuredContent: {
+          workspaceRoot: wsRoot,
+          workspaceRootSource: wsRootSource,
+          binding: binding
+            ? {
+                scope: binding.scope,
+                slug: binding.slug,
+                server: binding.server,
+                vaultDir: binding.vaultDir,
+                autoSync: binding.autoSync,
+              }
+            : null,
+          vaults: structured,
+          personalMemoryCount,
+        } as Record<string, unknown>,
       };
     },
   );

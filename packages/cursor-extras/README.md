@@ -20,7 +20,7 @@ npx @chamba/cursor-extras@latest --version
 Requires **Cursor 2.4+** for subagents (commands work from 1.6). It installs into `~/.cursor/`:
 
 - **Commands** → `commands/`: `/ticket`, `/triage`, `/qa`, `/design`, `/orq`, `/map`,
-  `/workspace`, `/worktrees`, `/recall`, `/vault`.
+  `/workspace`, `/worktrees`, `/recall`, `/vault`, `/parche`.
 - **Subagents** → `agents/`: `planner`, `implementer`, `reviewer`, `tester`, `qa`,
   `diagnostician`.
 - **MCP server** → `chamba` under `mcpServers` in `~/.cursor/mcp.json` (preserves any others).

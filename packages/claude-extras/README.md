@@ -43,7 +43,7 @@ Snapshots dedup by content and the newest 5 (plus any pinned) are kept.
 
 It installs into `~/.claude/`:
 
-- **Slash commands**: `/ticket`, `/triage`, `/workspace`, `/map`, `/qa`, `/design`, `/worktrees`, `/orq`, `/recall`, `/vault`
+- **Slash commands**: `/ticket`, `/triage`, `/workspace`, `/map`, `/qa`, `/design`, `/worktrees`, `/orq`, `/recall`, `/vault`, `/parche`
 - **Subagents**: `planner`, `implementer`, `reviewer`, `tester`, `qa`, `diagnostician`
 - **Hooks**: warn on destructive commands, validate worktree edits
 

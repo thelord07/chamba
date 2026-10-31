@@ -6,6 +6,7 @@
 import { z } from 'zod';
 import type { ClockPort } from '../ports/clock.js';
 import type { FilesystemPort } from '../ports/filesystem.js';
+import type { HashPort } from '../ports/hash.js';
 import { joinPath } from '../util/path.js';
 import type { SyncState } from './plan.js';
 
@@ -39,6 +40,12 @@ export const syncStateFileSchema = z.object({
    * Blocks syncOnce, chamba_vault_sync, and autosync until confirmed.
    */
   pendingAdoption: z.literal(true).optional(),
+  /**
+   * PARCHE-010 R12/R15: sha256(origin + '\n' + normalizedCode) written by joinOnce.
+   * Used to resume a pending join safely without consuming another invite.
+   * Never contains the code or token — only the hash.
+   */
+  pendingJoinCodeHash: z.string().optional(),
 });
 
 export type SyncStateFile = z.infer<typeof syncStateFileSchema>;
@@ -106,7 +113,8 @@ export function toSyncState(file: SyncStateFile): SyncState {
 
 /**
  * Merge a `SyncState` (from plan functions) back into a `SyncStateFile` for saving.
- * Preserves `pendingAdoption` flag from base (cleared separately by the gate).
+ * Preserves `pendingAdoption` and `pendingJoinCodeHash` flags from base
+ * (cleared separately by the gate).
  */
 export function mergeIntoStateFile(
   base: SyncStateFile,
@@ -127,6 +135,10 @@ export function mergeIntoStateFile(
   if (base.pendingAdoption === true) {
     result.pendingAdoption = true;
   }
+  // Preserve pendingJoinCodeHash (only cleared by clearPendingAdoption)
+  if (base.pendingJoinCodeHash !== undefined) {
+    result.pendingJoinCodeHash = base.pendingJoinCodeHash;
+  }
   return result;
 }
 
@@ -135,11 +147,14 @@ export function mergeIntoStateFile(
  * Always sets `pendingAdoption: true` — the caller must clear it after
  * gate confirmation.
  * Used by joinOnce (after server join) and vault link (re-link to new dir).
+ *
+ * PARCHE-010 R15: `meta.pendingJoinCodeHash` is written in the same step when
+ * provided (joinOnce passes it; link/resync do not).
  */
 export async function resetVaultState(
   fs: FilesystemPort,
   vaultDir: string,
-  meta: { server: string; slug: string; groupId?: string },
+  meta: { server: string; slug: string; groupId?: string; pendingJoinCodeHash?: string },
   clock: ClockPort,
 ): Promise<SyncStateFile> {
   const state: SyncStateFile = {
@@ -153,6 +168,40 @@ export async function resetVaultState(
   if (meta.groupId !== undefined) {
     state.groupId = meta.groupId;
   }
+  if (meta.pendingJoinCodeHash !== undefined) {
+    state.pendingJoinCodeHash = meta.pendingJoinCodeHash;
+  }
   await writeState(fs, vaultDir, state);
   return state;
+}
+
+/**
+ * Clear the `pendingAdoption` and `pendingJoinCodeHash` fields from a state object.
+ * Returns the mutated copy (does NOT write to disk — caller must call writeState).
+ *
+ * PARCHE-010 R12: all gate-confirmation paths call this helper to ensure both
+ * fields are cleared atomically.
+ */
+export function clearPendingAdoption(state: SyncStateFile): SyncStateFile {
+  const cleared = { ...state };
+  delete cleared.pendingAdoption;
+  delete cleared.pendingJoinCodeHash;
+  return cleared;
+}
+
+/**
+ * Compute the `pendingJoinCodeHash` for a given server + normalized code.
+ * Formula: sha256(utf8(`${origin}\n${code}`)) — hex.
+ *
+ * PARCHE-010 R15: single implementation used by both joinOnce (writer) and
+ * the resume path in binding-ops (verifier).
+ */
+export async function pendingJoinCodeHashOf(
+  hash: HashPort,
+  server: string,
+  normalizedCode: string,
+): Promise<string> {
+  const origin = new URL(server).origin;
+  const data = new TextEncoder().encode(`${origin}\n${normalizedCode}`);
+  return hash.sha256(data);
 }

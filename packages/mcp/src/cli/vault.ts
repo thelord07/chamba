@@ -15,9 +15,8 @@
 import { hostname } from 'node:os';
 import {
   AdoptionPendingError,
-  buildAdoptionSummary,
   CredentialsStore,
-  findWorkspaceRoot,
+  InvalidJoinInputError,
   joinFirstHint,
   joinOnce,
   joinPath,
@@ -25,27 +24,35 @@ import {
   linkHint,
   MEMORY_DIR,
   ParcheAlreadyMemberError,
-  ParcheClient,
   ParcheNotFoundError,
   ParcheRateLimitedError,
-  parcheFilePath,
   parseJoinInput,
   planPush,
-  prepareVaultDir,
-  readParcheBinding,
   readState,
-  resetVaultState,
   resolveServerUrl,
   resolveVaultDir,
   scanLocal,
   syncOnce,
   toSyncState,
-  unlinkWorkspaceHint,
   VaultDirMissingError,
-  VaultDirValidationError,
-  writeParcheBinding,
-  writeState,
 } from '@chamba/core';
+import {
+  type AdoptionGateResult,
+  BindingWriteError,
+  checkAdoptionGate,
+  finalizeAdoption,
+  getAdoptionSummary,
+  persistBindingAfterJoin,
+  precheckWorkspaceBinding,
+  prepareJoinVaultDir,
+  redactSecrets,
+  relinkPrepare,
+  removeBinding,
+  resolveJoinScope,
+  resolveWorkspaceSyncSlug,
+  resyncPrepare,
+  updateBindingVaultDirForSlug,
+} from '../parche/binding-ops.js';
 import type { Services } from '../services.js';
 
 export interface VaultCliDeps {
@@ -86,20 +93,20 @@ function hasFlag(argv: string[], flag: string): boolean {
 async function runAdoptionGate(
   vaultDir: string,
   slug: string,
+  gate: AdoptionGateResult,
   hasYes: boolean,
   deps: VaultCliDeps,
 ): Promise<boolean> {
-  const { services, stdout, stderr, exit, prompt, isTTY } = deps;
+  const { stdout, stderr, exit, prompt, isTTY } = deps;
 
-  const summary = await buildAdoptionSummary({ fs: services.fs }, vaultDir);
-  if (summary.syncableCount === 0) return true; // empty vault, no gate needed
+  if (gate.kind === 'proceed') return true;
 
-  // Print summary
-  stdout(`El vault "${vaultDir}" tiene ${summary.syncableCount} archivo(s) sincronizable(s).`);
-  stdout(`Archivos ignorados: ${summary.ignoredCount}`);
-  if (summary.sample.length > 0) {
-    stdout(`Muestra (primeros ${summary.sample.length}):`);
-    for (const p of summary.sample) {
+  // gate.kind === 'needs-confirmation'
+  stdout(`El vault "${vaultDir}" tiene ${gate.fileCount} archivo(s) sincronizable(s).`);
+  stdout(`Archivos ignorados: ${gate.ignoredCount}`);
+  if (gate.sample.length > 0) {
+    stdout(`Muestra (primeros ${gate.sample.length}):`);
+    for (const p of gate.sample) {
       stdout(`  - ${p}`);
     }
   }
@@ -107,9 +114,7 @@ async function runAdoptionGate(
   if (hasYes) return true;
 
   if (isTTY) {
-    const answer = await prompt(
-      `¿Subir ${summary.syncableCount} archivo(s) al parche "${slug}"? [s/N] `,
-    );
+    const answer = await prompt(`¿Subir ${gate.fileCount} archivo(s) al parche "${slug}"? [s/N] `);
     if (answer.trim().toLowerCase() === 's') return true;
     stdout(
       `No se subió nada. Para confirmar más tarde: ${linkHint(slug, vaultDir, { yes: true })}`,
@@ -118,9 +123,7 @@ async function runAdoptionGate(
   }
 
   // No TTY, no --yes: print instructions and exit 1
-  stderr(
-    `Hay ${summary.syncableCount} archivo(s) en "${vaultDir}" que se subirían al parche "${slug}".`,
-  );
+  stderr(`Hay ${gate.fileCount} archivo(s) en "${vaultDir}" que se subirían al parche "${slug}".`);
   stderr(`Para confirmar: ${linkHint(slug, vaultDir, { yes: true })}`);
   exit(1);
   return false;
@@ -151,28 +154,18 @@ async function runJoin(argv: string[], deps: VaultCliDeps): Promise<void> {
   const allowInRepo = hasFlag(argv, '--allow-in-repo');
   const hasYes = hasFlag(argv, '--yes');
 
-  // ── PARCHE-011: workspace scope resolution ─────────────────────────────────
-  const wsRoot =
-    services.workspaceRoot ??
-    (await findWorkspaceRoot(services.fs, services.cwd, services.homedir));
-
-  // Determine scope
+  // ── PARCHE-011: workspace scope resolution (via binding-ops) ────────────────
+  const scopeResolution = await resolveJoinScope(services, scopeFlag);
   let scope: 'workspace' | 'global';
-  if (scopeFlag === 'workspace' || scopeFlag === 'global') {
-    scope = scopeFlag;
-    if (scope === 'workspace' && !wsRoot) {
-      stderr(
-        `--scope workspace requiere estar dentro de un workspace (con .chamba/workspace.md). ` +
-          `No se detectó workspace desde ${services.cwd}.`,
-      );
-      exit(1);
-      return;
-    }
-  } else if (!scopeFlag) {
-    if (!wsRoot) {
-      // No workspace found → global
-      scope = 'global';
-    } else if (!isTTY) {
+  let wsRoot: string | null;
+
+  if (scopeResolution.kind === 'error') {
+    stderr(scopeResolution.message);
+    exit(1);
+    return;
+  } else if (scopeResolution.kind === 'needs-scope') {
+    wsRoot = scopeResolution.wsRoot;
+    if (!isTTY) {
       // AC3: no TTY + in workspace + no --scope → exit 1
       stderr(
         `Estás dentro de un workspace (${wsRoot}). ` +
@@ -181,91 +174,24 @@ async function runJoin(argv: string[], deps: VaultCliDeps): Promise<void> {
       );
       exit(1);
       return;
-    } else {
-      // TTY prompt
-      const answer = await prompt(
-        `¿Vincular este parche a este workspace (${wsRoot}/.chamba/parche.json) o como global? [workspace/global] `,
-      );
-      scope = answer.trim().toLowerCase().startsWith('w') ? 'workspace' : 'global';
     }
+    // TTY prompt
+    const answer = await prompt(
+      `¿Vincular este parche a este workspace (${wsRoot}/.chamba/parche.json) o como global? [workspace/global] `,
+    );
+    scope = answer.trim().toLowerCase().startsWith('w') ? 'workspace' : 'global';
   } else {
-    stderr(`--scope debe ser "workspace" o "global" (recibido: "${scopeFlag}")`);
-    exit(1);
-    return;
+    scope = scopeResolution.scope;
+    wsRoot = scopeResolution.wsRoot;
   }
 
-  // AC4/R4: if workspace scope and binding already exists, pre-check invite via GET endpoint
+  // AC4/R4: if workspace scope and binding already exists, pre-check invite
   if (scope === 'workspace' && wsRoot) {
-    const existingBindingPath = parcheFilePath(wsRoot);
-    const existingBindingResult = await readParcheBinding(services.fs, existingBindingPath, {
-      scope: 'workspace',
-      baseDir: wsRoot,
-    });
-    if (existingBindingResult.ok) {
-      // Pre-validate the invite code to see if slug matches
-      // (requires server to be known — parse it first)
-      let preServer: string | undefined;
-      try {
-        const preParsed = parseJoinInput(codeOrLink);
-        preServer = resolveServerUrl({
-          linkServer: preParsed.server,
-          envUrl: services.parcheServerUrl,
-          flagServer: serverFlag,
-        });
-      } catch {
-        // If server can't be resolved yet, fall through to later error
-      }
-
-      if (preServer) {
-        // Parse the code from codeOrLink (inline, before the outer parseJoinInput call)
-        let preCode = codeOrLink;
-        try {
-          const preParsed2 = parseJoinInput(codeOrLink);
-          preCode = preParsed2.code;
-        } catch {
-          // Use raw codeOrLink as code
-        }
-        const checkResult = await ParcheClient.checkInvite(services.http, preServer, preCode);
-        if (checkResult.status === 'invalid') {
-          stderr('código inválido, vencido o agotado');
-          exit(1);
-          return;
-        }
-        if (checkResult.status === 'not-found') {
-          // Conservative: don't reveal workspace state; hint to unlink
-          stderr(
-            `No se pudo verificar el código — el servidor no reconoce la invitación. ` +
-              `Si quieres vincular a otro parche, primero usa \`${unlinkWorkspaceHint()}\`.`,
-          );
-          exit(1);
-          return;
-        }
-        if (checkResult.status === 'network-error') {
-          // R13: no hint on transient errors
-          stderr(`No pude verificar el código (red/servidor): ${checkResult.message}. Reintenta.`);
-          exit(1);
-          return;
-        }
-        // valid: check slug
-        if (checkResult.slug !== existingBindingResult.binding.slug) {
-          stderr(
-            `Este workspace ya está vinculado al parche "${existingBindingResult.binding.slug}", ` +
-              `pero el código es para "${checkResult.slug}". ` +
-              `Usa \`${unlinkWorkspaceHint()}\` para desvincular primero.`,
-          );
-          exit(1);
-          return;
-        }
-        // Same slug → allow re-join (e.g. new device)
-      } else {
-        // Can't resolve server yet → reject conservatively
-        stderr(
-          `Este workspace ya está vinculado al parche "${existingBindingResult.binding.slug}". ` +
-            `Usa \`${unlinkWorkspaceHint()}\` para re-vincular.`,
-        );
-        exit(1);
-        return;
-      }
+    const precheck = await precheckWorkspaceBinding(services, { wsRoot, codeOrLink, serverFlag });
+    if (precheck.kind === 'reject') {
+      stderr(precheck.message);
+      exit(1);
+      return;
     }
   }
 
@@ -289,7 +215,12 @@ async function runJoin(argv: string[], deps: VaultCliDeps): Promise<void> {
   try {
     parsed = parseJoinInput(codeOrLink);
   } catch (err) {
-    stderr(err instanceof Error ? err.message : String(err));
+    // R1/AC4: never echo back the raw input (it may contain a pch_ token)
+    if (err instanceof InvalidJoinInputError) {
+      stderr('código o link inválido');
+    } else {
+      stderr(redactSecrets(err instanceof Error ? err.message : String(err)));
+    }
     exit(1);
     return;
   }
@@ -334,49 +265,30 @@ async function runJoin(argv: string[], deps: VaultCliDeps): Promise<void> {
     }
   }
 
-  // If --dir: validate the directory first
+  // If --dir: validate the directory first (via binding-ops)
   let canonicalDir: string | undefined;
   if (effectiveDirFlag) {
-    const creds = new CredentialsStore(services.fs, services.homedir);
-    const existingSlugs = await creds.listSlugs();
-    const existingLinks: Array<{ server: string; slug: string; dir: string }> = [];
-    for (const { server: srv, slug: sl } of existingSlugs) {
-      const existingCred = await creds.get(srv, sl);
-      if (existingCred) {
-        existingLinks.push({
-          server: srv,
-          slug: sl,
-          dir: resolveVaultDir(existingCred, services.homedir, sl),
-        });
-      }
-    }
-
-    try {
-      const prepared = await prepareVaultDir(
-        { fs: services.fs },
-        {
-          input: effectiveDirFlag,
-          homedir: services.homedir,
-          cwd: services.cwd,
-          slug: 'temp', // slug not known yet
-          server: server_,
-          allowInRepo,
-          existingLinks,
-          platform: process.platform,
-        },
+    const prepResult = await prepareJoinVaultDir(services, {
+      dirInput: effectiveDirFlag,
+      allowInRepo,
+      server: server_,
+    });
+    if (prepResult.kind === 'in-repo') {
+      stderr(
+        `La ruta "${effectiveDirFlag}" está dentro de un repositorio git. ` +
+          `Usa --allow-in-repo para permitirlo.`,
       );
-      canonicalDir = prepared.vaultDir;
-      if (prepared.gitignored.length > 0) {
-        stdout(`Añadido a .gitignore: ${prepared.gitignored.join(', ')}`);
-      }
-    } catch (err) {
-      if (err instanceof VaultDirValidationError) {
-        stderr(err.message);
-      } else {
-        stderr(err instanceof Error ? err.message : String(err));
-      }
       exit(1);
       return;
+    }
+    if (prepResult.kind === 'error') {
+      stderr(prepResult.message);
+      exit(1);
+      return;
+    }
+    canonicalDir = prepResult.canonicalDir;
+    if (prepResult.gitignored.length > 0) {
+      stdout(`Añadido a .gitignore: ${prepResult.gitignored.join(', ')}`);
     }
   }
 
@@ -398,12 +310,16 @@ async function runJoin(argv: string[], deps: VaultCliDeps): Promise<void> {
       },
     );
 
+    // Compute adoption summary via binding-ops (keeps buildAdoptionSummary out of cli/)
+    const summary = await getAdoptionSummary(services, result.vaultDir);
+
     // Run adoption gate
     const cred = await new CredentialsStore(services.fs, services.homedir).get(
       server_,
       result.slug,
     );
-    const confirmed = await runAdoptionGate(result.vaultDir, result.slug, hasYes, deps);
+    const gate = checkAdoptionGate(summary);
+    const confirmed = await runAdoptionGate(result.vaultDir, result.slug, gate, hasYes, deps);
 
     if (!confirmed) {
       // User declined — state stays with pendingAdoption=true
@@ -412,7 +328,7 @@ async function runJoin(argv: string[], deps: VaultCliDeps): Promise<void> {
         `Para sincronizar más tarde: ${linkHint(result.slug, result.vaultDir, { yes: true })}`,
       );
       // Still write parche.json (binding exists even if not synced)
-      await writeParcheJsonAfterJoin(
+      await writeBindingAfterJoinCli(
         services,
         scope,
         wsRoot,
@@ -426,39 +342,27 @@ async function runJoin(argv: string[], deps: VaultCliDeps): Promise<void> {
       return;
     }
 
-    // Confirmed: clear pendingAdoption and run first sync
-    const stateFile = await readState(services.fs, result.vaultDir);
-    if (stateFile?.pendingAdoption === true) {
-      const cleared = { ...stateFile };
-      delete cleared.pendingAdoption;
-      await writeState(services.fs, result.vaultDir, cleared);
-    }
-
+    // Confirmed: finalize adoption via binding-ops (clears pendingAdoption + syncOnce)
     if (!cred) {
       stderr('Error interno: credencial no encontrada.');
       exit(1);
       return;
     }
 
-    const syncResult = await syncOnce(
-      { fs: services.fs, http: services.http, hash: services.hash, clock: services.clock },
-      {
-        vaultDir: result.vaultDir,
-        server: server_,
-        slug: result.slug,
-        token: cred.token,
-        localAuthor: cred.user.name,
-        device: cred.device.label,
-      },
-    );
+    const syncResult = await finalizeAdoption(services, {
+      server: server_,
+      slug: result.slug,
+      vaultDir: result.vaultDir,
+      cred,
+    });
 
     stdout(`Unido al vault "${result.slug}" en ${result.vaultDir}`);
     stdout(
       `Primer sync: pushed ${syncResult.pushed}, pulled ${syncResult.pulled}, conflicts ${syncResult.conflicts.length}`,
     );
 
-    // Write parche.json after successful join (R6: atomic write after joinOnce success)
-    await writeParcheJsonAfterJoin(
+    // Write parche.json after successful join (R6: via binding-ops)
+    await writeBindingAfterJoinCli(
       services,
       scope,
       wsRoot,
@@ -471,14 +375,16 @@ async function runJoin(argv: string[], deps: VaultCliDeps): Promise<void> {
     );
   } catch (err) {
     let msg: string;
-    if (err instanceof ParcheNotFoundError) {
+    if (err instanceof InvalidJoinInputError) {
+      msg = 'código o link inválido';
+    } else if (err instanceof ParcheNotFoundError) {
       msg = 'código inválido, vencido o agotado';
     } else if (err instanceof ParcheAlreadyMemberError) {
       msg = 'ya eres miembro en este grupo (próximamente: vault login para máquinas existentes)';
     } else if (err instanceof ParcheRateLimitedError) {
       msg = 'demasiados intentos, espera un minuto';
     } else {
-      msg = err instanceof Error ? err.message : String(err);
+      msg = redactSecrets(err instanceof Error ? err.message : String(err));
     }
     stderr(msg);
     exit(1);
@@ -486,10 +392,10 @@ async function runJoin(argv: string[], deps: VaultCliDeps): Promise<void> {
 }
 
 /**
- * Write parche.json after a successful join (R6).
- * Returns false and writes to stderr + exits 1 on failure.
+ * Write parche.json after a join — wraps persistBindingAfterJoin with CLI messaging.
+ * R6: fail hard if write fails, showing exact JSON content so user can create it manually.
  */
-async function writeParcheJsonAfterJoin(
+async function writeBindingAfterJoinCli(
   services: Services,
   scope: 'workspace' | 'global',
   wsRoot: string | null,
@@ -500,42 +406,20 @@ async function writeParcheJsonAfterJoin(
   stderr: (msg: string) => void,
   exit: (code: number) => void,
 ): Promise<void> {
-  const bindingRoot = scope === 'workspace' ? wsRoot : services.homedir;
-  if (!bindingRoot) return;
-
-  // Determine vaultDir to persist: relative if inside the workspace, absolute otherwise
-  let persistVaultDir = vaultDir;
-  if (scope === 'workspace' && wsRoot && vaultDir.startsWith(`${wsRoot}/`)) {
-    persistVaultDir = vaultDir.slice(wsRoot.length + 1);
-  }
-
-  const bindingPath = parcheFilePath(bindingRoot);
-  const bindingContent = JSON.stringify(
-    {
-      version: 1,
-      server,
-      slug,
-      vaultDir: persistVaultDir,
-      autoSync: { enabled: true, pullTtlMin: 5 },
-    },
-    null,
-    2,
-  );
   try {
-    await writeParcheBinding(services.fs, bindingPath, {
-      version: 1,
-      server,
-      slug,
-      vaultDir: persistVaultDir,
-      autoSync: { enabled: true, pullTtlMin: 5 },
-    });
-    stdout(`Vínculo ${scope} guardado en ${bindingPath}.`);
+    const res = await persistBindingAfterJoin(services, { scope, wsRoot, server, slug, vaultDir });
+    if (res) {
+      stdout(`Vínculo ${scope} guardado en ${res.bindingPath}.`);
+    }
   } catch (e) {
-    // R6: fail hard — show exact content so user can create it manually
-    stderr(
-      `Te uniste a ${slug} pero no se pudo escribir ${bindingPath}: ${e instanceof Error ? e.message : String(e)}.\n` +
-        `Crea el archivo manualmente con este contenido:\n${bindingContent}`,
-    );
+    if (e instanceof BindingWriteError) {
+      stderr(
+        `Te uniste a ${slug} pero no se pudo escribir ${e.bindingPath}: ${(e.cause as Error | undefined)?.message ?? String(e.cause)}.\n` +
+          `Crea el archivo manualmente con este contenido:\n${e.jsonContent}`,
+      );
+    } else {
+      stderr(`Error escribiendo parche.json: ${e instanceof Error ? e.message : String(e)}`);
+    }
     exit(1);
   }
 }
@@ -566,109 +450,40 @@ async function runLink(argv: string[], deps: VaultCliDeps): Promise<void> {
   const allowInRepo = hasFlag(argv, '--allow-in-repo');
   const hasYes = hasFlag(argv, '--yes');
 
-  // Find the credential for this slug
-  const creds = new CredentialsStore(services.fs, services.homedir);
-  const allSlugs = await creds.listSlugs();
-  const found = allSlugs.find((s) => s.slug === slug);
-  if (!found) {
-    stderr(`No se encontró credencial para el vault "${slug}".`);
+  // Validate dir, update credential, reset state — all via binding-ops
+  const prep = await relinkPrepare(services, { slug, dirInput: dirFlag, allowInRepo });
+
+  if (prep.kind === 'error') {
+    stderr(prep.message);
     exit(1);
     return;
   }
-
-  const cred = await creds.get(found.server, slug);
-  if (!cred) {
-    stderr(`No se encontró credencial para el vault "${slug}".`);
-    exit(1);
-    return;
-  }
-
-  // Get old dir (for informational message)
-  const oldDir = resolveVaultDir(cred, services.homedir, slug);
-
-  // Build existing links (excluding this slug)
-  const existingLinks: Array<{ server: string; slug: string; dir: string }> = [];
-  for (const { server: srv, slug: sl } of allSlugs) {
-    if (sl === slug && srv === found.server) continue;
-    const existingCred = await creds.get(srv, sl);
-    if (existingCred) {
-      existingLinks.push({
-        server: srv,
-        slug: sl,
-        dir: resolveVaultDir(existingCred, services.homedir, sl),
-      });
-    }
-  }
-
-  // Validate and prepare new directory
-  let canonicalDir: string;
-  try {
-    const prepared = await prepareVaultDir(
-      { fs: services.fs },
-      {
-        input: dirFlag,
-        homedir: services.homedir,
-        cwd: services.cwd,
-        slug,
-        server: found.server,
-        allowInRepo,
-        existingLinks,
-        platform: process.platform,
-      },
+  if (prep.kind === 'in-repo') {
+    stderr(
+      `La ruta "${dirFlag}" está dentro de un repositorio git. ` +
+        `Usa --allow-in-repo para permitirlo.`,
     );
-    canonicalDir = prepared.vaultDir;
-    if (prepared.gitignored.length > 0) {
-      stdout(`Añadido a .gitignore: ${prepared.gitignored.join(', ')}`);
-    }
-  } catch (err) {
-    if (err instanceof VaultDirValidationError) {
-      stderr(err.message);
-    } else {
-      stderr(err instanceof Error ? err.message : String(err));
-    }
     exit(1);
     return;
   }
-
-  // Fix 5: if same dir and not pending, nothing to do
-  if (canonicalDir === oldDir) {
-    const currentState = await readState(services.fs, canonicalDir);
-    if (!currentState?.pendingAdoption) {
-      stdout(`Vault "${slug}" ya está vinculado a "${canonicalDir}"; nada que hacer.`);
-      return;
-    }
-    // If pending, fall through: this is the recovery path
+  if (prep.kind === 'noop') {
+    stdout(`Vault "${slug}" ya está vinculado a "${prep.canonicalDir}"; nada que hacer.`);
+    return;
   }
 
-  // Read old state's groupId (best-effort)
-  let oldGroupId: string | undefined;
-  try {
-    const oldState = await readState(services.fs, oldDir);
-    oldGroupId = oldState?.groupId;
-  } catch {
-    // Ignore
+  // prep.kind === 'ready'
+  const { server, cred, oldDir, canonicalDir, summary, gitignored } = prep;
+
+  if (gitignored.length > 0) {
+    stdout(`Añadido a .gitignore: ${gitignored.join(', ')}`);
   }
-
-  // Create .obsidian dir in new location
-  await services.fs.mkdir(joinPath(canonicalDir, '.obsidian'));
-
-  // Update credential with new dir
-  await creds.set(found.server, slug, { ...cred, dir: canonicalDir });
-
-  // Reset state in new dir (pendingAdoption=true)
-  await resetVaultState(
-    services.fs,
-    canonicalDir,
-    { server: found.server, slug, groupId: oldGroupId },
-    services.clock,
-  );
-
   if (oldDir !== canonicalDir) {
     stdout(`Nota: la ruta anterior "${oldDir}" sigue en disco intacta.`);
   }
 
-  // Run adoption gate
-  const confirmed = await runAdoptionGate(canonicalDir, slug, hasYes, deps);
+  // Run adoption gate (summary already computed by relinkPrepare)
+  const linkGate = checkAdoptionGate(summary);
+  const confirmed = await runAdoptionGate(canonicalDir, slug, linkGate, hasYes, deps);
 
   if (!confirmed) {
     stdout(`Vault "${slug}" re-vinculado a "${canonicalDir}" (sin sincronizar).`);
@@ -676,97 +491,25 @@ async function runLink(argv: string[], deps: VaultCliDeps): Promise<void> {
     return;
   }
 
-  // Confirmed: clear pendingAdoption and sync
-  const stateFile = await readState(services.fs, canonicalDir);
-  if (stateFile?.pendingAdoption === true) {
-    const cleared = { ...stateFile };
-    delete cleared.pendingAdoption;
-    await writeState(services.fs, canonicalDir, cleared);
-  }
-
-  const syncResult = await syncOnce(
-    { fs: services.fs, http: services.http, hash: services.hash, clock: services.clock },
-    {
-      vaultDir: canonicalDir,
-      server: found.server,
-      slug,
-      token: cred.token,
-      localAuthor: cred.user.name,
-      device: cred.device.label,
-    },
-  );
+  // Confirmed: finalize via binding-ops (clears pendingAdoption + syncOnce)
+  const syncResult = await finalizeAdoption(services, {
+    server,
+    slug,
+    vaultDir: canonicalDir,
+    cred,
+  });
 
   stdout(`Vault "${slug}" re-vinculado a "${canonicalDir}"`);
   stdout(
     `Sync: pushed ${syncResult.pushed}, pulled ${syncResult.pulled}, conflicts ${syncResult.conflicts.length}`,
   );
 
-  // O1: if workspace or global binding exists for this slug, update its vaultDir
-  await updateBindingVaultDir(services, slug, canonicalDir, stdout);
-}
-
-/**
- * O1: When vault link changes the vaultDir, update any parche.json binding
- * that references the same slug (workspace binding wins over global).
- */
-async function updateBindingVaultDir(
-  services: Services,
-  slug: string,
-  newVaultDir: string,
-  stdout: (msg: string) => void,
-): Promise<void> {
-  const wsRoot =
-    services.workspaceRoot ??
-    (await findWorkspaceRoot(services.fs, services.cwd, services.homedir));
-
-  let updated = 0;
-
-  // Try workspace binding (no early return — always check global too)
-  if (wsRoot) {
-    const bindingPath = parcheFilePath(wsRoot);
-    const result = await readParcheBinding(services.fs, bindingPath, {
-      scope: 'workspace',
-      baseDir: wsRoot,
-    });
-    if (result.ok && result.binding.slug === slug) {
-      // Store relative path if inside workspace, absolute otherwise
-      let persistVaultDir = newVaultDir;
-      if (newVaultDir.startsWith(`${wsRoot}/`)) {
-        persistVaultDir = newVaultDir.slice(wsRoot.length + 1);
-      }
-      try {
-        await writeParcheBinding(services.fs, bindingPath, {
-          ...result.binding,
-          vaultDir: persistVaultDir,
-        });
-        stdout(`Vínculo workspace actualizado con nueva ruta: ${persistVaultDir}`);
-        updated++;
-      } catch {
-        // Best-effort: don't fail the link operation
-      }
-    }
+  // O1: update any parche.json binding that references this slug with new vaultDir
+  const updates = await updateBindingVaultDirForSlug(services, { slug, newVaultDir: canonicalDir });
+  for (const msg of updates) {
+    stdout(msg);
   }
-
-  // Try global binding (always checked, independent of workspace)
-  const globalBindingPath = parcheFilePath(services.homedir);
-  const globalResult = await readParcheBinding(services.fs, globalBindingPath, {
-    scope: 'global',
-    baseDir: services.homedir,
-  });
-  if (globalResult.ok && globalResult.binding.slug === slug) {
-    try {
-      await writeParcheBinding(services.fs, globalBindingPath, {
-        ...globalResult.binding,
-        vaultDir: newVaultDir,
-      });
-      stdout(`Vínculo global actualizado con nueva ruta: ${newVaultDir}`);
-      updated++;
-    } catch {
-      // Best-effort
-    }
-  }
-
-  if (updated === 0) {
+  if (updates.length === 0) {
     stdout('ningún parche.json actualizado');
   }
 }
@@ -778,19 +521,7 @@ async function runSync(argv: string[], deps: VaultCliDeps): Promise<void> {
   // PARCHE-011: if no explicit slug and inside a workspace with a binding, sync only binding slug
   let effectiveSlugArg = slugArg;
   if (!effectiveSlugArg) {
-    const wsRoot =
-      services.workspaceRoot ??
-      (await findWorkspaceRoot(services.fs, services.cwd, services.homedir));
-    if (wsRoot) {
-      const wsBindingPath = parcheFilePath(wsRoot);
-      const wsBindingResult = await readParcheBinding(services.fs, wsBindingPath, {
-        scope: 'workspace',
-        baseDir: wsRoot,
-      });
-      if (wsBindingResult.ok) {
-        effectiveSlugArg = wsBindingResult.binding.slug;
-      }
-    }
+    effectiveSlugArg = await resolveWorkspaceSyncSlug(services);
   }
 
   const creds = new CredentialsStore(services.fs, services.homedir);
@@ -999,65 +730,78 @@ async function runLeave(argv: string[], deps: VaultCliDeps): Promise<void> {
 async function runUnlink(argv: string[], deps: VaultCliDeps): Promise<void> {
   const { services, stdout, stderr, exit } = deps;
 
-  const scopeFlag = parseFlag(argv, '--scope') as 'workspace' | 'global' | undefined;
+  const scopeFlag = parseFlag(argv, '--scope');
 
-  // Resolve workspace root
-  const wsRoot =
-    services.workspaceRoot ??
-    (await findWorkspaceRoot(services.fs, services.cwd, services.homedir));
+  // Delegate all resolution and deletion to binding-ops
+  const result = await removeBinding(services, { scopeFlag });
 
-  let scope: 'workspace' | 'global';
-  if (scopeFlag === 'workspace' || scopeFlag === 'global') {
-    scope = scopeFlag;
-  } else if (scopeFlag) {
-    stderr(`--scope debe ser "workspace" o "global" (recibido: "${scopeFlag}")`);
-    exit(1);
-    return;
-  } else {
-    // Default: workspace if inside one, else global
-    scope = wsRoot ? 'workspace' : 'global';
-  }
-
-  if (scope === 'workspace' && !wsRoot) {
-    stderr(
-      `--scope workspace requiere estar dentro de un workspace (con .chamba/workspace.md). ` +
-        `No se detectó workspace desde ${services.cwd}.`,
-    );
+  if (result.kind === 'error') {
+    stderr(result.message);
     exit(1);
     return;
   }
 
-  // wsRoot is non-null here because we've already validated scope=workspace→wsRoot exists
-  const bindingRoot = scope === 'workspace' ? (wsRoot as string) : services.homedir;
-  const bindingPath = parcheFilePath(bindingRoot);
-
-  // Check that binding exists
-  const exists = await services.fs.exists(bindingPath);
-  if (!exists) {
-    stdout(`No hay vínculo ${scope} en ${bindingPath}.`);
+  if (result.kind === 'none') {
+    stdout(`No hay vínculo ${result.scope} en ${result.bindingPath}.`);
     exit(0);
     return;
   }
 
-  // Read first so we can show the slug in the success message
-  const bindingResult = await readParcheBinding(services.fs, bindingPath, {
-    scope,
-    baseDir: bindingRoot,
-  });
-  const slugDesc = bindingResult.ok ? ` (${bindingResult.binding.slug})` : '';
+  // result.kind === 'removed'
+  const slugDesc = result.slug ? ` (${result.slug})` : '';
+  stdout(
+    `Vínculo ${result.scope}${slugDesc} eliminado (${result.bindingPath}). ` +
+      `Las credenciales y archivos del vault siguen intactos.`,
+  );
+}
 
-  // Delete the binding file
-  try {
-    await services.fs.remove(bindingPath);
-  } catch (e) {
-    stderr(`No se pudo eliminar ${bindingPath}: ${e instanceof Error ? e.message : String(e)}`);
+// ─── runResync ────────────────────────────────────────────────────────────────
+
+/**
+ * vault resync <slug> [--yes]
+ *
+ * PARCHE-010 O3: Reset state in-place and re-adopt a vault (re-download from server).
+ * Useful when local state is corrupted or the vault dir was replaced.
+ * Does NOT change the vault directory or credentials.
+ */
+async function runResync(argv: string[], deps: VaultCliDeps): Promise<void> {
+  const { services, stdout, stderr, exit } = deps;
+
+  const slug = argv[0];
+  if (!slug) {
+    stderr('Usage: vault resync <slug> [--yes]');
     exit(1);
     return;
   }
 
+  const hasYes = hasFlag(argv, '--yes');
+
+  const prep = await resyncPrepare(services, { slug });
+
+  if (prep.kind === 'error') {
+    stderr(prep.message);
+    exit(1);
+    return;
+  }
+
+  const { server, cred, vaultDir, summary } = prep;
+
+  // Run adoption gate
+  const resyncGate = checkAdoptionGate(summary);
+  const confirmed = await runAdoptionGate(vaultDir, slug, resyncGate, hasYes, deps);
+
+  if (!confirmed) {
+    stdout(`Vault "${slug}" marcado para resync en "${vaultDir}" (sin sincronizar).`);
+    stdout(`Para sincronizar: ${linkHint(slug, vaultDir, { yes: true })}`);
+    return;
+  }
+
+  // Confirmed: finalize adoption (clear pendingAdoption + syncOnce)
+  const syncResult = await finalizeAdoption(services, { server, slug, vaultDir, cred });
+
+  stdout(`Vault "${slug}" re-sincronizado en "${vaultDir}"`);
   stdout(
-    `Vínculo ${scope}${slugDesc} eliminado (${bindingPath}). ` +
-      `Las credenciales y archivos del vault siguen intactos.`,
+    `Sync: pushed ${syncResult.pushed}, pulled ${syncResult.pulled}, conflicts ${syncResult.conflicts.length}`,
   );
 }
 
@@ -1090,14 +834,18 @@ export async function runVaultCli(argv: string[], deps: VaultCliDeps): Promise<v
       await runLeave(rest, deps);
       break;
     case 'unlink':
-      // PARCHE-011: remove parche.json workspace/global binding
+      // PARCHE-010: remove parche.json workspace/global binding
       await runUnlink(rest, deps);
+      break;
+    case 'resync':
+      // PARCHE-010 O3: reset state + re-adopt in-place
+      await runResync(rest, deps);
       break;
     default: {
       const { stderr, exit } = deps;
       stderr(
         'Usage: vault <subcommand> [args]\n' +
-          'Subcommands: join, link, sync, status, leave, unlink',
+          'Subcommands: join, link, sync, status, leave, unlink, resync',
       );
       exit(1);
     }

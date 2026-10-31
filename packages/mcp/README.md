@@ -53,7 +53,7 @@ check, no LLM — powers `/triage`) · `chamba_generate_plan` · `chamba_review_
 **Memory + vault:** `chamba_remember` · `chamba_recall` · `chamba_summarize_to_vault` ·
 `chamba_vault_status`
 
-**Parche (group vaults):** `chamba_vault_join` · `chamba_vault_sync` · `chamba_parche_status`
+**Parche (group vaults):** `chamba_vault_join` · `chamba_vault_link` · `chamba_vault_unlink` · `chamba_vault_resync` · `chamba_vault_sync` · `chamba_parche_status`
 
 **Health + capacity:** `chamba_doctor` · `chamba_resource_budget` (safe parallelism from
 live RAM/CPU) · `chamba_qa_capabilities` (web/mobile QA probe) · `chamba_get_agent_config`
@@ -86,6 +86,7 @@ All commands run via `npx @chamba/mcp vault <subcommand>`.
 | `vault join <code\|link> [--name NAME] [--email EMAIL] [--label LABEL] [--server URL] [--dir PATH] [--allow-in-repo] [--yes]` | Join a parche group. With a TTY, `--name` and `--email` are prompted. `--label` defaults to the machine hostname. A link like `https://parche.chamba.tools/j/XXXX-XXXX` also sets the server. Use `--dir` to set a custom vault location. |
 | `vault link <slug> --dir <PATH> [--allow-in-repo] [--yes]` | Re-link an existing vault to a new local directory. Resets the local state and runs the adoption gate. The old directory is kept intact. |
 | `vault sync [slug]` | Sync one vault (by slug) or all vaults. Prints pushed/pulled/conflicts. |
+| `vault resync <slug> [--yes]` | Reset state in-place and re-adopt a vault (re-download from server). Useful when local state is corrupted. Runs the adoption gate; use `--yes` to confirm upload. |
 | `vault status` | Show server, slug, role, last sync, pending changes, and vault path for each vault. |
 | `vault leave <slug>` | Remove the credential for a vault. The files on disk are kept. |
 

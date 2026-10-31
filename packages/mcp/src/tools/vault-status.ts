@@ -1,13 +1,7 @@
-import {
-  findWorkspaceRoot,
-  listVaultNotes,
-  ObsidianDetector,
-  parcheFilePath,
-  readParcheBinding,
-  resolveParcheBinding,
-} from '@chamba/core';
+import { listVaultNotes, ObsidianDetector } from '@chamba/core';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { Logger } from 'pino';
+import { resolveBindingHeader } from '../parche/binding-ops.js';
 import { obsidianSearchRoots, type Services } from '../services.js';
 
 const TOOL_NAME = 'chamba_vault_status';
@@ -29,58 +23,34 @@ export function registerVaultStatus(server: McpServer, logger: Logger, services:
       inputSchema: {},
     },
     async () => {
-      // O3/R3: resolve workspace root and binding
-      const wsRoot =
-        services.workspaceRoot ??
-        (await findWorkspaceRoot(services.fs, services.cwd, services.homedir));
-      const wsRootSource: 'env' | 'cwd' | null = services.workspaceRoot
-        ? 'env'
-        : wsRoot
-          ? 'cwd'
-          : null;
-
-      const binding = await resolveParcheBinding(
-        { fs: services.fs },
-        { cwd: services.cwd, homedir: services.homedir, workspaceRoot: wsRoot ?? undefined },
-      );
-
-      // Bug 5: detect invalid workspace binding and show as warn
-      let invalidBindingWarning: string | undefined;
-      if (!binding && wsRoot) {
-        const wsBindingPath = parcheFilePath(wsRoot);
-        const wsRaw = await readParcheBinding(services.fs, wsBindingPath, {
-          scope: 'workspace',
-          baseDir: wsRoot,
-        });
-        if (!wsRaw.ok && !wsRaw.missing) {
-          invalidBindingWarning = `⚠ binding inválido en ${wsBindingPath}: ${wsRaw.error}`;
-        }
-      }
-      if (!binding && !invalidBindingWarning) {
-        const globalPath = parcheFilePath(services.homedir);
-        const globalRaw = await readParcheBinding(services.fs, globalPath, {
-          scope: 'global',
-          baseDir: services.homedir,
-        });
-        if (!globalRaw.ok && !globalRaw.missing) {
-          invalidBindingWarning = `⚠ binding inválido en ${globalPath}: ${globalRaw.error}`;
-        }
-      }
+      // PARCHE-010: resolve workspace root and binding via shared binding-ops header
+      const header = await resolveBindingHeader(services);
+      const {
+        workspaceRoot: wsRoot,
+        workspaceRootSource: wsRootSource,
+        binding,
+        invalidWarning,
+      } = header;
 
       const lines: string[] = [];
       // Workspace section
       if (wsRoot) {
-        lines.push(`Workspace: ${wsRoot} (${wsRootSource})`);
+        lines.push(
+          `Workspace: ${wsRoot} (origen: ${wsRootSource === 'env' ? 'CHAMBA_WORKSPACE_ROOT' : 'cwd'})`,
+        );
       } else {
         lines.push('Workspace: none detected');
       }
       // Binding section
       if (binding) {
+        const autoSyncStr = binding.autoSync
+          ? `, autoSync=${binding.autoSync.enabled ? `enabled (pullTtlMin=${binding.autoSync.pullTtlMin})` : 'disabled'}`
+          : '';
         lines.push(
-          `Parche binding: ${binding.scope} — slug="${binding.slug}", server=${binding.server}, dir=${binding.vaultDir}`,
+          `Parche binding: ${binding.scope} — slug="${binding.slug}", server=${binding.server}, dir=${binding.vaultDir}${autoSyncStr}`,
         );
-      } else if (invalidBindingWarning) {
-        lines.push(invalidBindingWarning);
+      } else if (invalidWarning) {
+        lines.push(invalidWarning);
       } else {
         lines.push('Parche binding: none');
       }
@@ -105,7 +75,13 @@ export function registerVaultStatus(server: McpServer, logger: Logger, services:
             workspaceRoot: wsRoot,
             workspaceRootSource: wsRootSource,
             binding: binding
-              ? { scope: binding.scope, slug: binding.slug, vaultDir: binding.vaultDir }
+              ? {
+                  scope: binding.scope,
+                  slug: binding.slug,
+                  server: binding.server,
+                  vaultDir: binding.vaultDir,
+                  autoSync: binding.autoSync,
+                }
               : null,
           } as Record<string, unknown>,
         };
@@ -138,7 +114,13 @@ export function registerVaultStatus(server: McpServer, logger: Logger, services:
           workspaceRoot: wsRoot,
           workspaceRootSource: wsRootSource,
           binding: binding
-            ? { scope: binding.scope, slug: binding.slug, vaultDir: binding.vaultDir }
+            ? {
+                scope: binding.scope,
+                slug: binding.slug,
+                server: binding.server,
+                vaultDir: binding.vaultDir,
+                autoSync: binding.autoSync,
+              }
             : null,
         } as Record<string, unknown>,
       };

@@ -15,6 +15,7 @@ import {
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { Logger } from 'pino';
 import { z } from 'zod';
+import { formatSyncOutput, redactSecrets } from '../parche/binding-ops.js';
 import { withVaultLock } from '../parche/mutex.js';
 import type { Services } from '../services.js';
 
@@ -48,6 +49,7 @@ export function registerVaultSync(server: McpServer, logger: Logger, services: S
       }
 
       const results: string[] = [];
+      const resultDetails: Array<Record<string, unknown>> = [];
       let anyError = false;
 
       for (const { server: srv, slug: sl } of targets) {
@@ -123,21 +125,30 @@ export function registerVaultSync(server: McpServer, logger: Logger, services: S
           results.push(
             `${sl}: pushed ${summary.pushed}, pulled ${summary.pulled}, conflicts ${summary.conflicts.length}`,
           );
+          for (const c of summary.conflicts) {
+            results.push(`  conflict: ${c.path} → copy saved as ${c.copyPath}`);
+          }
+          if (summary.movedToTrash.length > 0) {
+            results.push(`  moved to trash: ${summary.movedToTrash.join(', ')}`);
+          }
           if (summary.errors.length > 0) {
             results.push(`  errors: ${summary.errors.join('; ')}`);
             anyError = true;
           }
+          const syncOut = formatSyncOutput(summary);
+          resultDetails.push({ slug: sl, ...syncOut });
         } catch (err) {
-          const msg = err instanceof Error ? err.message : String(err);
+          const msg = redactSecrets(err instanceof Error ? err.message : String(err));
           logger.warn({ tool: TOOL_NAME, slug: sl, err: msg }, 'parche: sync failed');
           results.push(`${sl}: error — ${msg}`);
           anyError = true;
+          resultDetails.push({ slug: sl, error: msg });
         }
       }
 
       return {
         content: [{ type: 'text' as const, text: results.join('\n') }],
-        structuredContent: { results, anyError } as Record<string, unknown>,
+        structuredContent: { results: resultDetails, anyError } as Record<string, unknown>,
         ...(anyError ? { isError: true } : {}),
       };
     },
