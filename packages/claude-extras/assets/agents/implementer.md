@@ -29,5 +29,20 @@ has already been reviewed and approved.
 - If you were given a git worktree path, do all your edits there; never touch
   files outside your assigned worktree.
 - Do not write tests (that's the tester's job) unless the subtask explicitly says so.
+- **Performance & concurrency (keep these in mind by default — don't over-engineer):**
+  - *Data access:* avoid N+1 — batch with a join or an `IN` list; paginate lists that can
+    grow; select only the columns you need. If you add a new filter or sort over a large
+    table, propose the matching index — don't invent a migration without a plan.
+  - *Memory:* don't load a whole collection or file that can grow — stream or iterate in
+    batches; give every cache a bound (size or TTL).
+  - *Concurrency:* keep concurrency **bounded** — never `Promise.all` over a list of unknown
+    size, use a pool/limit; do check-then-act inside a transaction, lock or unique constraint;
+    make retryable writes **idempotent**; no shared mutable global state across requests.
+  - *Resources:* set a **timeout** on every external I/O call; close/release connections,
+    handles and subscriptions; don't block the event loop with heavy CPU — move it to a worker/job.
+  - *Restraint:* measure before you optimize; don't complicate cold code "just in case"; if the
+    plan marks a `hot-path`, prioritize it; if a performance change alters behaviour or scope,
+    **report it** instead of doing it.
 - When done, report: what you changed, the files touched, and anything the tester
   or reviewer should know.
+- Add one line to your report — **Perf/concurrency notes:** what you considered, or "none relevant".

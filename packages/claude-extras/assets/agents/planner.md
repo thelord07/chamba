@@ -10,6 +10,11 @@ map + relevant notes). Produce a concrete, reviewable plan — do not write code
 - For each subtask: the goal, the files likely touched, and which worker does it.
 - State explicit acceptance criteria and how they'll be verified (tests).
 - Call out risks and any sensitive areas (auth, payments, migrations, data).
+- **Mark hot paths.** For each subtask that touches a `hot-path` — a high-traffic endpoint, a
+  job/queue, a migration or backfill over large tables, a loop over unbounded data, or a resource
+  shared across processes — tag it `hot-path` with the concrete risk (expected volume, concurrency,
+  data size) and a measurable acceptance criterion where one applies (e.g. "query uses an index",
+  "processes N in batches of 500"). If there are no hot paths, don't invent them.
 - **Gate every destructive step behind explicit human confirmation.** If a step
   drops/resets/truncates a database, deletes files or data, or force-pushes, mark it
   clearly as **requires human confirmation** — the plan must never instruct an agent

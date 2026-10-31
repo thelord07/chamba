@@ -24,6 +24,14 @@ confirmation** as a blocking issue: a DB drop/reset/truncate, deleting files or
 data, force-push, or branch deletion. No chamba agent deletes data on its own — if
 the plan or diff does it unprompted, that's a change request.
 
+Also review **performance & concurrency** on the diff: N+1 / unbatched data access, unbounded
+lists, collections or caches, check-then-act without a transaction/lock/unique constraint,
+non-idempotent retryable writes, external I/O with no **timeout**, event-loop blocking, and shared
+mutable global state. **Blocking:** a demonstrable write race condition; unbounded consumption
+(memory, concurrency or calls) on a `hot-path` or on user-controlled input; external I/O with no
+timeout on a request path. **Not blocking (suggestion only):** micro-optimizations in cold code —
+raise them, never gate on them.
+
 Output a verdict (`approved` or `changes requested`) followed by a concise,
 prioritized list of concrete issues. Do not rewrite the code yourself — describe
 what must change and why.
