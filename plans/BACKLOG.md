@@ -176,6 +176,9 @@ Encontrado dogfooding en **finalis**. El check "Git repo" corría `git rev-parse
 - **PARCHE-009 — vault en ruta propia + adopción segura (✅ HECHO — 1.9.0)**
   `vault join --dir`, `vault link <slug> --dir`, `pendingAdoption` bloquea sync/autosync hasta confirmar,
   `VaultDirMissingError`, `realpath` en `FilesystemPort`. Sin LLM.
+- **PARCHE-011 — parche por workspace (✅ HECHO — 1.10.0)**
+  `.chamba/parche.json` por workspace (global en `~/.chamba/parche.json`), precedencia workspace → env → global,
+  `vault join --scope`, `vault unlink`, `autoSync` por vínculo, `CHAMBA_WORKSPACE_ROOT`, vínculo en doctor / vault_status. Sin LLM.
 
 ---
 
@@ -212,6 +215,7 @@ Encontrado dogfooding en **finalis**. El check "Git repo" corría `git rev-parse
 - ✅ **1.7.0** — protocolo de sync de vault v1 (parche) en `@chamba/core`: schemas, roles, conflictos, planificador puro. Sin tools nuevas.
 - ✅ **1.8.0** — cliente de parche: vault join/sync/status/leave (CLI + 3 tools MCP) + sync automático; memoria de grupo en el vault.
 - ✅ **1.9.0** — parche: vault en ruta propia (`--dir`, `vault link`) + gate de adopción segura antes de subir archivos existentes.
+- ✅ **1.10.0** — parche por workspace (`.chamba/parche.json`), `vault join --scope`, `vault unlink`, autosync configurable por vínculo.
 
 ## Orden sugerido (lo que sigue)
 1. ✅ **1.0.0** — Tier 3 completo. Pulido y estabilización: superficie de tools revisada, docs

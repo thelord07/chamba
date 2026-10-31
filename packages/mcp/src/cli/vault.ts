@@ -736,8 +736,11 @@ async function updateBindingVaultDir(
       }
       try {
         await writeParcheBinding(services.fs, bindingPath, {
-          ...result.binding,
+          version: 1,
+          server: result.binding.server,
+          slug: result.binding.slug,
           vaultDir: persistVaultDir,
+          autoSync: result.binding.autoSync,
         });
         stdout(`Vínculo workspace actualizado con nueva ruta: ${persistVaultDir}`);
         updated++;
@@ -756,8 +759,11 @@ async function updateBindingVaultDir(
   if (globalResult.ok && globalResult.binding.slug === slug) {
     try {
       await writeParcheBinding(services.fs, globalBindingPath, {
-        ...globalResult.binding,
+        version: 1,
+        server: globalResult.binding.server,
+        slug: globalResult.binding.slug,
         vaultDir: newVaultDir,
+        autoSync: globalResult.binding.autoSync,
       });
       stdout(`Vínculo global actualizado con nueva ruta: ${newVaultDir}`);
       updated++;
