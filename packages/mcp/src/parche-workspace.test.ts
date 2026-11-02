@@ -15,13 +15,10 @@
  *   AC6  — vault sync without slug in bound workspace syncs only that slug; autoSync.enabled:false → 0 requests
  */
 
-import { FakeHash, FakeParche, MemoryFilesystem } from '@chamba/core';
-import { pino } from 'pino';
+import { FakeHash, FakeParche, MemoryFilesystem, parcheBindingFileSchema } from '@chamba/core';
 import { describe, expect, it } from 'vitest';
 import { runVaultCli, type VaultCliDeps } from './cli/vault.js';
 import type { Services } from './services.js';
-
-const _logger = pino({ level: 'silent' });
 
 const FAKE_NOW = '2026-06-09T10:00:00.000Z';
 const PARCHE_SERVER = 'https://parche.chamba.tools';
@@ -650,6 +647,8 @@ describe('O1 — vault link updates workspace binding', () => {
     expect(bindingAfter.vaultDir).not.toBe(bindingBefore.vaultDir);
     // New vault dir should be stored as relative (inside workspace)
     expect(bindingAfter.vaultDir).toBe('new-vault');
+    // The rewritten file must still be a valid parche.json (version: 1, no resolved fields)
+    expect(parcheBindingFileSchema.safeParse(bindingAfter).success).toBe(true);
   });
 
   it('vault link --dir <new-path> --yes also updates global binding when slug matches', async () => {
@@ -686,6 +685,7 @@ describe('O1 — vault link updates workspace binding', () => {
       await svc.fs.readFile(`${HOMEDIR}/.chamba/parche.json`),
     ) as Record<string, unknown>;
     expect(globalBindingAfter.vaultDir).not.toBe(globalBindingBefore.vaultDir);
+    expect(parcheBindingFileSchema.safeParse(globalBindingAfter).success).toBe(true);
   });
 
   // BLOCKER: both workspace and global bindings updated, no premature return

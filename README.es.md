@@ -107,7 +107,7 @@ el directorio de logs y los worktrees.
 | `chamba_design_prefs` | `{ web?, mobile? }` | Lee/guarda la preferencia de arquitectura de UI (Atomic Design, Feature-Sliced, …) para que el planner pregunte una vez y la reuse. Web y móvil por separado. Sin LLM |
 | `chamba_summarize_to_vault` | `{ title, content, projectSlug? }` | Escribe un resumen a `proyectos/` — agrupado por proyecto (git remote) + un `INDEX.md` por carpeta para recall barato |
 | `chamba_save_plan` | `{ title, content, projectSlug? }` | Guarda un plan en `plans/` — mismo agrupamiento por proyecto + índice |
-| `chamba_vault_status` | `{}` | Ruta del vault resuelta + las notas que chamba ve (diagnóstico) |
+| `chamba_vault_status` | `{}` | Ruta del vault resuelta + las notas que chamba ve (diagnóstico); con parche, también qué vínculo está activo (workspace o global) |
 | `chamba_vault_join` | `{ code, name, email, deviceLabel?, dir?, confirmUpload? }` | Se une a un vault de grupo de **parche** con un código o link de invitación: crea el vault local (o usa tu propia carpeta con `dir`), guarda credenciales (0600, fuera del vault) y hace el primer sync. Si la carpeta ya tiene archivos, devuelve un resumen y no sube nada hasta `confirmUpload: true`. Nunca devuelve el token |
 | `chamba_vault_sync` | `{ slug? }` | Sincroniza un vault de parche (o todos) con el server → subidos / bajados / conflictos. Los conflictos quedan como copias, nunca pisa |
 | `chamba_parche_status` | `{}` | Por vault: server, slug, rol, último sync, cambios pendientes, ruta. Sin token |
@@ -266,6 +266,7 @@ corrés chamba en paralelo entre máquinas: sin techo de RAM de una sola, menos 
 - ✅ **1.7.0 — Protocolo de sync de vault:** `@chamba/core` trae el protocolo v1 de parche (sync privado de un vault Obsidian entre miembros de un grupo): schemas, roles, copias en conflicto y un planificador puro de push/pull. Solo la base, sin tools nuevas
 - ✅ **1.8.0 — Vaults de grupo (cliente de parche):** CLI `vault join/sync/status/leave` + `chamba_vault_join` / `chamba_vault_sync` / `chamba_parche_status`; las tools de contexto y memoria sincronizan solas en segundo plano (tope de 10 s). Memorias del grupo en el vault, las personales nunca se suben. Detalle en el [README de `@chamba/mcp`](./packages/mcp/README.md#parche--group-vaults)
 - ✅ **1.9.0 — Tu propia carpeta de vault:** `vault join --dir` / `vault link <slug> --dir` usan cualquier carpeta como vault de parche; un gate de adopción segura muestra qué se subiría y espera `--yes` (o `confirmUpload`) antes de sincronizar archivos existentes
+- ✅ **1.10.0 — parche por workspace:** cada workspace vincula su propio vault de grupo en `.chamba/parche.json` (sin código ni token), por encima de `CHAMBA_OBSIDIAN_VAULT_PATH` y del vínculo global; `vault join --scope workspace|global`, `vault unlink`, `autoSync` por vínculo; `doctor` y `chamba_vault_status` muestran el vínculo
 - 🔭 V2: búsqueda semántica del vault, MCP sampling, más bases de conocimiento
 
 Ver [`PLAN.md`](./PLAN.md) para el plan completo de fases.
