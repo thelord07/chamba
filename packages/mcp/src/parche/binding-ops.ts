@@ -406,8 +406,8 @@ export async function relinkPrepare(
 
   // Short-circuit: same dir and NOT pending → noop
   // Use caseFoldLocal for case-insensitive comparison on win32
-  const _linkStyle = detectStyle(services.platform);
-  if (caseFoldLocal(canonicalDir, _linkStyle) === caseFoldLocal(oldDir, _linkStyle)) {
+  const linkStyle = detectStyle(services.platform);
+  if (caseFoldLocal(canonicalDir, linkStyle) === caseFoldLocal(oldDir, linkStyle)) {
     const currentState = await readState(services.fs, canonicalDir);
     if (!currentState?.pendingAdoption) {
       return { kind: 'noop', canonicalDir };
@@ -861,17 +861,17 @@ export async function findResumeCandidate(
   const expectedHash = await pendingJoinCodeHashOf(services.hash, server, code);
 
   // Compute candidate canonical dir if given
-  const _style = detectStyle(services.platform);
+  const pathStyle = detectStyle(services.platform);
   let candidateCanonical: string | undefined;
   if (dirInput) {
     try {
       const expanded = expandTilde(dirInput, services.homedir);
-      const absolute = toAbsoluteLocal(services.cwd, expanded, _style);
+      const absolute = toAbsoluteLocal(services.cwd, expanded, pathStyle);
       candidateCanonical = await services.fs.realpath(absolute);
     } catch {
       // If realpath fails, use as-is
       const expanded = expandTilde(dirInput, services.homedir);
-      candidateCanonical = toAbsoluteLocal(services.cwd, expanded, _style);
+      candidateCanonical = toAbsoluteLocal(services.cwd, expanded, pathStyle);
     }
   }
 
@@ -904,7 +904,10 @@ export async function findResumeCandidate(
           } catch {
             vaultCanonical = vaultDir;
           }
-          if (caseFoldLocal(vaultCanonical, _style) === caseFoldLocal(candidateCanonical, _style)) {
+          if (
+            caseFoldLocal(vaultCanonical, pathStyle) ===
+            caseFoldLocal(candidateCanonical, pathStyle)
+          ) {
             hashMatches.push({ slug: sl, vaultDir, server: srv, cred });
           }
         }
@@ -920,7 +923,9 @@ export async function findResumeCandidate(
         } catch {
           vaultCanonical = vaultDir;
         }
-        if (caseFoldLocal(vaultCanonical, _style) === caseFoldLocal(candidateCanonical, _style)) {
+        if (
+          caseFoldLocal(vaultCanonical, pathStyle) === caseFoldLocal(candidateCanonical, pathStyle)
+        ) {
           legacyPending.push({ slug: sl, vaultDir });
         }
       }

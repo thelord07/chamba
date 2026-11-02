@@ -1019,6 +1019,47 @@ describe('PARCHE-009 AC9 — vault link', () => {
     expect(r.err.join('\n')).toContain('icacls falló');
   });
 
+  it('S8: secureFile failure warning appears in stderr during vault join (CLI)', async () => {
+    const parche = new FakeParche(makeClock());
+    const group = parche.seedGroup({ slug: 'team-alpha', name: 'Team Alpha' });
+    parche.addInvite({ code: 'K7QX-M2RP', groupId: group.id, role: 'editor' });
+    class FsWithSecureFileWarn extends MemoryFilesystem {
+      async secureFile(_path: string): Promise<{ ok: boolean; warning?: string }> {
+        return { ok: false, warning: 'icacls falló: acceso denegado' };
+      }
+    }
+    const svc = makeServices(parche, { fs: new FsWithSecureFileWarn() });
+
+    const r = await makeCli(svc, ['join', 'K7QX-M2RP', '--name', 'Joys', '--email', 'j@x.dev']);
+    expect(r.code).toBe(0);
+    expect(r.err.join('\n')).toContain('⚠ icacls falló: acceso denegado');
+    expect([...r.out, ...r.err].join('\n')).not.toMatch(/pch_/);
+  });
+
+  it('S8: secureFile failure warning appears in chamba_vault_join result (tool)', async () => {
+    const parche = new FakeParche(makeClock());
+    const group = parche.seedGroup({ slug: 'team-alpha', name: 'Team Alpha' });
+    parche.addInvite({ code: 'K7QX-M2RP', groupId: group.id, role: 'editor' });
+    class FsWithSecureFileWarn extends MemoryFilesystem {
+      async secureFile(_path: string): Promise<{ ok: boolean; warning?: string }> {
+        return { ok: false, warning: 'icacls falló: acceso denegado' };
+      }
+    }
+    const svc = makeServices(parche, { fs: new FsWithSecureFileWarn() });
+    const { client, server } = await connect(svc);
+
+    const result = await client.callTool({
+      name: 'chamba_vault_join',
+      arguments: { code: 'K7QX-M2RP', name: 'Joys', email: 'j@x.dev' },
+    });
+    const txt = textOf(result);
+    expect(txt).toContain('Joined group vault: team-alpha');
+    expect(txt).toContain('⚠ icacls falló: acceso denegado');
+    expect(txt).not.toMatch(/pch_/);
+
+    await server.close();
+  });
+
   it('S8: secureFile failure warning appears in stderr during vault leave', async () => {
     const parche = new FakeParche(makeClock());
     const group = parche.seedGroup({ slug: 'team-alpha', name: 'Team Alpha' });

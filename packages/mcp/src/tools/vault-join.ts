@@ -221,6 +221,8 @@ export function registerVaultJoin(server: McpServer, logger: Logger, services: S
           canonicalDir = prepResult.canonicalDir;
         }
 
+        // CHAMBA-015 S8: collect a failed Windows ACL hardening of credentials.json
+        const credWarnings: string[] = [];
         const result = await joinOnce(
           { fs: services.fs, http: services.http, hash: services.hash, clock: services.clock },
           {
@@ -234,8 +236,10 @@ export function registerVaultJoin(server: McpServer, logger: Logger, services: S
               ...(label ? { deviceLabel: label } : {}),
             },
             skipInitialSync: true, // Always use gate (D1: universal gate)
+            onCredWarn: (msg) => credWarnings.push(msg),
           },
         );
+        const credWarningText = credWarnings.map((w) => `\n⚠ ${w}`).join('');
 
         // Build adoption summary via binding-ops (keeps buildAdoptionSummary out of tools/)
         const summary = await getAdoptionSummary(services, result.vaultDir);
@@ -272,7 +276,8 @@ export function registerVaultJoin(server: McpServer, logger: Logger, services: S
                   (gate.sample.length > 0
                     ? `Muestra (primeros ${gate.sample.length}):\n${gate.sample.map((p) => `  - ${p}`).join('\n')}\n`
                     : '') +
-                  `\nPara confirmar la subida, vuelve a llamar con el mismo código, el mismo dir${dir ? ` ("${dir}")` : ''}, y confirmUpload: true.`,
+                  `\nPara confirmar la subida, vuelve a llamar con el mismo código, el mismo dir${dir ? ` ("${dir}")` : ''}, y confirmUpload: true.` +
+                  credWarningText,
               },
             ],
             structuredContent: {
@@ -329,7 +334,9 @@ export function registerVaultJoin(server: McpServer, logger: Logger, services: S
             `Joined group vault: ${result.slug}`,
             `Vault location: ${result.vaultDir}`,
             `First sync: pushed ${syncOut.pushed}, pulled ${syncOut.pulled}, conflicts ${syncResult.conflicts.length}`,
-          ].join('\n') + bindingNote;
+          ].join('\n') +
+          bindingNote +
+          credWarningText;
 
         return {
           content: [{ type: 'text' as const, text }],

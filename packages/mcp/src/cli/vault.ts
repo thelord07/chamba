@@ -307,6 +307,8 @@ async function runJoin(argv: string[], deps: VaultCliDeps): Promise<void> {
         },
         // D1: universal gate — always skipInitialSync
         skipInitialSync: true,
+        // CHAMBA-015 S8: surface a failed Windows ACL hardening of credentials.json
+        onCredWarn: (msg) => stderr(`⚠ ${msg}`),
       },
     );
 

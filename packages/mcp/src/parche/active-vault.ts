@@ -222,13 +222,13 @@ async function resolveFromBinding(
 
   // Realpath guard: binding.vaultDir must match credVaultDir.
   // Use caseFoldLocal for case-insensitive comparison on Windows (CHAMBA-015).
-  const _avStyle = detectStyle(services.platform);
+  const bindingStyle = detectStyle(services.platform);
   const bindingReal = await tryRealpath(services.fs, binding.vaultDir);
   const credReal = await tryRealpath(services.fs, credVaultDir);
   if (
     bindingReal &&
     credReal &&
-    caseFoldLocal(bindingReal, _avStyle) !== caseFoldLocal(credReal, _avStyle)
+    caseFoldLocal(bindingReal, bindingStyle) !== caseFoldLocal(credReal, bindingStyle)
   ) {
     // Bug 3: use binding.vaultDir (workspace-declared) not credVaultDir for the returned vaultDir
     const bindingDirExists = await services.fs.exists(binding.vaultDir);
@@ -290,12 +290,12 @@ async function resolveFromDetection(
     if (!dirExists) return null;
 
     // CHAMBA-015: use caseFoldLocal for case-insensitive realpath comparison on win32
-    const _rfStyle = detectStyle(services.platform);
+    const detectionStyle = detectStyle(services.platform);
     const a = await tryRealpath(services.fs, detection.path);
     const b = await tryRealpath(services.fs, credVaultDir);
     const sameRealpath =
       a !== null && b !== null
-        ? caseFoldLocal(a, _rfStyle) === caseFoldLocal(b, _rfStyle)
+        ? caseFoldLocal(a, detectionStyle) === caseFoldLocal(b, detectionStyle)
         : a === b;
     if (!sameRealpath) return null;
 
@@ -335,12 +335,12 @@ async function resolveViaDetection(services: Services): Promise<ActiveParcheVaul
     if (!dirExists) return null;
 
     // CHAMBA-015: use caseFoldLocal for case-insensitive realpath comparison on win32
-    const _rvStyle = detectStyle(services.platform);
+    const viaDetectionStyle = detectStyle(services.platform);
     const a = await tryRealpath(services.fs, detection.path);
     const b = await tryRealpath(services.fs, credVaultDir);
     const sameRealpath2 =
       a !== null && b !== null
-        ? caseFoldLocal(a, _rvStyle) === caseFoldLocal(b, _rvStyle)
+        ? caseFoldLocal(a, viaDetectionStyle) === caseFoldLocal(b, viaDetectionStyle)
         : a === b;
     if (!sameRealpath2) return null;
 

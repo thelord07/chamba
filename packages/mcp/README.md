@@ -159,6 +159,13 @@ domain account that `icacls` can't resolve), you get a warning and the command s
 finishes; the file then keeps the permissions inherited from your user profile, which is
 private by default.
 
+Note that `/inheritance:r` removes **every** inherited entry, including `SYSTEM` and
+`Administrators`: after hardening, only your user can read or write `credentials.json`.
+Backup tools or admin scripts that run as `SYSTEM` or as an administrator can no longer
+read it (an administrator can still take ownership of the file). That's intended (it holds your device token). If you need to restore their
+access, re-enable inheritance with `icacls "%USERPROFILE%\.chamba\credentials.json" /inheritance:e`;
+chamba applies the restriction again the next time it rewrites the file.
+
 ### Windows
 
 The parche client works the same on Windows (PowerShell), macOS and Linux. Absolute paths
