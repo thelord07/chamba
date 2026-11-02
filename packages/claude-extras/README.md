@@ -44,7 +44,7 @@ Snapshots dedup by content and the newest 5 (plus any pinned) are kept.
 It installs into `~/.claude/`:
 
 - **Slash commands**: `/ticket`, `/triage`, `/workspace`, `/map`, `/qa`, `/design`, `/worktrees`, `/orq`, `/recall`, `/vault`
-- **Subagents**: `planner`, `implementer`, `reviewer`, `tester`, `qa`, `diagnostician`
+- **Subagents**: `planner`, `implementer`, `reviewer`, `tester`, `qa`, `diagnostician` — all four core agents (planner, implementer, reviewer, tester) consider performance and concurrency by default (N+1, unbounded memory/concurrency, timeouts, idempotency, hot paths) without optimizing prematurely; see [`examples/skills/`](../../examples/skills/) for stack-specific playbooks (Knex+Postgres, NestJS, React Native) you can copy into `.chamba/skills/`.
 - **Hooks**: warn on destructive commands, validate worktree edits
 
 …and registers the `chamba` MCP server in `~/.claude.json`. It never overwrites your
