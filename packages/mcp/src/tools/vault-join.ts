@@ -8,28 +8,33 @@
 
 import { hostname } from 'node:os';
 import {
-  buildAdoptionSummary,
   CredentialsStore,
-  expandTilde,
+  InvalidJoinInputError,
   joinInRepoHint,
   joinOnce,
-  joinPath,
-  lexicalNormalize,
+  linkHint,
   ParcheAlreadyMemberError,
   ParcheNotFoundError,
   ParcheRateLimitedError,
   parseJoinInput,
-  prepareVaultDir,
-  readState,
   resolveServerUrl,
-  resolveVaultDir,
-  syncOnce,
-  VaultDirValidationError,
-  writeState,
 } from '@chamba/core';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { Logger } from 'pino';
 import { z } from 'zod';
+import {
+  checkAdoptionGate,
+  finalizeAdoption,
+  formatSyncOutput,
+  gateStructuredDetails,
+  getAdoptionSummary,
+  persistBindingAfterJoin,
+  prepareJoinVaultDir,
+  redactSecrets,
+  resolveDefaultDir,
+  resolveJoinScope,
+  resumeJoin,
+} from '../parche/binding-ops.js';
 import type { Services } from '../services.js';
 
 const TOOL_NAME = 'chamba_vault_join';
@@ -69,11 +74,18 @@ export function registerVaultJoin(server: McpServer, logger: Logger, services: S
           .optional()
           .describe(
             'Set to true to confirm uploading existing files in the vault directory. ' +
-              'Required when syncableCount > 0 and you want to proceed.',
+              'Required when the vault has files and you want to proceed.',
+          ),
+        scope: z
+          .enum(['workspace', 'global'])
+          .optional()
+          .describe(
+            'Where to save the parche binding: "workspace" (inside the nearest .chamba/parche.json) ' +
+              'or "global" (~/.chamba/parche.json). Required when inside a workspace.',
           ),
       },
     },
-    async ({ code, name, email, deviceLabel, dir, confirmUpload }) => {
+    async ({ code, name, email, deviceLabel, dir, confirmUpload, scope: scopeInput }) => {
       try {
         const parsed = parseJoinInput(code);
         const server_ = resolveServerUrl({
@@ -86,152 +98,127 @@ export function registerVaultJoin(server: McpServer, logger: Logger, services: S
         // This MUST happen BEFORE prepareVaultDir to avoid the already_linked rejection when
         // the user re-calls with the same dir they already joined.
         if (confirmUpload === true) {
-          const creds = new CredentialsStore(services.fs, services.homedir);
-          const allSlugs = await creds.listSlugs();
-          const serverSlugs = allSlugs.filter((s) => s.server === server_);
-
-          // Compute the candidate canonical dir (lightweight, no fs validation)
-          let candidateCanonical: string | undefined;
-          if (dir) {
-            const expanded = expandTilde(dir, services.homedir);
-            const absolute = expanded.startsWith('/') ? expanded : joinPath(services.cwd, expanded);
-            const lex = lexicalNormalize(absolute);
-            candidateCanonical = await services.fs.realpath(lex);
+          const resume = await resumeJoin(services, { server: server_, code: parsed.code, dir });
+          if (resume.kind === 'ambiguous') {
+            return {
+              isError: true,
+              content: [
+                {
+                  type: 'text' as const,
+                  text:
+                    'Hay más de un vault pendiente de confirmar para este código. ' +
+                    'Especifica el directorio con `dir` para identificar cuál confirmar.',
+                },
+              ],
+            };
           }
-
-          // If no dir and multiple slugs → check how many are pending
-          if (!candidateCanonical && serverSlugs.length > 1) {
-            const pendingOnes: string[] = [];
-            for (const { server: srv, slug: sl } of serverSlugs) {
-              const existingCred = await creds.get(srv, sl);
-              if (!existingCred) continue;
-              const existingVaultDir = resolveVaultDir(existingCred, services.homedir, sl);
-              if (!(await services.fs.exists(existingVaultDir))) continue;
-              const existingState = await readState(services.fs, existingVaultDir);
-              if (existingState?.pendingAdoption === true) pendingOnes.push(sl);
-            }
-            if (pendingOnes.length > 1) {
-              return {
-                isError: true,
-                content: [
-                  {
-                    type: 'text' as const,
-                    text:
-                      `Hay ${pendingOnes.length} vaults pendientes de confirmar (${pendingOnes.join(', ')}). ` +
-                      `Especifica el directorio con \`dir\` para identificar cuál confirmar.`,
-                  },
-                ],
-              };
-            }
+          if (resume.kind === 'legacy') {
+            return {
+              isError: true,
+              content: [
+                {
+                  type: 'text' as const,
+                  text:
+                    `Hay una adopción pendiente creada por una versión anterior para "${resume.slug}" ` +
+                    `(${resume.vaultDir}). No se confirmó ni se usó la invitación. Confírmala con ` +
+                    `\`chamba_vault_link\` (slug "${resume.slug}", dir "${resume.vaultDir}", confirmUpload: true) ` +
+                    `o \`${linkHint(resume.slug, resume.vaultDir, { yes: true })}\`.`,
+                },
+              ],
+              structuredContent: {
+                legacyPending: true,
+                slug: resume.slug,
+                vaultDir: resume.vaultDir,
+              } as Record<string, unknown>,
+            };
           }
-
-          // Find the matching pending credential and resume it
-          for (const { server: srv, slug: sl } of serverSlugs) {
-            const existingCred = await creds.get(srv, sl);
-            if (!existingCred) continue;
-            const existingVaultDir = resolveVaultDir(existingCred, services.homedir, sl);
-            if (candidateCanonical) {
-              const existingCanonical = await services.fs.realpath(existingVaultDir);
-              if (existingCanonical !== candidateCanonical) continue;
-            }
-            if (!(await services.fs.exists(existingVaultDir))) continue;
-            const existingState = await readState(services.fs, existingVaultDir);
-            if (existingState?.pendingAdoption !== true) continue;
-
-            // Found — clear pendingAdoption and sync
-            const cleared = { ...existingState };
-            delete cleared.pendingAdoption;
-            await writeState(services.fs, existingVaultDir, cleared);
-
-            const syncResult = await syncOnce(
-              { fs: services.fs, http: services.http, hash: services.hash, clock: services.clock },
-              {
-                vaultDir: existingVaultDir,
-                server: srv,
-                slug: sl,
-                token: existingCred.token,
-                localAuthor: existingCred.user.name,
-                device: existingCred.device.label,
-              },
+          if (resume.kind === 'resumed') {
+            logger.info(
+              { tool: TOOL_NAME, slug: resume.slug, vault: resume.vaultDir },
+              'parche: adopted',
             );
-
-            logger.info({ tool: TOOL_NAME, slug: sl, vault: existingVaultDir }, 'parche: adopted');
-            const { pushed, pulled, conflicts } = syncResult;
+            const syncOut = formatSyncOutput(resume.syncResult);
             const adoptText = [
-              `Joined group vault: ${sl}`,
-              `Vault location: ${existingVaultDir}`,
-              `First sync: pushed ${pushed}, pulled ${pulled}, conflicts ${conflicts.length}`,
+              `Joined group vault: ${resume.slug}`,
+              `Vault location: ${resume.vaultDir}`,
+              `First sync: pushed ${syncOut.pushed}, pulled ${syncOut.pulled}, conflicts ${resume.syncResult.conflicts.length}`,
             ].join('\n');
             return {
               content: [{ type: 'text' as const, text: adoptText }],
               structuredContent: {
-                slug: sl,
-                vaultDir: existingVaultDir,
-                pushed,
-                pulled,
-                conflicts: conflicts.length,
+                slug: resume.slug,
+                vaultDir: resume.vaultDir,
+                ...syncOut,
               } as Record<string, unknown>,
             };
           }
-          // No pending found — fall through to normal join (new vault, confirmUpload is still true
-          // but will be treated as the first-time call)
+          // resume.kind === 'none' → fall through to normal join
         }
 
-        // Validate dir with prepareVaultDir (only for new joins)
-        let canonicalDir: string | undefined;
-        if (dir) {
-          const creds = new CredentialsStore(services.fs, services.homedir);
-          const existingSlugs = await creds.listSlugs();
-          const existingLinks: Array<{ server: string; slug: string; dir: string }> = [];
-          for (const { server: srv, slug: sl } of existingSlugs) {
-            const existingCred = await creds.get(srv, sl);
-            if (existingCred) {
-              existingLinks.push({
-                server: srv,
-                slug: sl,
-                dir: resolveVaultDir(existingCred, services.homedir, sl),
-              });
-            }
-          }
-
-          try {
-            const prepared = await prepareVaultDir(
-              { fs: services.fs },
+        // AC6: Resolve scope BEFORE any network call (no fallback to 'global' for needs-scope).
+        const scopeResolution = await resolveJoinScope(services, scopeInput);
+        if (scopeResolution.kind === 'error') {
+          return {
+            isError: true,
+            content: [{ type: 'text' as const, text: scopeResolution.message }],
+          };
+        }
+        if (scopeResolution.kind === 'needs-scope') {
+          return {
+            content: [
               {
-                input: dir,
-                homedir: services.homedir,
-                cwd: services.cwd,
-                slug: 'temp', // slug not known yet; validated again after join
-                server: server_,
-                allowInRepo: false, // D5: no allowInRepo in MCP tool
-                existingLinks,
-                platform: process.platform,
+                type: 'text' as const,
+                text:
+                  `Este directorio es parte del workspace "${scopeResolution.wsRoot}".\n` +
+                  `¿Quieres unir el vault al workspace (scope: workspace) o de forma global (scope: global)?\n` +
+                  `Vuelve a llamar con scope: "workspace" o scope: "global".`,
               },
-            );
-            canonicalDir = prepared.vaultDir;
-          } catch (err) {
-            if (err instanceof VaultDirValidationError) {
-              if (err.code === 'in_repo') {
-                return {
-                  isError: true,
-                  content: [
-                    {
-                      type: 'text' as const,
-                      text:
-                        `La ruta "${dir}" está dentro de un repositorio git. ` +
-                        `Usa la CLI con --allow-in-repo para permitirlo:\n` +
-                        `  ${joinInRepoHint(dir)}`,
-                    },
-                  ],
-                };
-              }
-              return {
-                isError: true,
-                content: [{ type: 'text' as const, text: err.message }],
-              };
-            }
-            throw err;
+            ],
+            structuredContent: {
+              needsScope: true,
+              workspaceRoot: scopeResolution.wsRoot,
+            } as Record<string, unknown>,
+          };
+        }
+        // scopeResolution.kind === 'resolved'
+        const resolvedScope = scopeResolution.scope;
+        const wsRootForBinding = scopeResolution.wsRoot;
+
+        // AC6: If scope=workspace and no dir given, try <wsRoot>/vault as default dir.
+        const defaultDir = !dir
+          ? await resolveDefaultDir(services, { scope: resolvedScope, wsRoot: wsRootForBinding })
+          : undefined;
+        const effectiveDir = dir ?? defaultDir;
+
+        // Validate dir via binding-ops (only for new joins)
+        let canonicalDir: string | undefined;
+        if (effectiveDir) {
+          const prepResult = await prepareJoinVaultDir(services, {
+            dirInput: effectiveDir,
+            allowInRepo: false, // D5: no allowInRepo in MCP tool
+            server: server_,
+          });
+          if (prepResult.kind === 'in-repo') {
+            return {
+              isError: true,
+              content: [
+                {
+                  type: 'text' as const,
+                  text:
+                    `La ruta "${effectiveDir}" está dentro de un repositorio git. ` +
+                    `Usa la CLI con --allow-in-repo para permitirlo:\n` +
+                    `  ${joinInRepoHint(effectiveDir)}`,
+                },
+              ],
+            };
           }
+          if (prepResult.kind === 'error') {
+            return {
+              isError: true,
+              content: [{ type: 'text' as const, text: prepResult.message }],
+            };
+          }
+          canonicalDir = prepResult.canonicalDir;
         }
 
         const result = await joinOnce(
@@ -250,25 +237,40 @@ export function registerVaultJoin(server: McpServer, logger: Logger, services: S
           },
         );
 
-        // Build adoption summary
-        const summary = await buildAdoptionSummary({ fs: services.fs }, result.vaultDir);
+        // Build adoption summary via binding-ops (keeps buildAdoptionSummary out of tools/)
+        const summary = await getAdoptionSummary(services, result.vaultDir);
 
-        // Gate: if there are syncable files and confirmUpload is not true, return needsConfirmation.
-        // (confirmUpload:true here means this was a direct first-time call, not a resume)
-        if (summary.syncableCount > 0 && confirmUpload !== true) {
+        // Gate: if there are files and confirmUpload is not true, return needsConfirmation.
+        const gate = checkAdoptionGate(summary, confirmUpload);
+        if (gate.kind === 'needs-confirmation') {
+          const gateDetails = gateStructuredDetails(gate);
           logger.info(
-            { tool: TOOL_NAME, slug: result.slug, syncableCount: summary.syncableCount },
+            { tool: TOOL_NAME, slug: result.slug, fileCount: gate.fileCount },
             'parche: join needs confirmation',
           );
+
+          // R11: write parche.json even on needsConfirmation (best-effort).
+          try {
+            await persistBindingAfterJoin(services, {
+              scope: resolvedScope as 'workspace' | 'global',
+              wsRoot: wsRootForBinding,
+              server: server_,
+              slug: result.slug,
+              vaultDir: result.vaultDir,
+            });
+          } catch {
+            // Best-effort — do not fail
+          }
+
           return {
             content: [
               {
                 type: 'text' as const,
                 text:
-                  `El vault "${result.vaultDir}" tiene ${summary.syncableCount} archivo(s) sincronizable(s).\n` +
-                  `Archivos ignorados: ${summary.ignoredCount}\n` +
-                  (summary.sample.length > 0
-                    ? `Muestra (primeros ${summary.sample.length}):\n${summary.sample.map((p) => `  - ${p}`).join('\n')}\n`
+                  `El vault "${result.vaultDir}" tiene ${gate.fileCount} archivo(s) sincronizable(s).\n` +
+                  `Archivos ignorados: ${gate.ignoredCount}\n` +
+                  (gate.sample.length > 0
+                    ? `Muestra (primeros ${gate.sample.length}):\n${gate.sample.map((p) => `  - ${p}`).join('\n')}\n`
                     : '') +
                   `\nPara confirmar la subida, vuelve a llamar con el mismo código, el mismo dir${dir ? ` ("${dir}")` : ''}, y confirmUpload: true.`,
               },
@@ -277,22 +279,12 @@ export function registerVaultJoin(server: McpServer, logger: Logger, services: S
               needsConfirmation: true,
               slug: result.slug,
               vaultDir: result.vaultDir,
-              syncableCount: summary.syncableCount,
-              ignoredCount: summary.ignoredCount,
-              sample: summary.sample,
+              ...gateDetails,
             } as Record<string, unknown>,
           };
         }
 
-        // Empty vault or confirmUpload on first-time call: clear pendingAdoption and sync
-        const stateFile = await readState(services.fs, result.vaultDir);
-        if (stateFile?.pendingAdoption === true) {
-          const cleared = { ...stateFile };
-          delete cleared.pendingAdoption;
-          await writeState(services.fs, result.vaultDir, cleared);
-        }
-
-        // Get the credential for sync
+        // Gate passed: finalize adoption via binding-ops (clears pendingAdoption + syncOnce)
         const creds2 = new CredentialsStore(services.fs, services.homedir);
         const cred = await creds2.get(server_, result.slug);
         if (!cred) {
@@ -302,43 +294,57 @@ export function registerVaultJoin(server: McpServer, logger: Logger, services: S
           };
         }
 
-        const syncResult = await syncOnce(
-          { fs: services.fs, http: services.http, hash: services.hash, clock: services.clock },
-          {
-            vaultDir: result.vaultDir,
-            server: server_,
-            slug: result.slug,
-            token: cred.token,
-            localAuthor: cred.user.name,
-            device: cred.device.label,
-          },
-        );
+        const syncResult = await finalizeAdoption(services, {
+          server: server_,
+          slug: result.slug,
+          vaultDir: result.vaultDir,
+          cred,
+        });
 
         logger.info(
           { tool: TOOL_NAME, slug: result.slug, vault: result.vaultDir },
           'parche: joined',
         );
 
-        const { pushed, pulled, conflicts } = syncResult;
-        const text = [
-          `Joined group vault: ${result.slug}`,
-          `Vault location: ${result.vaultDir}`,
-          `First sync: pushed ${pushed}, pulled ${pulled}, conflicts ${conflicts.length}`,
-        ].join('\n');
+        // PARCHE-010: persist parche.json binding (best-effort; tool returns success even if write fails)
+        let bindingNote = '';
+        try {
+          const bindRes = await persistBindingAfterJoin(services, {
+            scope: resolvedScope as 'workspace' | 'global',
+            wsRoot: wsRootForBinding,
+            server: server_,
+            slug: result.slug,
+            vaultDir: result.vaultDir,
+          });
+          if (bindRes) {
+            bindingNote = `\nBinding saved: ${bindRes.bindingPath}`;
+          }
+        } catch {
+          // Best-effort — do not fail the join
+        }
+
+        const syncOut = formatSyncOutput(syncResult);
+        const text =
+          [
+            `Joined group vault: ${result.slug}`,
+            `Vault location: ${result.vaultDir}`,
+            `First sync: pushed ${syncOut.pushed}, pulled ${syncOut.pulled}, conflicts ${syncResult.conflicts.length}`,
+          ].join('\n') + bindingNote;
 
         return {
           content: [{ type: 'text' as const, text }],
           structuredContent: {
             slug: result.slug,
             vaultDir: result.vaultDir,
-            pushed,
-            pulled,
-            conflicts: conflicts.length,
+            ...syncOut,
           } as Record<string, unknown>,
         };
       } catch (err) {
         let msg: string;
-        if (err instanceof ParcheNotFoundError) {
+        if (err instanceof InvalidJoinInputError) {
+          // R1/AC4: never repeat the user input (it may contain a pch_ token)
+          msg = 'código o link inválido';
+        } else if (err instanceof ParcheNotFoundError) {
           msg = 'código inválido, vencido o agotado';
         } else if (err instanceof ParcheAlreadyMemberError) {
           msg =
@@ -346,7 +352,7 @@ export function registerVaultJoin(server: McpServer, logger: Logger, services: S
         } else if (err instanceof ParcheRateLimitedError) {
           msg = 'demasiados intentos, espera un minuto';
         } else {
-          msg = err instanceof Error ? err.message : String(err);
+          msg = redactSecrets(err instanceof Error ? err.message : String(err));
         }
         logger.warn({ tool: TOOL_NAME, err: msg }, 'parche: join failed');
         return {

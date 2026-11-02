@@ -288,7 +288,9 @@ export {
 } from './vault-sync/server-url.js';
 export type { SyncStateFile } from './vault-sync/state-store.js';
 export {
+  clearPendingAdoption,
   mergeIntoStateFile,
+  pendingJoinCodeHashOf,
   readState,
   resetVaultState,
   syncStateFileSchema,

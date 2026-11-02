@@ -20,7 +20,7 @@ npx @chamba/opencode-extras --version
 It installs into `~/.config/opencode/` (or `$OPENCODE_CONFIG_DIR`):
 
 - **Commands** → `commands/`: `/ticket`, `/triage`, `/qa`, `/design`, `/orq`, `/map`,
-  `/workspace`, `/worktrees`, `/recall`, `/vault`.
+  `/workspace`, `/worktrees`, `/recall`, `/vault`, `/parche`.
 - **Subagents** → `agents/` (`mode: subagent`): `planner`, `implementer`, `reviewer`,
   `tester`, `qa`, `diagnostician`.
 - **MCP server** → `chamba` under `"mcp"` in `opencode.json` (preserves any others).

@@ -146,10 +146,13 @@ export async function writeParcheBinding(
   bindingPath: string,
   file: ParcheBindingFile,
 ): Promise<void> {
+  // Validate before writing: never persist extra keys (or a token/code) and always
+  // a readable v1 file.
+  const valid = parcheBindingFileSchema.parse(file);
   const dir = dirname(bindingPath);
   await fs.mkdir(dir);
   const enc = new TextEncoder();
-  await fs.writeBytes(bindingPath, enc.encode(JSON.stringify(file, null, 2)));
+  await fs.writeBytes(bindingPath, enc.encode(JSON.stringify(valid, null, 2)));
 }
 
 // ─── findWorkspaceRoot ────────────────────────────────────────────────────────
