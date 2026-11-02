@@ -51,10 +51,13 @@ export function registerVaultLink(server: McpServer, logger: Logger, services: S
     },
     async ({ slug, dir, confirmUpload }) => {
       try {
+        // CHAMBA-015 S8: collect ACL warnings to include in tool output
+        const credWarnings: string[] = [];
         const prep = await relinkPrepare(services, {
           slug,
           dirInput: dir,
           allowInRepo: false, // D5: no allowInRepo in MCP tool
+          onCredWarn: (msg) => credWarnings.push(msg),
         });
 
         if (prep.kind === 'error') {
@@ -151,6 +154,7 @@ export function registerVaultLink(server: McpServer, logger: Logger, services: S
           oldDir !== canonicalDir ? `Ruta anterior: "${oldDir}" (sigue en disco intacta).` : null,
           `Sync: pushed ${syncOut.pushed}, pulled ${syncOut.pulled}, conflicts ${syncResult.conflicts.length}`,
           ...updatedBindings,
+          ...credWarnings.map((w) => `⚠ ${w}`),
         ].filter(Boolean);
 
         return {

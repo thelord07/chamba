@@ -111,6 +111,7 @@ export function registerVaultSync(server: McpServer, logger: Logger, services: S
                   token: cred.token,
                   localAuthor: cred.user.name,
                   device: cred.device.label,
+                  platform: services.platform,
                 },
               ),
           );
@@ -130,6 +131,17 @@ export function registerVaultSync(server: McpServer, logger: Logger, services: S
           }
           if (summary.movedToTrash.length > 0) {
             results.push(`  moved to trash: ${summary.movedToTrash.join(', ')}`);
+          }
+          // CHAMBA-015 D2.3
+          for (const p of summary.skippedInvalidNames ?? []) {
+            results.push(
+              `  ⚠ No se puede crear '${p}' en Windows. ` +
+                `Pídele a alguien en macOS/Linux que lo renombre; mientras tanto no se sincroniza en esta máquina.`,
+            );
+          }
+          // CHAMBA-015 D2.4
+          for (const p of summary.windowsIncompatibleNames ?? []) {
+            results.push(`  ⚠ este nombre no se va a sincronizar en Windows: '${p}'`);
           }
           if (summary.errors.length > 0) {
             results.push(`  errors: ${summary.errors.join('; ')}`);

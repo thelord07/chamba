@@ -159,6 +159,21 @@ export {
   renderTicketCompleteness,
   TICKET_SIGNALS,
 } from './triage/ticket-completeness.js';
+// Local (OS-native) path helpers — CHAMBA-015
+export type { PathStyle } from './util/local-path.js';
+export {
+  assertNotUnsupportedPath,
+  caseFoldLocal,
+  detectStyle,
+  isAbsoluteLocal,
+  isInvalidPath,
+  joinLocal,
+  localBasename,
+  localDirname,
+  localRelative,
+  normalizeLocal,
+  toAbsoluteLocal,
+} from './util/local-path.js';
 // Path helpers
 export { basename, dirname, extname, joinPath } from './util/path.js';
 // Vault dir resolution and validation (PARCHE-009)

@@ -127,6 +127,8 @@ async function makeWorkspaceSvc(opts: {
     hash: new FakeHash(),
     parchePullTtlMin: 5,
     vaultMutex: new Map(),
+    platform: 'linux',
+    username: 'testuser',
     workspaceRoot: opts.workspaceRootOverride,
   };
 
@@ -238,6 +240,8 @@ describe('AC2 — workspace isolation (same machine, shared credentials.json)', 
       hash: new FakeHash(),
       parchePullTtlMin: 5,
       vaultMutex: new Map(),
+      platform: 'linux',
+      username: 'testuser',
     };
 
     const { client: clientA, server: serverA } = await connect(svcA);
@@ -432,6 +436,8 @@ describe('O2 — bound-unsyncable: warning line with fix command', () => {
       hash: new FakeHash(),
       parchePullTtlMin: 5,
       vaultMutex: new Map(),
+      platform: 'linux',
+      username: 'testuser',
     };
 
     const { client, server } = await connect(svc);
@@ -492,6 +498,8 @@ describe('O2 — bound-unsyncable: warning line with fix command', () => {
       hash: new FakeHash(),
       parchePullTtlMin: 5,
       vaultMutex: new Map(),
+      platform: 'linux',
+      username: 'testuser',
     };
 
     const { client, server } = await connect(svc);
@@ -603,6 +611,8 @@ describe('O3 — CHAMBA_WORKSPACE_ROOT (services.workspaceRoot) override', () =>
       hash: new FakeHash(),
       parchePullTtlMin: 5,
       vaultMutex: new Map(),
+      platform: 'linux',
+      username: 'testuser',
       workspaceRoot: wsB, // but workspaceRoot override points to wsB
     };
 
@@ -702,6 +712,8 @@ describe('R8 — workspace_init leaves existing parche.json byte-identical', () 
       hash: new FakeHash(),
       parchePullTtlMin: 5,
       vaultMutex: new Map(),
+      platform: 'linux',
+      username: 'testuser',
     };
 
     const { client, server } = await connect(svc);
@@ -968,6 +980,8 @@ describe('O2 additional — pending-adoption and realpath-mismatch', () => {
       hash: new FakeHash(),
       parchePullTtlMin: 5,
       vaultMutex: new Map(),
+      platform: 'linux',
+      username: 'testuser',
     };
 
     const requestsBefore = parche.requestLog.length;
@@ -1040,6 +1054,8 @@ describe('O2 additional — pending-adoption and realpath-mismatch', () => {
       hash: new FakeHash(),
       parchePullTtlMin: 5,
       vaultMutex: new Map(),
+      platform: 'linux',
+      username: 'testuser',
     };
 
     const requestsBefore = parche.requestLog.length;
@@ -1099,6 +1115,8 @@ describe('O2 additional — pending-adoption and realpath-mismatch', () => {
       hash: new FakeHash(),
       parchePullTtlMin: 5,
       vaultMutex: new Map(),
+      platform: 'linux',
+      username: 'testuser',
       obsidianVaultPath: envVault,
     };
 
@@ -1230,6 +1248,8 @@ describe('O2 — invalid workspace binding: no fallthrough', () => {
       hash: new FakeHash(),
       parchePullTtlMin: 5,
       vaultMutex: new Map(),
+      platform: 'linux',
+      username: 'testuser',
       obsidianVaultPath: envVaultDir,
     };
 
@@ -1333,6 +1353,8 @@ describe('N2 — recall reads from binding vault when bound-unsyncable + dirExis
       hash: new FakeHash(),
       parchePullTtlMin: 5,
       vaultMutex: new Map(),
+      platform: 'linux',
+      username: 'testuser',
       obsidianVaultPath: envVaultDir,
     };
 
@@ -1389,6 +1411,8 @@ describe('N3 — summarize_to_vault with invalid binding → isError text matche
       hash: new FakeHash(),
       parchePullTtlMin: 5,
       vaultMutex: new Map(),
+      platform: 'linux',
+      username: 'testuser',
     };
 
     const { client, server } = await connect(svc);

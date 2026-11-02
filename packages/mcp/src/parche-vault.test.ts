@@ -65,6 +65,8 @@ function makeServices(parche: FakeParche, extra: Partial<Services> = {}): Servic
     hash: new FakeHash(),
     parchePullTtlMin: 5,
     vaultMutex: new Map(),
+    platform: 'linux',
+    username: 'testuser',
     ...extra,
   };
 }
@@ -667,6 +669,37 @@ describe('parche status', () => {
 
     await server.close();
   });
+
+  // CHAMBA-015 D2.5
+  it('D2.5: structuredContent.vaults[].skippedByName reflects state.skippedPaths count', async () => {
+    const { parche } = makeParche();
+    const svc = makeServices(parche);
+
+    await makeCli(svc, ['join', 'K7QX-M2RP', '--name', 'Joys', '--email', 'j@x.dev']);
+
+    // Inject skippedPaths into the written state.json
+    const vaultDir = '/home/test/.chamba/vaults/team-alpha';
+    const statePath = `${vaultDir}/.chamba-sync/state.json`;
+    const existing = JSON.parse(await svc.fs.readFile(statePath)) as Record<string, unknown>;
+    existing.skippedPaths = {
+      'CON.md': 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    };
+    await svc.fs.writeFile(statePath, JSON.stringify(existing));
+
+    const { client, server } = await connect(svc);
+    const result = await client.callTool({ name: 'chamba_parche_status', arguments: {} });
+    const sc = structuredOf(result);
+    const vaults = sc.vaults as Array<Record<string, unknown>>;
+    const vault = vaults.find((v) => v.slug === 'team-alpha');
+    expect(vault?.skippedByName).toBe(1);
+
+    // Also in text
+    const text = textOf(result);
+    expect(text).toContain('skipped:');
+    expect(text).toContain('1 archivo');
+
+    await server.close();
+  });
 });
 
 // ─── AC12: vault leave ────────────────────────────────────────────────────────
@@ -958,6 +991,51 @@ describe('PARCHE-009 AC9 — vault link', () => {
 
     // Old dir is intact
     expect(await fs.exists(oldVaultDir)).toBe(true);
+  });
+
+  // CHAMBA-015 S8: ACL warning from secureFile must reach CLI stderr
+  it('S8: secureFile failure warning appears in stderr during vault link', async () => {
+    const parche = new FakeParche(makeClock());
+    const group = parche.seedGroup({ slug: 'team-alpha', name: 'Team Alpha' });
+    parche.addInvite({ code: 'K7QX-M2RP', groupId: group.id, role: 'editor' });
+
+    // Subclass MemoryFilesystem to simulate secureFile returning a warning
+    class FsWithSecureFileWarn extends MemoryFilesystem {
+      async secureFile(_path: string): Promise<{ ok: boolean; warning?: string }> {
+        return { ok: false, warning: 'icacls falló: acceso denegado' };
+      }
+    }
+    const fs = new FsWithSecureFileWarn();
+    const svc = makeServices(parche, { fs });
+
+    await makeCli(svc, ['join', 'K7QX-M2RP', '--name', 'Joys', '--email', 'j@x.dev']);
+
+    const newVaultDir = '/new/vault';
+    await fs.mkdir(newVaultDir);
+
+    const r = await makeCli(svc, ['link', 'team-alpha', '--dir', newVaultDir, '--yes']);
+    expect(r.code).toBe(0);
+    // The ACL warning must appear in stderr (prefixed with ⚠)
+    expect(r.err.join('\n')).toContain('icacls falló');
+  });
+
+  it('S8: secureFile failure warning appears in stderr during vault leave', async () => {
+    const parche = new FakeParche(makeClock());
+    const group = parche.seedGroup({ slug: 'team-alpha', name: 'Team Alpha' });
+    parche.addInvite({ code: 'K7QX-M2RP', groupId: group.id, role: 'editor' });
+    class FsWithSecureFileWarn extends MemoryFilesystem {
+      async secureFile(_path: string): Promise<{ ok: boolean; warning?: string }> {
+        return { ok: false, warning: 'icacls falló: acceso denegado' };
+      }
+    }
+    const fs = new FsWithSecureFileWarn();
+    const svc = makeServices(parche, { fs });
+    await makeCli(svc, ['join', 'K7QX-M2RP', '--name', 'Joys', '--email', 'j@x.dev']);
+
+    const r = await makeCli(svc, ['leave', 'team-alpha']);
+    expect(r.code).toBe(0);
+    expect(r.err.join('\n')).toContain('icacls falló');
+    expect(r.out.join('\n')).toContain('Credencial eliminada');
   });
 });
 

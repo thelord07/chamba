@@ -14,6 +14,7 @@ import type { ClockPort } from '../ports/clock.js';
 import type { FilesystemPort } from '../ports/filesystem.js';
 import type { HashPort } from '../ports/hash.js';
 import type { HttpPort } from '../ports/http.js';
+import { detectStyle, isInvalidPath } from '../util/local-path.js';
 import { joinPath } from '../util/path.js';
 import { addConflictFrontmatter, readConflictMeta } from './conflict.js';
 import { CredentialsStore } from './credentials.js';
@@ -21,6 +22,7 @@ import { linkDirPlaceholderHint, linkHint } from './messages.js';
 import {
   ParcheCaseCollisionError,
   ParcheClient,
+  ParcheHttpError,
   ParcheMissingBlobsError,
 } from './parche-client.js';
 import { findCaseCollisions } from './path-key.js';
@@ -57,6 +59,13 @@ export interface SyncOpts {
   device: string;
   batchSize?: number;
   signal?: AbortSignal;
+  /**
+   * CHAMBA-015 S10: OS platform string (injected so core stays pure and tests can
+   * exercise Windows name validation on any host). Defaults to `'posix'` (no
+   * Windows name checks). Pass `process.platform` (or `services.platform`) from
+   * the adapter layer.
+   */
+  platform?: string;
 }
 
 export interface JoinOpts {
@@ -79,6 +88,19 @@ export interface SyncSummary {
    */
   movedToTrashEntries: Array<{ path: string; trashPath: string }>;
   errors: string[];
+  /**
+   * CHAMBA-015 S10 / D2.3: vault-relative paths skipped during pull because the
+   * name is invalid on Windows. Only populated when `platform === 'win32'`.
+   * Optional for backward-compatibility with code that constructs a partial summary.
+   */
+  skippedInvalidNames?: string[];
+  /**
+   * CHAMBA-015 D2.4: vault-relative paths pushed from a non-Windows machine
+   * whose names are invalid on Windows. The push proceeded normally — this is a
+   * warning to prompt the author to rename the file.
+   * Optional for backward-compatibility with code that constructs a partial summary.
+   */
+  windowsIncompatibleNames?: string[];
 }
 
 /** Local snapshot: path → sha256 hex */
@@ -490,12 +512,14 @@ async function executePullActions(
   actions: PullAction[],
   localAuthor: string,
   signal?: AbortSignal,
+  style?: ReturnType<typeof detectStyle>,
 ): Promise<{
   conflicts: Array<{ path: string; copyPath: string }>;
   movedToTrash: string[];
   movedToTrashEntries: Array<{ path: string; trashPath: string }>;
   errors: string[];
   conflictBlobSource: Map<string, string>;
+  skippedInvalidNames: string[];
 }> {
   const { fs, hash } = deps;
   const conflicts: Array<{ path: string; copyPath: string }> = [];
@@ -503,6 +527,8 @@ async function executePullActions(
   const movedToTrashEntries: Array<{ path: string; trashPath: string }> = [];
   const errors: string[] = [];
   const conflictBlobSource = new Map<string, string>();
+  const skippedInvalidNames: string[] = [];
+  const effectiveStyle = style ?? 'posix';
 
   for (const action of actions) {
     checkAbort(signal);
@@ -528,6 +554,11 @@ async function executePullActions(
 
       case 'write': {
         checkAbort(signal);
+        // CHAMBA-015 S10: skip files with Windows-invalid names on win32
+        if (isInvalidPath(action.path, effectiveStyle)) {
+          skippedInvalidNames.push(action.path);
+          break;
+        }
         let data: Uint8Array;
         try {
           data = await downloadBlob(client, hash, action.hash, signal);
@@ -546,6 +577,15 @@ async function executePullActions(
 
       case 'conflict': {
         const { path, remoteHash, localHash } = action;
+
+        // CHAMBA-015 S10 R2 note 4: if path (or copyPath) is invalid on Windows,
+        // skip the ENTIRE conflict (both steps). The local file is NOT touched.
+        // We report the path in skippedInvalidNames and do NOT write anything.
+        if (isInvalidPath(path, effectiveStyle) || isInvalidPath(action.copyPath, effectiveStyle)) {
+          skippedInvalidNames.push(path);
+          break;
+        }
+
         const localAbsPath = joinPath(vaultDir, path);
 
         // 1. Read local bytes
@@ -608,14 +648,22 @@ async function executePullActions(
     }
   }
 
-  return { conflicts, movedToTrash, movedToTrashEntries, errors, conflictBlobSource };
+  return {
+    conflicts,
+    movedToTrash,
+    movedToTrashEntries,
+    errors,
+    conflictBlobSource,
+    skippedInvalidNames,
+  };
 }
 
 // ─── syncOnce ─────────────────────────────────────────────────────────────────
 
 export async function syncOnce(deps: SyncDeps, opts: SyncOpts): Promise<SyncSummary> {
   const { fs, http, hash, clock } = deps;
-  const { vaultDir, server, slug, token, localAuthor, batchSize = 500, signal } = opts;
+  const { vaultDir, server, slug, token, localAuthor, batchSize = 500, signal, platform } = opts;
+  const style = detectStyle(platform ?? 'posix');
 
   const client = new ParcheClient(http, server, token);
 
@@ -645,6 +693,16 @@ export async function syncOnce(deps: SyncDeps, opts: SyncOpts): Promise<SyncSumm
   const pushEntries = planPush(syncState, localSnapshot);
 
   let pushedCount = 0;
+  // CHAMBA-015 D2.4: warn when pushing a file whose name is invalid on Windows.
+  // The push proceeds normally — this is informational only.
+  const windowsIncompatibleNames: string[] = [];
+  if (style !== 'win32') {
+    for (const entry of pushEntries) {
+      if (entry.newHash !== null && isInvalidPath(entry.path, 'win32')) {
+        windowsIncompatibleNames.push(entry.path);
+      }
+    }
+  }
 
   if (pushEntries.length > 0) {
     syncState = await pushAll(
@@ -660,7 +718,7 @@ export async function syncOnce(deps: SyncDeps, opts: SyncOpts): Promise<SyncSumm
     pushedCount = pushEntries.filter((e) => e.newHash !== null).length;
   }
 
-  // Save state after phase 1
+  // Save state after phase 1 (preserves any existing skippedPaths from stateFile)
   const now1 = clock.now().toISOString();
   const baseStateFile: SyncStateFile = stateFile ?? {
     server,
@@ -695,20 +753,140 @@ export async function syncOnce(deps: SyncDeps, opts: SyncOpts): Promise<SyncSumm
   // Single planPull over all changes
   const pullPlan = planPull(syncState, localSnapshot, allChanges, { localAuthor });
 
-  // Execute actions in order
-  const { conflicts, movedToTrash, movedToTrashEntries, errors, conflictBlobSource } =
-    await executePullActions(client, deps, vaultDir, pullPlan.actions, localAuthor, signal);
+  // Execute actions in order (passes style so invalid Windows names are skipped)
+  const {
+    conflicts,
+    movedToTrash,
+    movedToTrashEntries,
+    errors,
+    conflictBlobSource,
+    skippedInvalidNames,
+  } = await executePullActions(
+    client,
+    deps,
+    vaultDir,
+    pullPlan.actions,
+    localAuthor,
+    signal,
+    style,
+  );
 
   const pulledCount = pullPlan.actions.filter(
-    (a) => a.type === 'write' || a.type === 'conflict',
+    (a) => (a.type === 'write' || a.type === 'conflict') && !skippedInvalidNames.includes(a.path),
   ).length;
 
   // Update state with pull results
-  const postPullState = applyPullPlan(syncState, pullPlan);
+  let postPullState = applyPullPlan(syncState, pullPlan);
 
-  // Save state after phase 2
+  // CHAMBA-015 S10: reconcile state for skipped invalid-name paths.
+  // Rule: for skipped paths, revert files[path] to the pre-pull value so the
+  // next sync does not see a "local file missing" → push tombstone.
+  // Also update skippedPaths map with the latest remote hash.
+  const newSkippedPaths: Record<string, string> = { ...(baseStateFile.skippedPaths ?? {}) };
+
+  // Handle paths that were part of this pull plan (write/conflict/delete actions)
+  for (const action of pullPlan.actions) {
+    const path = 'path' in action ? action.path : undefined;
+    if (!path) continue;
+
+    if (action.type === 'delete') {
+      // Tombstone: always drop from skippedPaths, regardless of local validity
+      delete newSkippedPaths[path];
+    } else if (skippedInvalidNames.includes(path)) {
+      // Skipped write or conflict: track the remote hash and revert files[path]
+      const remoteHash =
+        action.type === 'write'
+          ? action.hash
+          : action.type === 'conflict'
+            ? (action.remoteHash ?? null)
+            : null;
+      if (remoteHash !== null) {
+        newSkippedPaths[path] = remoteHash;
+      }
+      // Revert files[path] to pre-pull value so next push doesn't see it as deleted
+      const prePullEntry = syncState.files[path];
+      const newFiles = { ...postPullState.files };
+      if (prePullEntry !== undefined) {
+        newFiles[path] = { syncedHash: prePullEntry.syncedHash };
+      } else {
+        delete newFiles[path];
+      }
+      postPullState = { ...postPullState, files: newFiles };
+    } else {
+      // Successfully processed: remove from skippedPaths if it was there
+      delete newSkippedPaths[path];
+    }
+  }
+
+  // CHAMBA-015 S10 rule (d): retry pre-existing skipped paths before writing state.
+  // For each path still in skippedPaths that did NOT appear in this pull's actions,
+  // attempt to re-download. This handles "blob gone" gracefully (drops + warns).
+  const actionPaths = new Set(
+    pullPlan.actions.filter((a) => 'path' in a).map((a) => (a as { path: string }).path),
+  );
+
+  // CHAMBA-015 S10 bug fix (rule b): a remote delete of a skipped path that was
+  // never written locally produces NO planPull action (S=null, L=null, R=null →
+  // noop). Reconcile against allChanges so tombstones and hash updates for such
+  // paths are applied even when planPull emitted nothing for them.
+  const latestChangeByPath = new Map<string, string | null>();
+  for (const change of allChanges) {
+    latestChangeByPath.set(change.path, change.hash);
+  }
+  for (const skippedPath of Object.keys(newSkippedPaths)) {
+    if (actionPaths.has(skippedPath)) continue; // already handled by action loop above
+    const latestHash = latestChangeByPath.get(skippedPath);
+    if (latestHash === undefined) continue; // path had no change in this sync window
+    if (latestHash === null) {
+      // Tombstone: server deleted this path → stop tracking it
+      delete newSkippedPaths[skippedPath];
+    } else {
+      // New remote hash: refresh so the retry loop uses the latest blob
+      newSkippedPaths[skippedPath] = latestHash;
+    }
+  }
+
+  for (const [skippedPath, remoteHash] of Object.entries(newSkippedPaths)) {
+    if (actionPaths.has(skippedPath)) continue; // already handled above
+    // Skip if still an invalid name (re-check — name might have changed... but in
+    // practice the name is deterministic, so this is always true on win32)
+    if (isInvalidPath(skippedPath, style)) continue;
+    // Path became valid (or platform changed) — try to download and write it
+    try {
+      const data = await downloadBlob(client, hash, remoteHash, signal);
+      const absPath = joinPath(vaultDir, skippedPath);
+      const dir = absPath.slice(0, absPath.lastIndexOf('/'));
+      await fs.mkdir(dir);
+      await fs.writeBytes(absPath, data);
+      const newFiles = { ...postPullState.files };
+      newFiles[skippedPath] = { syncedHash: remoteHash };
+      postPullState = { ...postPullState, files: newFiles };
+      delete newSkippedPaths[skippedPath];
+    } catch (err) {
+      // Blob-gone: 404 from the server means the blob was deleted.
+      // BlobHashMismatchError must NOT be treated as gone (it is a data error).
+      if (
+        err instanceof ParcheHttpError &&
+        err.status === 404 &&
+        !(err instanceof BlobHashMismatchError)
+      ) {
+        errors.push(
+          `Archivo skipped "${skippedPath}" ya no está disponible en el servidor (blob eliminado). ` +
+            `Se elimina de la lista de pendientes.`,
+        );
+        delete newSkippedPaths[skippedPath];
+      }
+      // Other errors (network, hash mismatch, etc.): keep in skippedPaths, retry next sync
+    }
+  }
+
+  // Save state after phase 2 with the updated skippedPaths
   const now2 = clock.now().toISOString();
-  await writeState(fs, vaultDir, mergeIntoStateFile(baseStateFile, postPullState, now2));
+  await writeState(
+    fs,
+    vaultDir,
+    mergeIntoStateFile(baseStateFile, postPullState, now2, newSkippedPaths),
+  );
 
   // ── Phase 3: Push conflict copies ─────────────────────────────────────────
   if (conflicts.length > 0) {
@@ -749,9 +927,14 @@ export async function syncOnce(deps: SyncDeps, opts: SyncOpts): Promise<SyncSumm
         }
       }
 
-      // Save state after phase 3
+      // Save state after phase 3 — pass newSkippedPaths so phase-2 skipped entries
+      // are not lost when conflicts cause a re-write of state here.
       const now3 = clock.now().toISOString();
-      await writeState(fs, vaultDir, mergeIntoStateFile(baseStateFile, phase3State, now3));
+      await writeState(
+        fs,
+        vaultDir,
+        mergeIntoStateFile(baseStateFile, phase3State, now3, newSkippedPaths),
+      );
     }
   }
 
@@ -762,6 +945,8 @@ export async function syncOnce(deps: SyncDeps, opts: SyncOpts): Promise<SyncSumm
     movedToTrash,
     movedToTrashEntries,
     errors,
+    skippedInvalidNames,
+    windowsIncompatibleNames,
   };
 }
 
@@ -784,6 +969,12 @@ export interface JoinOnceOpts {
    * `pendingAdoption: true` in the written state.
    */
   skipInitialSync?: boolean;
+  /**
+   * CHAMBA-015 S8: called when the Windows ACL hardening of credentials.json
+   * fails (e.g. domain account whose name icacls cannot resolve). The token is
+   * never included in the message. When absent, warnings are silently discarded.
+   */
+  onCredWarn?: (msg: string) => void;
 }
 
 export interface JoinOnceResult {
@@ -804,7 +995,7 @@ const ZERO_SUMMARY: SyncSummary = {
 
 export async function joinOnce(deps: SyncDeps, opts: JoinOnceOpts): Promise<JoinOnceResult> {
   const { fs, http, hash, clock } = deps;
-  const { server, homedir, joinRequest, signal, skipInitialSync } = opts;
+  const { server, homedir, joinRequest, signal, skipInitialSync, onCredWarn } = opts;
 
   const client = new ParcheClient(http, server, '');
 
@@ -823,7 +1014,8 @@ export async function joinOnce(deps: SyncDeps, opts: JoinOnceOpts): Promise<Join
   await fs.mkdir(joinPath(vaultDir, '.obsidian'));
 
   // Save credentials (mode 0600, outside vault). Store dir only if custom.
-  const creds = new CredentialsStore(fs, homedir);
+  // onCredWarn is forwarded so callers (CLI, tools) can surface Windows ACL warnings.
+  const creds = new CredentialsStore(fs, homedir, onCredWarn);
   await creds.set(server, slug, {
     token,
     user: { id: joinRes.user.id, name: joinRes.user.name },

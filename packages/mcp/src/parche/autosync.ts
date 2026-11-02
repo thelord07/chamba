@@ -82,6 +82,7 @@ export async function maybeAutoSync(
             localAuthor: vault.localAuthor,
             device: vault.device,
             signal: controller.signal,
+            platform: services.platform,
           },
         );
         logger.info({ tool: 'autosync', slug: vault.slug, phase }, 'auto-sync completed');

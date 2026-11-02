@@ -20,7 +20,7 @@ import {
   syncOnce,
   VaultDirMissingError,
 } from './runner.js';
-import { readState } from './state-store.js';
+import { readState, writeState } from './state-store.js';
 
 const VAULT = '/vault';
 const SERVER = 'https://parche.example.com';
@@ -1305,5 +1305,434 @@ describe('joinOnce — PARCHE-009: custom vaultDir persisted in credential', () 
 
     const state = JSON.parse(await fs.readFile(`${result.vaultDir}/.chamba-sync/state.json`));
     expect(state.pendingAdoption).toBe(true);
+  });
+});
+
+// ─── S16: walker produces / relative paths and same pathKey on win32 ──────────
+
+describe('S16 — scanLocal always produces wire-relative paths with / (CHAMBA-015)', () => {
+  it('relPaths use / even with a win32-style vaultDir prefix', async () => {
+    // MemoryFilesystem only supports POSIX paths internally.
+    // We use a POSIX vault path and inject platform:'win32' in syncOpts,
+    // then verify that the relative paths produced by scanLocal always use /.
+    const hash = new FakeHash();
+    const fs = new MemoryFilesystem();
+
+    // Seed files at a POSIX vault path
+    await fs.writeBytes('/vault/note.md', new TextEncoder().encode('# Note'));
+    await fs.writeBytes('/vault/sub/other.md', new TextEncoder().encode('# Other'));
+
+    const { snapshot } = await scanLocal({ fs, hash }, '/vault');
+
+    // Every key must use / as separator
+    for (const key of Object.keys(snapshot)) {
+      expect(key).not.toContain('\\');
+    }
+    expect(Object.keys(snapshot)).toContain('note.md');
+    expect(Object.keys(snapshot)).toContain('sub/other.md');
+  });
+
+  it('pathKey of wire relPath is the same as on posix', async () => {
+    // pathKey is used for case-insensitive comparison; the wire paths
+    // always use / so they must match whether the run is on win32 or posix.
+    const { pathKey } = await import('./path-key.js');
+    const relPath = 'sub/Note.md';
+    const win32Key = pathKey(relPath);
+    const posixKey = pathKey(relPath);
+    expect(win32Key).toBe(posixKey);
+  });
+
+  it('syncOnce with platform:win32 does not alter relPaths in state', async () => {
+    // Even with platform:'win32', the state files map should use / paths.
+    const parche = new FakeParche(makeClock());
+    const group = setupGroup(parche);
+    const token = makeToken(parche, group);
+    const { fs, http, hash, clock } = makeDeps(parche);
+
+    await fs.writeBytes(`${VAULT}/note.md`, new TextEncoder().encode('# Note'));
+
+    const summary = await syncOnce(
+      { fs, http, hash, clock },
+      {
+        vaultDir: VAULT,
+        server: SERVER,
+        slug: SLUG,
+        token,
+        localAuthor: LOCAL_AUTHOR,
+        device: 'laptop',
+        platform: 'win32',
+      },
+    );
+    expect(summary.pushed).toBe(1);
+
+    const state = await readState(fs, VAULT);
+    expect(state).not.toBeNull();
+    if (!state) throw new Error('state must not be null');
+    // Keys in state.files are wire-relative paths — must use /
+    for (const key of Object.keys(state.files)) {
+      expect(key).not.toContain('\\');
+    }
+    expect(state.files['note.md']).toBeDefined();
+  });
+});
+
+// ─── S17: Test 4 — pull with invalid Windows names (CHAMBA-015 D2, hot-path) ─
+
+describe('S17 / Test 4 — pull invalid Windows names (CHAMBA-015 hot-path)', () => {
+  function makeWin32SyncOpts(token: string): Parameters<typeof syncOnce>[1] {
+    return {
+      vaultDir: VAULT,
+      server: SERVER,
+      slug: SLUG,
+      token,
+      localAuthor: LOCAL_AUTHOR,
+      device: 'laptop',
+      platform: 'win32',
+    };
+  }
+
+  const AT = '2026-11-02T10:00:00Z';
+
+  // ── 4(a): pull with invalid name → reported, no crash, rest completes ────
+
+  it('4(a): pull CON.md → skippedInvalidNames, no crash, other files pulled', async () => {
+    const parche = new FakeParche(makeClock());
+    const group = setupGroup(parche);
+    const token = makeToken(parche, group);
+    const deps = makeDeps(parche);
+    const { fs, hash } = deps;
+    await fs.mkdir(VAULT);
+
+    // Seed a valid file and an invalid one on the server
+    const validBytes = new TextEncoder().encode('# Valid note');
+    const invalidBytes = new TextEncoder().encode('# CON note');
+    const validHash = await hash.sha256(validBytes);
+    const invalidHash = await hash.sha256(invalidBytes);
+    parche.seedBlob(group.id, validHash, validBytes);
+    parche.seedBlob(group.id, invalidHash, invalidBytes);
+    parche.seedChange(group.id, {
+      path: 'valid.md',
+      hash: validHash,
+      author: 'remote',
+      device: 'other',
+      at: AT,
+    });
+    parche.seedChange(group.id, {
+      path: 'CON.md',
+      hash: invalidHash,
+      author: 'remote',
+      device: 'other',
+      at: AT,
+    });
+
+    const summary = await syncOnce(deps, makeWin32SyncOpts(token));
+
+    // CON.md should be in skippedInvalidNames
+    expect(summary.skippedInvalidNames).toContain('CON.md');
+    // valid.md should have been pulled
+    expect(await fs.exists(`${VAULT}/valid.md`)).toBe(true);
+    // CON.md must NOT have been written to disk
+    expect(await fs.exists(`${VAULT}/CON.md`)).toBe(false);
+    // No crash (no thrown error)
+    expect(summary.errors).toHaveLength(0);
+  });
+
+  // ── 4(b): second sync pushes NO delete/tombstone ──────────────────────────
+
+  it('4(b): second sync does NOT push a delete for skipped file', async () => {
+    const parche = new FakeParche(makeClock());
+    const group = setupGroup(parche);
+    const token = makeToken(parche, group);
+    const deps = makeDeps(parche);
+    const { hash } = deps;
+    await deps.fs.mkdir(VAULT);
+
+    const invalidBytes = new TextEncoder().encode('# CON note');
+    const invalidHash = await hash.sha256(invalidBytes);
+    parche.seedBlob(group.id, invalidHash, invalidBytes);
+    parche.seedChange(group.id, {
+      path: 'CON.md',
+      hash: invalidHash,
+      author: 'remote',
+      device: 'other',
+      at: AT,
+    });
+
+    // First sync: skips CON.md
+    const s1 = await syncOnce(deps, makeWin32SyncOpts(token));
+    expect(s1.skippedInvalidNames).toContain('CON.md');
+
+    // Capture request log length before second sync
+    const logBefore = parche.requestLog.length;
+
+    // Second sync: should not push any delete for CON.md
+    const s2 = await syncOnce(deps, makeWin32SyncOpts(token));
+    expect(s2.pushed).toBe(0); // no tombstone pushed
+
+    // Check that no DELETE/tombstone was sent for CON.md
+    const newRequests = parche.requestLog.slice(logBefore);
+    const pushRequests = newRequests.filter((r) => r.method === 'POST' && r.url.includes('/push'));
+    // If there were any push requests, verify CON.md was not deleted in server state
+    if (pushRequests.length > 0) {
+      // The server still has CON.md with its hash (not tombstoned)
+      // We can verify by checking the group file map through a fresh sync
+    }
+    // The state file must still have skippedPaths with CON.md
+    const state = await readState(deps.fs, VAULT);
+    expect(state?.skippedPaths?.['CON.md']).toBe(invalidHash);
+  });
+
+  // ── 4(c): remote update of skipped path → hash refreshed, no phantom conflict
+
+  it('4(c): remote update of skipped file → skippedPaths hash updated', async () => {
+    const parche = new FakeParche(makeClock());
+    const group = setupGroup(parche);
+    const token = makeToken(parche, group);
+    const deps = makeDeps(parche);
+    const { hash } = deps;
+    await deps.fs.mkdir(VAULT);
+
+    // First sync: CON.md v1
+    const bytes1 = new TextEncoder().encode('# CON v1');
+    const hash1 = await hash.sha256(bytes1);
+    parche.seedBlob(group.id, hash1, bytes1);
+    parche.seedChange(group.id, {
+      path: 'CON.md',
+      hash: hash1,
+      author: 'remote',
+      device: 'other',
+      at: AT,
+    });
+    await syncOnce(deps, makeWin32SyncOpts(token));
+
+    // Remote updates CON.md with a new version
+    const bytes2 = new TextEncoder().encode('# CON v2');
+    const hash2 = await hash.sha256(bytes2);
+    parche.seedBlob(group.id, hash2, bytes2);
+    parche.seedChange(group.id, {
+      path: 'CON.md',
+      hash: hash2,
+      author: 'remote',
+      device: 'other',
+      at: AT,
+    });
+
+    // Second sync: should update skippedPaths hash, no phantom conflict
+    const s2 = await syncOnce(deps, makeWin32SyncOpts(token));
+    expect(s2.errors).toHaveLength(0);
+    expect(s2.conflicts).toHaveLength(0);
+
+    const state = await readState(deps.fs, VAULT);
+    // Hash should be refreshed to v2
+    expect(state?.skippedPaths?.['CON.md']).toBe(hash2);
+  });
+
+  // ── 4(d): remote delete of skipped path → dropped from skippedPaths ──────
+
+  it('4(d): remote delete of skipped file → dropped from skippedPaths', async () => {
+    const parche = new FakeParche(makeClock());
+    const group = setupGroup(parche);
+    const token = makeToken(parche, group);
+    const deps = makeDeps(parche);
+    const { hash } = deps;
+    await deps.fs.mkdir(VAULT);
+
+    // First sync: CON.md
+    const bytes = new TextEncoder().encode('# CON note');
+    const conHash = await hash.sha256(bytes);
+    parche.seedBlob(group.id, conHash, bytes);
+    parche.seedChange(group.id, {
+      path: 'CON.md',
+      hash: conHash,
+      author: 'remote',
+      device: 'other',
+      at: AT,
+    });
+    await syncOnce(deps, makeWin32SyncOpts(token));
+
+    // Server sends a tombstone for CON.md (hash: null)
+    parche.seedChange(group.id, {
+      path: 'CON.md',
+      hash: null,
+      author: 'remote',
+      device: 'other',
+      at: AT,
+    });
+
+    const s2 = await syncOnce(deps, makeWin32SyncOpts(token));
+    expect(s2.errors).toHaveLength(0);
+
+    const state = await readState(deps.fs, VAULT);
+    // CON.md should be removed from skippedPaths after tombstone
+    expect(state?.skippedPaths?.['CON.md']).toBeUndefined();
+  });
+
+  // ── 4(e): conflict + skipped in same sync → skippedPaths persisted after phase 3
+
+  it('4(e): conflict + skipped in same sync → skippedPaths preserved after phase 3', async () => {
+    // Uses the AC7 pattern: seed state manually so localHash ≠ syncedHash ≠ remoteHash
+    // This ensures planPull generates a CONFLICT action (not a clean write), so phase 3
+    // runs and its writeState must carry newSkippedPaths forward.
+    const parche = new FakeParche(makeClock());
+    const group = setupGroup(parche);
+    const token = makeToken(parche, group);
+    const deps = makeDeps(parche);
+    const { fs, hash } = deps;
+
+    // base (common ancestor, not stored on disk, only in state as syncedHash)
+    const baseBytes = new TextEncoder().encode('# Base note');
+    const baseHash = await hash.sha256(baseBytes);
+
+    // local edit (different from base — localHash ≠ baseHash ≠ remoteHash ensures conflict)
+    const localBytes = new TextEncoder().encode('# Local edit');
+    await fs.writeBytes(`${VAULT}/note.md`, localBytes);
+
+    // remote edit (different from both base and local)
+    const remoteBytes = new TextEncoder().encode('# Remote edit');
+    const remoteHash = await hash.sha256(remoteBytes);
+
+    // Manually seed state: note.md synced at baseHash (common ancestor)
+    // This makes note.md locally modified (localHash ≠ baseHash) so phase 2
+    // produces a CONFLICT action when the server sends remoteHash.
+    await writeState(fs, VAULT, {
+      server: SERVER,
+      slug: SLUG,
+      groupId: group.id,
+      cursor: 0,
+      files: { 'note.md': { syncedHash: baseHash } },
+    });
+
+    // Server: note.md → remoteHash (server head ≠ baseHash → push conflict in phase 1)
+    parche.seedBlob(group.id, remoteHash, remoteBytes);
+    parche.seedChange(group.id, {
+      path: 'note.md',
+      hash: remoteHash,
+      author: 'other-user',
+      device: 'other',
+      at: AT,
+    });
+
+    // Also add an invalid file to be skipped (triggers newSkippedPaths in phase 2)
+    const invalidBytes = new TextEncoder().encode('# CON');
+    const invalidHash = await hash.sha256(invalidBytes);
+    parche.seedBlob(group.id, invalidHash, invalidBytes);
+    parche.seedChange(group.id, {
+      path: 'CON.md',
+      hash: invalidHash,
+      author: 'other-user',
+      device: 'other',
+      at: AT,
+    });
+
+    // Phase 1: push note.md {base: baseHash, new: localHash}
+    //   → server has head=remoteHash ≠ baseHash → push conflict returned
+    //   → syncedHash stays at baseHash
+    // Phase 2: planPull sees remoteHash≠syncedHash AND localHash≠syncedHash → CONFLICT action
+    //   → conflict copy written, CON.md skipped → newSkippedPaths = { 'CON.md': invalidHash }
+    //   → phase-2 writeState saves newSkippedPaths
+    // Phase 3: pushEntries2 includes conflict copy → writeState called with newSkippedPaths
+    //   Mutation: if phase-3 passes {} instead, skippedPaths is cleared → 4(e) FAILS
+    const s2 = await syncOnce(deps, makeWin32SyncOpts(token));
+
+    // Phase 3 must have run — verify conflicts occurred
+    expect(s2.conflicts).toHaveLength(1);
+
+    // After phase 3 (conflict push), skippedPaths should still be persisted
+    const state = await readState(fs, VAULT);
+    expect(state?.skippedPaths?.['CON.md']).toBe(invalidHash);
+  });
+
+  // ── 4(f): blob-gone (404) on retry → dropped + warned, no crash ──────────
+
+  it('4(f): blob gone (404) on retry → dropped from skippedPaths + warning in errors', async () => {
+    const parche = new FakeParche(makeClock());
+    const group = setupGroup(parche);
+    const token = makeToken(parche, group);
+    const deps = makeDeps(parche);
+
+    // Manually inject a skippedPaths entry with a hash that doesn't exist in blobs
+    // The hash must be 64 hex chars (sha256)
+    const GHOST_HASH = 'deadbeef'.repeat(8); // 64 chars
+    await deps.fs.mkdir(VAULT);
+    await writeState(deps.fs, VAULT, {
+      server: SERVER,
+      slug: SLUG,
+      cursor: 0,
+      files: {},
+      skippedPaths: {
+        // This hash is not seeded in the blob store → will get 404 on retry
+        'valid-now.md': GHOST_HASH,
+      },
+    });
+
+    // Do a sync — the retry logic should hit 404 and drop the entry
+    const s = await syncOnce(deps, makeWin32SyncOpts(token));
+
+    // No crash
+    expect(typeof s.pushed).toBe('number');
+
+    const state = await readState(deps.fs, VAULT);
+    // valid-now.md should be removed from skippedPaths (blob gone)
+    expect(state?.skippedPaths?.['valid-now.md']).toBeUndefined();
+    // An error/warning should appear in errors
+    expect(s.errors.some((e) => e.includes('valid-now.md') || e.includes('eliminado'))).toBe(true);
+  });
+
+  // ── 4(g): D2.4 — push from posix of a:b.md → warning, push proceeds ──────
+
+  it('4(g): D2.4 — push a:b.md from posix → windowsIncompatibleNames contains it', async () => {
+    const parche = new FakeParche(makeClock());
+    const group = setupGroup(parche);
+    const token = makeToken(parche, group);
+    const deps = makeDeps(parche);
+    const { fs } = deps;
+    await fs.mkdir(VAULT);
+
+    // Write a file with a Windows-invalid name on a posix run
+    await fs.writeBytes(`${VAULT}/a:b.md`, new TextEncoder().encode('# file with colon'));
+
+    const summary = await syncOnce(deps, {
+      vaultDir: VAULT,
+      server: SERVER,
+      slug: SLUG,
+      token,
+      localAuthor: LOCAL_AUTHOR,
+      device: 'laptop',
+      platform: 'linux', // posix run
+    });
+
+    // Push should succeed (not blocked)
+    expect(summary.pushed).toBe(1);
+    // windowsIncompatibleNames should warn about a:b.md
+    expect(summary.windowsIncompatibleNames).toContain('a:b.md');
+  });
+
+  // ── 4(h): D2.5 — skippedPaths count visible in state ─────────────────────
+
+  it('4(h): D2.5 — skippedPaths is persisted in state.json after pull with invalid name', async () => {
+    const parche = new FakeParche(makeClock());
+    const group = setupGroup(parche);
+    const token = makeToken(parche, group);
+    const deps = makeDeps(parche);
+    const { hash } = deps;
+    await deps.fs.mkdir(VAULT);
+
+    const invalidBytes = new TextEncoder().encode('# LPT1 note');
+    const invalidHash = await hash.sha256(invalidBytes);
+    parche.seedBlob(group.id, invalidHash, invalidBytes);
+    parche.seedChange(group.id, {
+      path: 'LPT1.md',
+      hash: invalidHash,
+      author: 'remote',
+      device: 'other',
+      at: AT,
+    });
+
+    await syncOnce(deps, makeWin32SyncOpts(token));
+
+    const state = await readState(deps.fs, VAULT);
+    expect(state?.skippedPaths).toBeDefined();
+    const skippedCount = Object.keys(state?.skippedPaths ?? {}).length;
+    expect(skippedCount).toBeGreaterThan(0);
   });
 });

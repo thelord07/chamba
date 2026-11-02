@@ -451,7 +451,13 @@ async function runLink(argv: string[], deps: VaultCliDeps): Promise<void> {
   const hasYes = hasFlag(argv, '--yes');
 
   // Validate dir, update credential, reset state — all via binding-ops
-  const prep = await relinkPrepare(services, { slug, dirInput: dirFlag, allowInRepo });
+  // CHAMBA-015 S8: surface ACL warning (secureFile) on Windows to stderr
+  const prep = await relinkPrepare(services, {
+    slug,
+    dirInput: dirFlag,
+    allowInRepo,
+    onCredWarn: (msg) => stderr(`⚠ ${msg}`),
+  });
 
   if (prep.kind === 'error') {
     stderr(prep.message);
@@ -585,12 +591,25 @@ async function runSync(argv: string[], deps: VaultCliDeps): Promise<void> {
           token: cred.token,
           localAuthor: cred.user.name,
           device: cred.device.label,
+          platform: services.platform,
         },
       );
 
       stdout(
         `${slug}: pushed ${summary.pushed}, pulled ${summary.pulled}, conflicts ${summary.conflicts.length}`,
       );
+      // CHAMBA-015 D2.3: warn about Windows-invalid names skipped on this machine
+      for (const p of summary.skippedInvalidNames ?? []) {
+        stderr(
+          `  ⚠ No se puede crear '${p}' en Windows. ` +
+            `Pídele a alguien en macOS/Linux que lo renombre; mientras tanto no se sincroniza en esta máquina.`,
+        );
+      }
+      // CHAMBA-015 D2.4: warn about names pushed from this non-Windows machine that
+      // are Windows-incompatible (the push succeeded; the file won't sync on Windows)
+      for (const p of summary.windowsIncompatibleNames ?? []) {
+        stderr(`  ⚠ este nombre no se va a sincronizar en Windows: '${p}'`);
+      }
       if (summary.errors.length > 0) {
         stderr(`  errors: ${summary.errors.join('; ')}`);
         anyError = true;
@@ -668,12 +687,16 @@ async function runStatus(deps: VaultCliDeps): Promise<void> {
         }
       }
 
+      const skippedCount = Object.keys(state?.skippedPaths ?? {}).length;
       stdout('---');
       stdout(`slug:      ${slug}`);
       stdout(`server:    ${server}`);
       stdout(`role:      ${cred.role}`);
       stdout(`last sync: ${state?.lastSyncAt ?? 'never'}`);
       stdout(`pending:   ${pending}${dirExists ? ' change(s)' : ''}`);
+      if (skippedCount > 0) {
+        stdout(`skipped:   ${skippedCount} archivo(s) con nombre inválido en Windows`);
+      }
       stdout(`path:      ${vaultDir}`);
     } catch (err) {
       stdout(`${slug}: error — ${err instanceof Error ? err.message : String(err)}`);
@@ -691,7 +714,8 @@ async function runLeave(argv: string[], deps: VaultCliDeps): Promise<void> {
     return;
   }
 
-  const creds = new CredentialsStore(services.fs, services.homedir);
+  // leave rewrites credentials.json → surface a failed Windows ACL hardening (CHAMBA-015 S8)
+  const creds = new CredentialsStore(services.fs, services.homedir, (msg) => stderr(`⚠ ${msg}`));
   const allSlugs = await creds.listSlugs();
   const found = allSlugs.find((s) => s.slug === slug);
 

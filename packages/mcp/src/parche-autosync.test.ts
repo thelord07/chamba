@@ -87,6 +87,8 @@ async function makeServicesWithParcheVault(opts: {
     hash: new FakeHash(),
     parchePullTtlMin: 5,
     vaultMutex: new Map(),
+    platform: 'linux',
+    username: 'testuser',
     obsidianVaultPath: vaultDir,
   };
 
@@ -382,6 +384,8 @@ describe('PARCHE-009 AC10 — autosync with custom vault dir', () => {
       hash: new FakeHash(),
       parchePullTtlMin: 5,
       vaultMutex: new Map(),
+      platform: 'linux',
+      username: 'testuser',
       obsidianVaultPath: customDir, // CHAMBA_OBSIDIAN_VAULT_PATH = customDir
     };
 
@@ -454,6 +458,8 @@ describe('PARCHE-009 AC10 — autosync with custom vault dir', () => {
       hash: new FakeHash(),
       parchePullTtlMin: 5,
       vaultMutex: new Map(),
+      platform: 'linux',
+      username: 'testuser',
       obsidianVaultPath: anotherDir, // detection path differs from cred.dir
     };
 

@@ -16,6 +16,8 @@ import type { ParcheBinding } from '@chamba/core';
 import {
   AdoptionPendingError,
   CredentialsStore,
+  caseFoldLocal,
+  detectStyle,
   findWorkspaceRoot,
   joinFirstHint,
   linkDirPlaceholderHint,
@@ -80,13 +82,14 @@ export async function resolveActiveParcheVaultFull(
     // ── Step 1: workspace parche.json ──────────────────────────────────────────
     wsRoot =
       services.workspaceRoot ??
-      (await findWorkspaceRoot(services.fs, services.cwd, services.homedir));
+      (await findWorkspaceRoot(services.fs, services.cwd, services.homedir, services.platform));
 
     if (wsRoot) {
       const wsPath = parcheFilePath(wsRoot);
       const wsResult = await readParcheBinding(services.fs, wsPath, {
         scope: 'workspace',
         baseDir: wsRoot,
+        platform: services.platform,
       });
 
       if (wsResult.ok) {
@@ -120,6 +123,7 @@ export async function resolveActiveParcheVaultFull(
     const globalResult = await readParcheBinding(services.fs, globalPath, {
       scope: 'global',
       baseDir: services.homedir,
+      platform: services.platform,
     });
 
     if (globalResult.ok) {
@@ -216,10 +220,16 @@ async function resolveFromBinding(
     };
   }
 
-  // Realpath guard: binding.vaultDir must match credVaultDir
+  // Realpath guard: binding.vaultDir must match credVaultDir.
+  // Use caseFoldLocal for case-insensitive comparison on Windows (CHAMBA-015).
+  const _avStyle = detectStyle(services.platform);
   const bindingReal = await tryRealpath(services.fs, binding.vaultDir);
   const credReal = await tryRealpath(services.fs, credVaultDir);
-  if (bindingReal && credReal && bindingReal !== credReal) {
+  if (
+    bindingReal &&
+    credReal &&
+    caseFoldLocal(bindingReal, _avStyle) !== caseFoldLocal(credReal, _avStyle)
+  ) {
     // Bug 3: use binding.vaultDir (workspace-declared) not credVaultDir for the returned vaultDir
     const bindingDirExists = await services.fs.exists(binding.vaultDir);
     return {
@@ -279,9 +289,15 @@ async function resolveFromDetection(
     const dirExists = await services.fs.exists(credVaultDir);
     if (!dirExists) return null;
 
+    // CHAMBA-015: use caseFoldLocal for case-insensitive realpath comparison on win32
+    const _rfStyle = detectStyle(services.platform);
     const a = await tryRealpath(services.fs, detection.path);
     const b = await tryRealpath(services.fs, credVaultDir);
-    if (a !== b) return null;
+    const sameRealpath =
+      a !== null && b !== null
+        ? caseFoldLocal(a, _rfStyle) === caseFoldLocal(b, _rfStyle)
+        : a === b;
+    if (!sameRealpath) return null;
 
     return {
       vaultDir: credVaultDir,
@@ -318,9 +334,15 @@ async function resolveViaDetection(services: Services): Promise<ActiveParcheVaul
     const dirExists = await services.fs.exists(credVaultDir);
     if (!dirExists) return null;
 
+    // CHAMBA-015: use caseFoldLocal for case-insensitive realpath comparison on win32
+    const _rvStyle = detectStyle(services.platform);
     const a = await tryRealpath(services.fs, detection.path);
     const b = await tryRealpath(services.fs, credVaultDir);
-    if (a !== b) return null;
+    const sameRealpath2 =
+      a !== null && b !== null
+        ? caseFoldLocal(a, _rvStyle) === caseFoldLocal(b, _rvStyle)
+        : a === b;
+    if (!sameRealpath2) return null;
 
     return {
       vaultDir: credVaultDir,

@@ -46,6 +46,13 @@ export const syncStateFileSchema = z.object({
    * Never contains the code or token — only the hash.
    */
   pendingJoinCodeHash: z.string().optional(),
+  /**
+   * CHAMBA-015 S10: paths skipped during pull because the name is invalid on
+   * Windows (e.g. contains `<>:"\|?*`, reserved names like CON, trailing space).
+   * Maps wire-relative path → last-seen remote hash.
+   * Absent when there are no skipped paths (backward-compatible with older states).
+   */
+  skippedPaths: z.record(z.string(), z.string()).optional(),
 });
 
 export type SyncStateFile = z.infer<typeof syncStateFileSchema>;
@@ -113,13 +120,17 @@ export function toSyncState(file: SyncStateFile): SyncState {
 
 /**
  * Merge a `SyncState` (from plan functions) back into a `SyncStateFile` for saving.
- * Preserves `pendingAdoption` and `pendingJoinCodeHash` flags from base
- * (cleared separately by the gate).
+ * Preserves `pendingAdoption`, `pendingJoinCodeHash`, and `skippedPaths` flags from
+ * base (each cleared separately by dedicated helpers).
+ *
+ * @param newSkippedPaths - When provided, replaces the `skippedPaths` map (phase-2
+ *   write). When absent, the base value is preserved (phases 1 and 3).
  */
 export function mergeIntoStateFile(
   base: SyncStateFile,
   state: SyncState,
   now: string,
+  newSkippedPaths?: Record<string, string>,
 ): SyncStateFile {
   const result: SyncStateFile = {
     server: base.server,
@@ -138,6 +149,12 @@ export function mergeIntoStateFile(
   // Preserve pendingJoinCodeHash (only cleared by clearPendingAdoption)
   if (base.pendingJoinCodeHash !== undefined) {
     result.pendingJoinCodeHash = base.pendingJoinCodeHash;
+  }
+  // skippedPaths: use newSkippedPaths when provided (phase-2 write);
+  // otherwise preserve from base (phases 1 and 3).
+  const effectiveSkipped = newSkippedPaths ?? base.skippedPaths;
+  if (effectiveSkipped && Object.keys(effectiveSkipped).length > 0) {
+    result.skippedPaths = effectiveSkipped;
   }
   return result;
 }

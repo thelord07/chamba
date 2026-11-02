@@ -49,4 +49,17 @@ export interface FilesystemPort {
    * existing ancestor and re-appends the remaining segments.
    */
   realpath(path: string): Promise<string>;
+
+  /**
+   * Harden file permissions so only the current OS user can read/write `path`.
+   * Optional — adapters that run on non-Windows or non-privileged environments
+   * may omit this method; `CredentialsStore` treats its absence as a no-op.
+   *
+   * On Windows: runs `icacls <path> /inheritance:r /grant:r <user>:(F)`.
+   * On POSIX:  `writeBytes` already applies mode 0600; this is a no-op.
+   *
+   * Returns `{ ok: true }` on success, or `{ ok: false, warning }` on failure
+   * (e.g. domain account whose name icacls can't resolve). NEVER throws.
+   */
+  secureFile?(path: string): Promise<{ ok: boolean; warning?: string }>;
 }

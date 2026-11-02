@@ -18,11 +18,13 @@ import type {
 import {
   buildAdoptionSummary,
   CredentialsStore,
+  caseFoldLocal,
   clearPendingAdoption,
+  detectStyle,
   expandTilde,
   findWorkspaceRoot,
   joinPath,
-  lexicalNormalize,
+  localRelative,
   ParcheClient,
   parcheFilePath,
   parseJoinInput,
@@ -35,6 +37,7 @@ import {
   resolveServerUrl,
   resolveVaultDir,
   syncOnce,
+  toAbsoluteLocal,
   unlinkWorkspaceHint,
   VaultDirValidationError,
   writeParcheBinding,
@@ -73,7 +76,7 @@ export async function resolveJoinScope(
 ): Promise<ScopeResolution> {
   const wsRoot =
     services.workspaceRoot ??
-    (await findWorkspaceRoot(services.fs, services.cwd, services.homedir));
+    (await findWorkspaceRoot(services.fs, services.cwd, services.homedir, services.platform));
 
   if (scopeFlag === 'workspace' || scopeFlag === 'global') {
     const scope = scopeFlag as ParcheScope;
@@ -121,6 +124,7 @@ export async function precheckWorkspaceBinding(
   const existingBindingResult = await readParcheBinding(services.fs, existingBindingPath, {
     scope: 'workspace',
     baseDir: wsRoot,
+    platform: services.platform,
   });
 
   if (!existingBindingResult.ok) return { kind: 'ok' };
@@ -222,7 +226,7 @@ export async function prepareJoinVaultDir(
         server,
         allowInRepo,
         existingLinks,
-        platform: process.platform,
+        platform: services.platform,
       },
     );
     return { kind: 'ok', canonicalDir: prepared.vaultDir, gitignored: prepared.gitignored };
@@ -273,8 +277,12 @@ export async function persistBindingAfterJoin(
   if (!bindingRoot) return null;
 
   let persistVaultDir = vaultDir;
-  if (scope === 'workspace' && wsRoot && vaultDir.startsWith(`${wsRoot}/`)) {
-    persistVaultDir = vaultDir.slice(wsRoot.length + 1);
+  if (scope === 'workspace' && wsRoot) {
+    const style = detectStyle(services.platform);
+    const rel = localRelative(wsRoot, vaultDir, style);
+    if (rel !== vaultDir && rel !== '.') {
+      persistVaultDir = rel;
+    }
   }
 
   const bindingPath = parcheFilePath(bindingRoot);
@@ -326,11 +334,21 @@ export type RelinkPrepare =
  */
 export async function relinkPrepare(
   services: Services,
-  opts: { slug: string; dirInput: string; allowInRepo: boolean },
+  opts: {
+    slug: string;
+    dirInput: string;
+    allowInRepo: boolean;
+    /**
+     * CHAMBA-015 S8: called when the Windows ACL hardening of credentials.json
+     * fails after updating the credential dir. Never includes the token.
+     * When absent, warnings are silently discarded.
+     */
+    onCredWarn?: (msg: string) => void;
+  },
 ): Promise<RelinkPrepare> {
-  const { slug, dirInput, allowInRepo } = opts;
+  const { slug, dirInput, allowInRepo, onCredWarn } = opts;
 
-  const creds = new CredentialsStore(services.fs, services.homedir);
+  const creds = new CredentialsStore(services.fs, services.homedir, onCredWarn);
   const allSlugs = await creds.listSlugs();
   const found = allSlugs.find((s) => s.slug === slug);
   if (!found) {
@@ -371,7 +389,7 @@ export async function relinkPrepare(
         server: found.server,
         allowInRepo,
         existingLinks,
-        platform: process.platform,
+        platform: services.platform,
       },
     );
     canonicalDir = prepared.vaultDir;
@@ -387,7 +405,9 @@ export async function relinkPrepare(
   }
 
   // Short-circuit: same dir and NOT pending → noop
-  if (canonicalDir === oldDir) {
+  // Use caseFoldLocal for case-insensitive comparison on win32
+  const _linkStyle = detectStyle(services.platform);
+  if (caseFoldLocal(canonicalDir, _linkStyle) === caseFoldLocal(oldDir, _linkStyle)) {
     const currentState = await readState(services.fs, canonicalDir);
     if (!currentState?.pendingAdoption) {
       return { kind: 'noop', canonicalDir };
@@ -536,6 +556,7 @@ export async function finalizeAdoption(
           token: cred.token,
           localAuthor: cred.user.name,
           device: cred.device.label,
+          platform: services.platform,
         },
       ),
   );
@@ -549,6 +570,8 @@ export async function finalizeAdoption(
       movedToTrash: [],
       movedToTrashEntries: [],
       errors: [],
+      skippedInvalidNames: [],
+      windowsIncompatibleNames: [],
     };
   }
   return lockResult.result;
@@ -568,7 +591,7 @@ export async function updateBindingVaultDirForSlug(
   const { slug, newVaultDir } = opts;
   const wsRoot =
     services.workspaceRoot ??
-    (await findWorkspaceRoot(services.fs, services.cwd, services.homedir));
+    (await findWorkspaceRoot(services.fs, services.cwd, services.homedir, services.platform));
 
   const updates: string[] = [];
 
@@ -577,11 +600,16 @@ export async function updateBindingVaultDirForSlug(
     const result = await readParcheBinding(services.fs, bindingPath, {
       scope: 'workspace',
       baseDir: wsRoot,
+      platform: services.platform,
     });
     if (result.ok && result.binding.slug === slug) {
       let persistVaultDir = newVaultDir;
-      if (newVaultDir.startsWith(`${wsRoot}/`)) {
-        persistVaultDir = newVaultDir.slice(wsRoot.length + 1);
+      {
+        const style = detectStyle(services.platform);
+        const rel = localRelative(wsRoot, newVaultDir, style);
+        if (rel !== newVaultDir && rel !== '.') {
+          persistVaultDir = rel;
+        }
       }
       try {
         await writeParcheBinding(services.fs, bindingPath, {
@@ -602,6 +630,7 @@ export async function updateBindingVaultDirForSlug(
   const globalResult = await readParcheBinding(services.fs, globalBindingPath, {
     scope: 'global',
     baseDir: services.homedir,
+    platform: services.platform,
   });
   if (globalResult.ok && globalResult.binding.slug === slug) {
     try {
@@ -639,7 +668,7 @@ export async function removeBinding(
   const { scopeFlag } = opts;
   const wsRoot =
     services.workspaceRoot ??
-    (await findWorkspaceRoot(services.fs, services.cwd, services.homedir));
+    (await findWorkspaceRoot(services.fs, services.cwd, services.homedir, services.platform));
 
   let scope: ParcheScope;
   if (scopeFlag === 'workspace' || scopeFlag === 'global') {
@@ -673,6 +702,7 @@ export async function removeBinding(
   const bindingResult = await readParcheBinding(services.fs, bindingPath, {
     scope,
     baseDir: bindingRoot,
+    platform: services.platform,
   });
   const slug = bindingResult.ok ? bindingResult.binding.slug : undefined;
 
@@ -704,7 +734,7 @@ export interface BindingHeader {
 export async function resolveBindingHeader(services: Services): Promise<BindingHeader> {
   const wsRoot =
     services.workspaceRoot ??
-    (await findWorkspaceRoot(services.fs, services.cwd, services.homedir));
+    (await findWorkspaceRoot(services.fs, services.cwd, services.homedir, services.platform));
   const workspaceRootSource: 'env' | 'cwd' | null = services.workspaceRoot
     ? 'env'
     : wsRoot
@@ -713,7 +743,12 @@ export async function resolveBindingHeader(services: Services): Promise<BindingH
 
   const binding = await resolveParcheBinding(
     { fs: services.fs },
-    { cwd: services.cwd, homedir: services.homedir, workspaceRoot: wsRoot ?? undefined },
+    {
+      cwd: services.cwd,
+      homedir: services.homedir,
+      workspaceRoot: wsRoot ?? undefined,
+      platform: services.platform,
+    },
   );
 
   let invalidWarning: string | undefined;
@@ -722,6 +757,7 @@ export async function resolveBindingHeader(services: Services): Promise<BindingH
     const wsRaw = await readParcheBinding(services.fs, wsBindingPath, {
       scope: 'workspace',
       baseDir: wsRoot,
+      platform: services.platform,
     });
     if (!wsRaw.ok && !wsRaw.missing) {
       invalidWarning = `⚠ binding inválido en ${wsBindingPath}: ${wsRaw.error}`;
@@ -732,6 +768,7 @@ export async function resolveBindingHeader(services: Services): Promise<BindingH
     const globalRaw = await readParcheBinding(services.fs, globalPath, {
       scope: 'global',
       baseDir: services.homedir,
+      platform: services.platform,
     });
     if (!globalRaw.ok && !globalRaw.missing) {
       invalidWarning = `⚠ binding inválido en ${globalPath}: ${globalRaw.error}`;
@@ -750,12 +787,13 @@ export async function resolveBindingHeader(services: Services): Promise<BindingH
 export async function resolveWorkspaceSyncSlug(services: Services): Promise<string | undefined> {
   const wsRoot =
     services.workspaceRoot ??
-    (await findWorkspaceRoot(services.fs, services.cwd, services.homedir));
+    (await findWorkspaceRoot(services.fs, services.cwd, services.homedir, services.platform));
   if (!wsRoot) return undefined;
   const wsBindingPath = parcheFilePath(wsRoot);
   const wsBindingResult = await readParcheBinding(services.fs, wsBindingPath, {
     scope: 'workspace',
     baseDir: wsRoot,
+    platform: services.platform,
   });
   return wsBindingResult.ok ? wsBindingResult.binding.slug : undefined;
 }
@@ -823,17 +861,17 @@ export async function findResumeCandidate(
   const expectedHash = await pendingJoinCodeHashOf(services.hash, server, code);
 
   // Compute candidate canonical dir if given
+  const _style = detectStyle(services.platform);
   let candidateCanonical: string | undefined;
   if (dirInput) {
     try {
       const expanded = expandTilde(dirInput, services.homedir);
-      const absolute = expanded.startsWith('/') ? expanded : joinPath(services.cwd, expanded);
-      const lex = lexicalNormalize(absolute);
-      candidateCanonical = await services.fs.realpath(lex);
+      const absolute = toAbsoluteLocal(services.cwd, expanded, _style);
+      candidateCanonical = await services.fs.realpath(absolute);
     } catch {
       // If realpath fails, use as-is
       const expanded = expandTilde(dirInput, services.homedir);
-      candidateCanonical = expanded.startsWith('/') ? expanded : joinPath(services.cwd, expanded);
+      candidateCanonical = toAbsoluteLocal(services.cwd, expanded, _style);
     }
   }
 
@@ -866,7 +904,7 @@ export async function findResumeCandidate(
           } catch {
             vaultCanonical = vaultDir;
           }
-          if (vaultCanonical === candidateCanonical) {
+          if (caseFoldLocal(vaultCanonical, _style) === caseFoldLocal(candidateCanonical, _style)) {
             hashMatches.push({ slug: sl, vaultDir, server: srv, cred });
           }
         }
@@ -882,7 +920,7 @@ export async function findResumeCandidate(
         } catch {
           vaultCanonical = vaultDir;
         }
-        if (vaultCanonical === candidateCanonical) {
+        if (caseFoldLocal(vaultCanonical, _style) === caseFoldLocal(candidateCanonical, _style)) {
           legacyPending.push({ slug: sl, vaultDir });
         }
       }
@@ -994,6 +1032,10 @@ export interface SyncStructuredOutput {
   movedToTrash: Array<{ path: string; trashPath: string }>;
   truncated?: { conflicts: number; movedToTrash: number };
   errors: string[];
+  /** CHAMBA-015 D2.3: paths skipped on this Windows machine due to invalid names. */
+  skippedInvalidNames?: string[];
+  /** CHAMBA-015 D2.4: paths pushed from non-Windows that are Windows-incompatible. */
+  windowsIncompatibleNames?: string[];
 }
 
 /**
@@ -1017,6 +1059,13 @@ export function formatSyncOutput(summary: SyncSummary): SyncStructuredOutput {
   const truncatedMovedToTrash = summary.movedToTrashEntries.length - movedToTrash.length;
   if (truncatedConflicts > 0 || truncatedMovedToTrash > 0) {
     result.truncated = { conflicts: truncatedConflicts, movedToTrash: truncatedMovedToTrash };
+  }
+  // CHAMBA-015 D2.3 / D2.4: include Windows name warnings when non-empty
+  if (summary.skippedInvalidNames && summary.skippedInvalidNames.length > 0) {
+    result.skippedInvalidNames = summary.skippedInvalidNames;
+  }
+  if (summary.windowsIncompatibleNames && summary.windowsIncompatibleNames.length > 0) {
+    result.windowsIncompatibleNames = summary.windowsIncompatibleNames;
   }
   return result;
 }

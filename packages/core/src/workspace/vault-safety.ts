@@ -1,4 +1,5 @@
 import type { FilesystemPort } from '../ports/filesystem.js';
+import { localDirname, type PathStyle } from '../util/local-path.js';
 import { dirname, joinPath } from '../util/path.js';
 
 /**
@@ -24,14 +25,30 @@ export const VAULT_ARTIFACTS = [
  * Walk up from `startPath` and return the first directory that contains a `.git`
  * (directory or gitdir file) — the git work-tree root — or null if the path isn't
  * inside a repo. Pure over `FilesystemPort`; no `git` process needed.
+ *
+ * On Windows (style='win32'), uses `localDirname` to stop at drive/UNC roots
+ * instead of an empty string. On POSIX, behaviour is unchanged.
  */
-export async function findGitRoot(fs: FilesystemPort, startPath: string): Promise<string | null> {
+export async function findGitRoot(
+  fs: FilesystemPort,
+  startPath: string,
+  style?: PathStyle,
+): Promise<string | null> {
   let dir = startPath.replace(/[/\\]+$/, '');
   if (dir.length === 0) dir = '/';
   for (let i = 0; i < 64; i++) {
     if (await pathExists(fs, joinPath(dir, '.git'))) return dir;
-    const parent = dirname(dir);
-    if (parent === dir) return null;
+    let parent: string;
+    try {
+      parent = style === 'win32' ? localDirname(dir, 'win32') : dirname(dir);
+    } catch {
+      // assertNotUnsupportedPath threw (e.g. bare C: root) — we've reached the top
+      return null;
+    }
+    // Stop when we can't go further up
+    if (parent === dir || parent === '' || parent === '.') return null;
+    // On win32, stop at drive root (C:\ or C: form)
+    if (style === 'win32' && /^[A-Za-z]:[/\\]?$/.test(parent)) return null;
     dir = parent;
   }
   return null;

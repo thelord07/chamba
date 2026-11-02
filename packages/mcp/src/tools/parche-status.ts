@@ -142,12 +142,17 @@ export function registerParcheStatus(server: McpServer, logger: Logger, services
 
           const lastSync = state?.lastSyncAt ?? 'never';
           const adoptionNote = state?.pendingAdoption === true ? ' [pendiente de confirmar]' : '';
+          const skippedByName = Object.keys(state?.skippedPaths ?? {}).length;
+          const skippedNote =
+            skippedByName > 0
+              ? `\nskipped:   ${skippedByName} archivo(s) con nombre inválido en Windows`
+              : '';
           const line = [
             `slug:      ${sl}`,
             `server:    ${srv}`,
             `role:      ${cred.role}`,
             `last sync: ${lastSync}${adoptionNote}`,
-            `pending:   ${pending}${dirExists ? ' change(s)' : ''}`,
+            `pending:   ${pending}${dirExists ? ' change(s)' : ''}${skippedNote}`,
             `path:      ${vaultDir}`,
           ].join('\n');
 
@@ -158,6 +163,7 @@ export function registerParcheStatus(server: McpServer, logger: Logger, services
             role: cred.role,
             lastSyncAt: lastSync,
             pendingChanges: pending,
+            skippedByName,
             vaultDir,
           });
         } catch (err) {

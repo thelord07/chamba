@@ -8,9 +8,17 @@
 
 import { z } from 'zod';
 import type { FilesystemPort } from '../ports/filesystem.js';
+import {
+  caseFoldLocal,
+  detectStyle,
+  isAbsoluteLocal,
+  localDirname,
+  normalizeLocal,
+  type PathStyle,
+  toAbsoluteLocal,
+} from '../util/local-path.js';
 import { dirname, joinPath } from '../util/path.js';
 import { assertAllowedServerUrl } from './server-url.js';
-import { lexicalNormalize } from './vault-dir.js';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -88,11 +96,12 @@ export type ReadParcheBindingResult =
  *   `{ ok: false, error }` when the file exists but is invalid.
  *
  * Resolves a relative `vaultDir` against `opts.baseDir`.
+ * Pass `opts.platform` (from `process.platform`) to correctly handle Windows paths.
  */
 export async function readParcheBinding(
   fs: FilesystemPort,
   bindingPath: string,
-  opts: { scope: ParcheScope; baseDir: string },
+  opts: { scope: ParcheScope; baseDir: string; platform?: string },
 ): Promise<ReadParcheBindingResult> {
   try {
     const exists = await fs.exists(bindingPath);
@@ -112,11 +121,25 @@ export async function readParcheBinding(
     }
 
     const file = result.data;
+    const style = detectStyle(opts.platform ?? 'posix');
 
-    // Resolve vaultDir: relative → absolute against baseDir
+    // Resolve vaultDir: relative → absolute against baseDir.
+    // Use isAbsoluteLocal so Windows drive paths (C:\...) are treated as absolute.
     let vaultDir = file.vaultDir;
-    if (!vaultDir.startsWith('/')) {
-      vaultDir = lexicalNormalize(joinPath(opts.baseDir, vaultDir));
+    try {
+      if (!isAbsoluteLocal(vaultDir, style)) {
+        vaultDir = normalizeLocal(toAbsoluteLocal(opts.baseDir, vaultDir, style), style);
+      }
+    } catch (_pathErr) {
+      // Drive-relative or device path in vaultDir — reject with a clear error.
+      // D1.3: do NOT guess (treat-as-relative was removed in CHAMBA-015 wave 2).
+      return {
+        ok: false,
+        error:
+          `La ruta "${file.vaultDir}" en ${bindingPath} no está soportada ` +
+          `(ruta relativa a unidad o prefijo de dispositivo). ` +
+          `Edita ${bindingPath} y escribe una ruta absoluta válida, por ejemplo C:\\carpeta\\vault.`,
+      };
     }
 
     const binding: ParcheBinding = {
@@ -163,25 +186,41 @@ export async function writeParcheBinding(
  * accepting `homedir` as a workspace root (homedir is NEVER a workspace).
  *
  * Returns `null` when no workspace is found.
+ *
+ * Pass `platform` (from `process.platform`) for correct Windows walk-up.
  */
 export async function findWorkspaceRoot(
   fs: FilesystemPort,
   cwd: string,
   homedir?: string,
+  platform?: string,
 ): Promise<string | null> {
+  const style: PathStyle = detectStyle(platform ?? 'posix');
   let dir = cwd.replace(/[/\\]+$/, '');
   if (dir.length === 0) dir = '/';
 
   for (let i = 0; i < 64; i++) {
-    // Never accept homedir as a workspace root, and never walk past it: a cwd under
-    // home stops there; a cwd outside home walks up to `/` without ever reaching it.
-    if (homedir && dir === homedir) return null;
+    // On win32, never probe the drive root itself (C:\, C:/) — strip of trailing
+    // separators in the init above may yield bare "C:" which is drive-relative.
+    if (style === 'win32' && /^[A-Za-z]:[/\\]?$/.test(dir)) return null;
+
+    // Never accept homedir as a workspace root, and never walk past it.
+    // Use caseFoldLocal for case-insensitive comparison on win32.
+    if (homedir && caseFoldLocal(dir, style) === caseFoldLocal(homedir, style)) return null;
 
     const markerPath = joinPath(dir, CHAMBA_DIR, WORKSPACE_MARKER);
     if (await fs.exists(markerPath)) return dir;
 
-    const parent = dirname(dir);
-    if (parent === dir || parent === '') return null;
+    let parent: string;
+    try {
+      parent = style === 'win32' ? localDirname(dir, 'win32') : dirname(dir);
+    } catch {
+      // assertNotUnsupportedPath threw (e.g. bare C: root) — we've reached the top
+      return null;
+    }
+    if (parent === dir || parent === '' || parent === '.') return null;
+    // On win32, stop at drive root (C:\ or C: form)
+    if (style === 'win32' && /^[A-Za-z]:[/\\]?$/.test(parent)) return null;
     dir = parent;
   }
 
@@ -199,16 +238,20 @@ export async function findWorkspaceRoot(
  */
 export async function resolveParcheBinding(
   deps: { fs: FilesystemPort },
-  opts: { cwd: string; homedir: string; workspaceRoot?: string },
+  opts: { cwd: string; homedir: string; workspaceRoot?: string; platform?: string },
 ): Promise<ParcheBinding | null> {
   const { fs } = deps;
-  const { cwd, homedir, workspaceRoot } = opts;
+  const { cwd, homedir, workspaceRoot, platform } = opts;
 
   // Step 1: workspace binding
-  const wsRoot = workspaceRoot ?? (await findWorkspaceRoot(fs, cwd, homedir));
+  const wsRoot = workspaceRoot ?? (await findWorkspaceRoot(fs, cwd, homedir, platform));
   if (wsRoot) {
     const wsPath = parcheFilePath(wsRoot);
-    const wsResult = await readParcheBinding(fs, wsPath, { scope: 'workspace', baseDir: wsRoot });
+    const wsResult = await readParcheBinding(fs, wsPath, {
+      scope: 'workspace',
+      baseDir: wsRoot,
+      platform,
+    });
     if (wsResult.ok) return wsResult.binding;
     // If file exists but is invalid, still don't fall through to global
     if (!wsResult.missing) return null;
@@ -219,6 +262,7 @@ export async function resolveParcheBinding(
   const globalResult = await readParcheBinding(fs, globalPath, {
     scope: 'global',
     baseDir: homedir,
+    platform,
   });
   if (globalResult.ok) return globalResult.binding;
 
