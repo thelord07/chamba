@@ -24,6 +24,18 @@ describe('parseChambaConfig', () => {
     expect(result.ok).toBe(true);
   });
 
+  it('accepts the 5.5 / 5.1 model ids', () => {
+    const result = parseChambaConfig({
+      version: 1,
+      defaults: {
+        orchestrator: { model: 'claude-opus-5-5' },
+        implementer: { model: 'claude-sonnet-5-5' },
+        researcher: { model: 'claude-fable-5-1' },
+      },
+    });
+    expect(result.ok).toBe(true);
+  });
+
   it('rejects an unknown model with a helpful message', () => {
     const result = parseChambaConfig({
       version: 1,

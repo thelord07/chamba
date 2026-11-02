@@ -11,6 +11,10 @@ import type { Effort } from '../config/roles.js';
 // to 50% of the weekly limit, Claude Code ≥ 2.1.170). Opus 4.8/4.7 + Sonnet 4.6 kept as
 // legacy. Still unconfirmed, with conservative fallbacks in place: whether `gpt-5.5-mini`
 // accepts `xhigh`, and whether `gemini-3.1-pro-preview` is still the current flagship Pro id.
+//
+// Added at 1.11.0: Opus 5.5 (`claude-opus-5-5`), Sonnet 5.5 (`claude-sonnet-5-5`) and Fable 5.1
+// (`claude-fable-5-1`), so configs that name them validate. Pricing not verified here —
+// no numbers are stated for them. The defaults still point at Opus 5 / Sonnet 5.
 
 export type ModelProvider = 'anthropic' | 'openai' | 'google' | 'ollama';
 
@@ -91,6 +95,26 @@ export const MODEL_CATALOG: readonly ModelInfo[] = [
     effortMap: ANTHROPIC_EFFORT,
   },
   {
+    id: 'claude-opus-5-5',
+    provider: 'anthropic',
+    label: 'Claude Opus 5.5',
+    description: 'Newer Opus generation for agentic coding and reasoning. Opt-in; not a default.',
+    supports_thinking: true,
+    effortMap: ANTHROPIC_EFFORT,
+  },
+  {
+    // Opt-in, premium — same caveats as Fable 5 until verified otherwise.
+    id: 'claude-fable-5-1',
+    provider: 'anthropic',
+    label: 'Claude Fable 5.1',
+    description: 'Newer Fable generation for demanding long-horizon reasoning. Opt-in, premium.',
+    supports_thinking: true,
+    effortMap: ANTHROPIC_EFFORT,
+    pricing_note: 'Premium tier, priced above Opus — check current pricing before adopting it.',
+    requires_data_retention: true,
+    can_refuse: true,
+  },
+  {
     // Opt-in, premium — NOT a default. Its recommended `xhigh` setting is not reachable
     // on the Claude Code path (extreme → max skips xhigh), so it runs at high or max.
     id: 'claude-fable-5',
@@ -130,6 +154,14 @@ export const MODEL_CATALOG: readonly ModelInfo[] = [
     description:
       'Best speed/intelligence balance — ideal for implementation. Intro pricing ' +
       '$2/$10 per 1M through 2026-08-31, then $3/$15.',
+    supports_thinking: true,
+    effortMap: ANTHROPIC_EFFORT,
+  },
+  {
+    id: 'claude-sonnet-5-5',
+    provider: 'anthropic',
+    label: 'Claude Sonnet 5.5',
+    description: 'Newer Sonnet generation — speed/intelligence balance for implementation.',
     supports_thinking: true,
     effortMap: ANTHROPIC_EFFORT,
   },

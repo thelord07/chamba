@@ -54,6 +54,17 @@ describe('model catalog', () => {
     expect(modelCaveat(mustGet('claude-opus-4-8'))).toBeUndefined();
   });
 
+  it('includes the 5.5 / 5.1 generation so configs naming them validate', () => {
+    for (const id of ['claude-opus-5-5', 'claude-sonnet-5-5', 'claude-fable-5-1']) {
+      expect(mustGet(id).provider).toBe('anthropic');
+      expect(resolveEffort(mustGet(id), 'extreme')).toBe('max');
+    }
+    // Fable 5.1 carries the same premium caveats as Fable 5; Opus/Sonnet 5.5 carry none.
+    expect(modelCaveat(mustGet('claude-fable-5-1'))).toContain('data retention');
+    expect(modelCaveat(mustGet('claude-opus-5-5'))).toBeUndefined();
+    expect(modelCaveat(mustGet('claude-sonnet-5-5'))).toBeUndefined();
+  });
+
   it('looks up by id and by provider', () => {
     expect(getModel('claude-haiku-4-5')?.provider).toBe('anthropic');
     expect(getModel('nope')).toBeUndefined();
