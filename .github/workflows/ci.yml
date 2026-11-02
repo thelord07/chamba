@@ -24,11 +24,13 @@ jobs:
       - name: Lint + format
         run: pnpm biome check .
 
-      - name: Typecheck
-        run: pnpm -r exec tsc --noEmit
-
+      # Build before typecheck: packages resolve each other's types from dist/
+      # (e.g. @chamba/adapters imports @chamba/core), which doesn't exist on a clean checkout.
       - name: Build
         run: pnpm -r build
+
+      - name: Typecheck
+        run: pnpm typecheck
 
       - name: Test
         run: pnpm -r test
