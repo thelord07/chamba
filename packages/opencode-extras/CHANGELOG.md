@@ -2,8 +2,17 @@
 
 ## 1.10.0
 
+### Minor Changes
+
+- 90fda11: CHAMBA-012: performance and concurrency awareness in all four core agents (planner, implementer, reviewer, tester). Agents now consider N+1 data access, unbounded memory/concurrency, timeouts, idempotency, and hot paths by default, without optimizing prematurely. Adds example skills for Knex+PostgreSQL, NestJS concurrency, and React Native performance in `examples/skills/`.
+- e86acd9: PARCHE-010: `/parche` command and vault link/unlink/resync tools. Adds `chamba_vault_link`, `chamba_vault_unlink`, `chamba_vault_resync` MCP tools; `scope` parameter to `chamba_vault_join`; `movedToTrashEntries` to `SyncSummary`; binding header in `chamba_parche_status` and `chamba_vault_status`; `pendingJoinCodeHash` in sync state for safe join resume; `clearPendingAdoption`/`pendingJoinCodeHashOf` helpers; shared `binding-ops.ts` orchestration module; `vault resync` CLI subcommand; and the `/parche` slash command for all editors.
+
+  **Upgrade desde 1.9.0 o anterior:** los vaults pendientes de confirmar creados por esas versiones se confirman con `chamba_vault_link` o `npx @chamba/mcp vault link <slug> --dir <dir> --yes`.
+
 ### Patch Changes
 
+- Updated dependencies [adb366b]
+- Updated dependencies [e86acd9]
 - Updated dependencies [9af9555]
   - @chamba/core@1.10.0
   - @chamba/adapters@1.10.0

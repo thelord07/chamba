@@ -4,11 +4,17 @@
 
 ### Minor Changes
 
+- e86acd9: PARCHE-010: `/parche` command and vault link/unlink/resync tools. Adds `chamba_vault_link`, `chamba_vault_unlink`, `chamba_vault_resync` MCP tools; `scope` parameter to `chamba_vault_join`; `movedToTrashEntries` to `SyncSummary`; binding header in `chamba_parche_status` and `chamba_vault_status`; `pendingJoinCodeHash` in sync state for safe join resume; `clearPendingAdoption`/`pendingJoinCodeHashOf` helpers; shared `binding-ops.ts` orchestration module; `vault resync` CLI subcommand; and the `/parche` slash command for all editors.
+
+  **Upgrade desde 1.9.0 o anterior:** los vaults pendientes de confirmar creados por esas versiones se confirman con `chamba_vault_link` o `npx @chamba/mcp vault link <slug> --dir <dir> --yes`.
+
 - 9af9555: PARCHE-011: workspace-aware parche vault binding. Each workspace can keep its own `.chamba/parche.json` that binds to a specific group vault, taking precedence over the global binding and env-based detection. Adds `--scope workspace|global` to `vault join`, new `vault unlink` subcommand, `checkInvite` pre-validation, O2 bound-unsyncable handling in all tools, O3 workspace info in `chamba_vault_status` and `chamba_doctor`, and `CHAMBA_WORKSPACE_ROOT` env support.
 
 ### Patch Changes
 
 - `vault link --dir` now rewrites `.chamba/parche.json` (workspace and global) as a valid binding file (`version: 1`, only `server`, `slug`, `vaultDir`, `autoSync`). Before, it wrote the resolved binding object, which the strict schema rejected, so the binding stopped working after a `vault link`.
+- Updated dependencies [adb366b]
+- Updated dependencies [e86acd9]
 - Updated dependencies [9af9555]
   - @chamba/core@1.10.0
   - @chamba/adapters@1.10.0

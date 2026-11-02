@@ -4,6 +4,8 @@
 
 ### Patch Changes
 
+- Updated dependencies [adb366b]
+- Updated dependencies [e86acd9]
 - Updated dependencies [9af9555]
   - @chamba/core@1.10.0
 
