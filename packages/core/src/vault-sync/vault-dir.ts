@@ -11,6 +11,7 @@
  */
 
 import type { FilesystemPort } from '../ports/filesystem.js';
+import { caseFoldLocal, detectStyle, normalizeLocal, toAbsoluteLocal } from '../util/local-path.js';
 import { joinPath } from '../util/path.js';
 import { ensureVaultGitignored, findGitRoot } from '../workspace/vault-safety.js';
 import type { CredentialEntry } from './credentials.js';
@@ -46,6 +47,10 @@ export function expandTilde(input: string, homedir: string): string {
 /**
  * Normalize a path lexically: resolve `.` and `..`, collapse multiple slashes,
  * remove trailing slash. Does NOT resolve symlinks.
+ *
+ * @deprecated No longer called in production — replaced by `normalizeLocal` from
+ * `../util/local-path` (CHAMBA-015 wave 2). Kept as a public export to avoid a
+ * breaking change; will be removed in the next minor release.
  */
 export function lexicalNormalize(path: string): string {
   const parts = path.split('/');
@@ -117,10 +122,16 @@ function isWindowsRoot(path: string): boolean {
   return /^[A-Za-z]:[/\\]?$/.test(path);
 }
 
+/**
+ * Windows trees rejected together with everything under them (any drive letter):
+ * `X:\Windows\…` and `X:\Program Files…\…` (covers `Program Files (x86)`).
+ */
+const WINDOWS_SYSTEM_TREE = /^[a-z]:\/(windows|program files[^/]*)(\/|$)/;
+
 function isWindowsSystemDir(path: string): boolean {
   if (isWindowsRoot(path)) return true;
-  const norm = path.replace(/\\/g, '/').toLowerCase();
-  return WINDOWS_SYSTEM_DIRS_LOWER.has(norm);
+  const norm = path.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
+  return WINDOWS_SYSTEM_DIRS_LOWER.has(norm) || WINDOWS_SYSTEM_TREE.test(norm);
 }
 
 // ─── VaultDirValidationError ──────────────────────────────────────────────────
@@ -131,6 +142,18 @@ export type VaultDirValidationCode =
   | 'is_system'
   | 'in_repo'
   | 'already_linked'
+  /**
+   * Produced when the input path is a drive-relative path (`C:foo`, `C:` with no
+   * separator) or a Windows device path (`\\?\…`, `\\.\…`). These are unambiguously
+   * unsupported regardless of other validation steps.
+   * Added in CHAMBA-015 (replaces the old `'unsupported_platform'` code).
+   */
+  | 'unsupported_path'
+  /**
+   * @deprecated Never produced by `prepareVaultDir` since CHAMBA-015.
+   * Windows paths are now supported. Kept in the union to avoid a breaking
+   * change to the public API.
+   */
   | 'unsupported_platform';
 
 export class VaultDirValidationError extends Error {
@@ -173,15 +196,30 @@ export interface PrepareVaultDirResult {
 /**
  * Throw VaultDirValidationError when `path` is /, the home dir, or a system dir.
  * Used for both lex and canonical to catch symlink attacks.
+ * On win32, comparisons are case-insensitive (via caseFoldLocal).
  */
-function checkNotRootHomeOrSystem(path: string, homedir: string, _label: string): void {
+function checkNotRootHomeOrSystem(
+  path: string,
+  homedir: string,
+  _label: string,
+  platform?: string,
+): void {
+  const style = detectStyle(platform ?? 'posix');
+  const fold = (p: string) => caseFoldLocal(p, style);
+
   if (path === '/') {
     throw new VaultDirValidationError(
       'is_root',
       'No puedes usar el directorio raíz "/" como vault.',
     );
   }
-  if (path === homedir) {
+  if (style === 'win32' && isWindowsRoot(path)) {
+    throw new VaultDirValidationError(
+      'is_system',
+      `"${path}" es la raíz de una unidad de disco y no puede usarse como vault.`,
+    );
+  }
+  if (fold(path) === fold(homedir)) {
     throw new VaultDirValidationError(
       'is_home',
       `No puedes usar tu carpeta de usuario "${homedir}" como vault.`,
@@ -193,7 +231,14 @@ function checkNotRootHomeOrSystem(path: string, homedir: string, _label: string)
       `"${path}" es un directorio del sistema y no puede usarse como vault.`,
     );
   }
-  // Home-relative system dirs
+  // Windows system dirs (case-insensitive)
+  if (style === 'win32' && isWindowsSystemDir(path)) {
+    throw new VaultDirValidationError(
+      'is_system',
+      `"${path}" es un directorio del sistema (Windows) y no puede usarse como vault.`,
+    );
+  }
+  // Home-relative system dirs (POSIX)
   const homeDerived = [
     homedir,
     joinPath(homedir, 'Library'),
@@ -201,11 +246,26 @@ function checkNotRootHomeOrSystem(path: string, homedir: string, _label: string)
     joinPath(homedir, '.chamba'),
     joinPath(homedir, '.config'),
   ];
-  if (homeDerived.includes(path)) {
+  if (homeDerived.map(fold).includes(fold(path))) {
     throw new VaultDirValidationError(
       'is_system',
       `"${path}" es una carpeta del sistema y no puede usarse como vault.`,
     );
+  }
+  // Windows home-derived dirs. `.ssh`, `.chamba` and `.config` are rejected exactly
+  // (subfolders stay allowed, as on POSIX — e.g. `.chamba\vaults\x`); `AppData` is
+  // rejected together with everything under it.
+  if (style === 'win32') {
+    const fPath = fold(path).replace(/\/+$/, '');
+    const fHome = fold(homedir).replace(/\/+$/, '');
+    const exact = ['.ssh', '.chamba', '.config'].map((d) => `${fHome}/${d}`);
+    const appData = `${fHome}/appdata`;
+    if (exact.includes(fPath) || fPath === appData || fPath.startsWith(`${appData}/`)) {
+      throw new VaultDirValidationError(
+        'is_system',
+        `"${path}" es una carpeta del sistema y no puede usarse como vault.`,
+      );
+    }
   }
 }
 
@@ -214,7 +274,7 @@ function checkNotRootHomeOrSystem(path: string, homedir: string, _label: string)
  * return the canonical absolute path.
  *
  * Order of operations (per R2):
- * 1. expandTilde + Windows check + absolutize against cwd if relative + lexicalNormalize → lex
+ * 1. expandTilde + absolutize against cwd if relative + normalizeLocal → lex
  * 2. String rejections on lex: is_root, is_home, is_system (no fs needed)
  * 3. canonical = fs.realpath(lex) — ENOENT-tolerant (returns lex if path not yet created)
  * 4. Re-check canonical (catches symlink attacks)
@@ -240,69 +300,41 @@ export async function prepareVaultDir(
     platform,
   } = opts;
 
-  // Step 1: expand ~ + absolutize + lexical normalize
+  const style = detectStyle(platform ?? 'posix');
+
+  // Step 1: expand ~ + absolutize + lexical normalize using local-path helpers
+  // (handles Windows drive letters and UNC paths — CHAMBA-015)
   const expanded = expandTilde(input, homedir);
-
-  // Step 3 (early): Windows system-dir check on the raw expanded path (before POSIX normalization)
-  // since Windows paths are not valid POSIX paths.
-  if (platform === 'win32') {
-    if (isWindowsSystemDir(expanded)) {
-      throw new VaultDirValidationError(
-        'is_system',
-        `"${expanded}" es un directorio del sistema (Windows) y no puede usarse como vault.`,
-      );
-    }
-    // Also check Windows home-derived dirs
-    const winHomeDerived = [
-      homedir,
-      `${homedir}\\Library`,
-      `${homedir}\\.ssh`,
-      `${homedir}\\.chamba`,
-      `${homedir}\\.config`,
-      `${homedir}/Library`,
-      `${homedir}/.ssh`,
-      `${homedir}/.chamba`,
-      `${homedir}/.config`,
-    ];
-    const normalizedExpanded = expanded.replace(/\\/g, '/').toLowerCase();
-    if (winHomeDerived.some((d) => d.replace(/\\/g, '/').toLowerCase() === normalizedExpanded)) {
-      throw new VaultDirValidationError(
-        'is_system',
-        `"${expanded}" es una carpeta del sistema y no puede usarse como vault.`,
-      );
-    }
-
-    // Windows absolute path (drive letter + colon): can't be handled cleanly
-    // with the current POSIX-only FilesystemPort. Throw unsupported_platform.
-    if (/^[A-Za-z]:[/\\]/.test(expanded) || /^[A-Za-z]:$/.test(expanded)) {
-      throw new VaultDirValidationError(
-        'unsupported_platform',
-        `La ruta "${expanded}" es una ruta absoluta de Windows. El soporte nativo de rutas ` +
-          `Windows aún no está disponible en esta versión. Usa una ruta relativa o reporta ` +
-          `este caso en https://github.com/chamba-dev/chamba.`,
-      );
-    }
+  let absolute: string;
+  let lex: string;
+  try {
+    absolute = toAbsoluteLocal(cwd, expanded, style);
+    lex = normalizeLocal(absolute, style);
+  } catch (pathErr) {
+    // assertNotUnsupportedPath threw: drive-relative or device path — clear user error
+    throw new VaultDirValidationError(
+      'unsupported_path',
+      pathErr instanceof Error ? pathErr.message : String(pathErr),
+    );
   }
 
-  const absolute = expanded.startsWith('/') ? expanded : joinPath(cwd, expanded);
-  const lex = lexicalNormalize(absolute);
-
   // Step 2a: early string rejections on lex (no fs needed)
-  checkNotRootHomeOrSystem(lex, homedir, 'lex');
+  checkNotRootHomeOrSystem(lex, homedir, 'lex', platform);
 
   // Step 2b: resolve canonical BEFORE mkdir — realpath is ENOENT-tolerant, so
   // if the path does not yet exist it returns the lexical path. Resolving here
   // catches symlinks that point to / or a system dir before we create anything.
   const canonical = await fs.realpath(lex);
 
-  // Step 2c: re-check canonical (catches symlink attacks)
-  if (canonical !== lex) {
-    checkNotRootHomeOrSystem(canonical, homedir, 'canonical');
+  // Step 2c: re-check canonical (catches symlink attacks), using case-fold for win32
+  const fold = (p: string) => caseFoldLocal(p, style);
+  if (fold(canonical) !== fold(lex)) {
+    checkNotRootHomeOrSystem(canonical, homedir, 'canonical', platform);
   }
 
   // Step 4: git root check — run on canonical path
   let gitRoot: string | null = null;
-  gitRoot = await findGitRoot(fs, canonical);
+  gitRoot = await findGitRoot(fs, canonical, style);
   if (gitRoot !== null && !allowInRepo) {
     throw new VaultDirValidationError(
       'in_repo',
@@ -312,10 +344,10 @@ export async function prepareVaultDir(
     );
   }
 
-  // Step 5: already_linked — compare canonical against realpath(link.dir) for each link
+  // Step 5: already_linked — compare canonical against realpath(link.dir), case-fold on win32
   for (const link of existingLinks) {
     const linkCanonical = await fs.realpath(link.dir);
-    if (linkCanonical === canonical) {
+    if (fold(linkCanonical) === fold(canonical)) {
       throw new VaultDirValidationError(
         'already_linked',
         `"${canonical}" ya está vinculado al vault "${link.slug}". Usa otra ruta.`,

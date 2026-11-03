@@ -1,4 +1,4 @@
-import { listVaultNotes, ObsidianDetector } from '@chamba/core';
+import { listVaultNotes, ObsidianDetector, readState } from '@chamba/core';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { Logger } from 'pino';
 import { resolveBindingHeader } from '../parche/binding-ops.js';
@@ -31,6 +31,17 @@ export function registerVaultStatus(server: McpServer, logger: Logger, services:
         binding,
         invalidWarning,
       } = header;
+
+      // CHAMBA-015 D2.5: read skippedPaths count for the active binding's vault
+      let skippedByName = 0;
+      if (binding?.vaultDir) {
+        try {
+          const vaultState = await readState(services.fs, binding.vaultDir);
+          skippedByName = Object.keys(vaultState?.skippedPaths ?? {}).length;
+        } catch {
+          // Non-fatal: directory may not exist yet
+        }
+      }
 
       const lines: string[] = [];
       // Workspace section
@@ -72,6 +83,7 @@ export function registerVaultStatus(server: McpServer, logger: Logger, services:
           content: [{ type: 'text', text }],
           structuredContent: {
             found: false,
+            skippedByName,
             workspaceRoot: wsRoot,
             workspaceRootSource: wsRootSource,
             binding: binding
@@ -95,10 +107,12 @@ export function registerVaultStatus(server: McpServer, logger: Logger, services:
 
       const shown = names.slice(0, MAX_LISTED);
       const more = names.length > MAX_LISTED ? `\n…and ${names.length - MAX_LISTED} more` : '';
+      const skippedLine =
+        skippedByName > 0 ? `\nSkipped (Windows-invalid names): ${skippedByName} archivo(s)` : '';
       const text =
         lines.join('\n') +
         `Vault: ${detection.path} (${source})\n` +
-        `Notes chamba can see: ${names.length}\n\n${shown.map((n) => `- ${n}`).join('\n')}${more}` +
+        `Notes chamba can see: ${names.length}${skippedLine}\n\n${shown.map((n) => `- ${n}`).join('\n')}${more}` +
         (names.length === 0
           ? '\n\n⚠️ No notes found. If your path ends in `.obsidian`, point it at the parent folder instead.'
           : '');
@@ -110,6 +124,7 @@ export function registerVaultStatus(server: McpServer, logger: Logger, services:
           vaultPath: detection.path,
           source,
           noteCount: names.length,
+          skippedByName,
           notes: shown,
           workspaceRoot: wsRoot,
           workspaceRootSource: wsRootSource,

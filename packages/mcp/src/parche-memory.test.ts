@@ -92,6 +92,8 @@ async function makeMachine(opts: {
     hash: new FakeHash(),
     parchePullTtlMin: 5,
     vaultMutex: new Map(),
+    platform: 'linux',
+    username: 'testuser',
     obsidianVaultPath: vaultDir,
   };
 
@@ -209,6 +211,8 @@ describe('AC14 regression — without parche vault uses cwd/.chamba/memory/', ()
       hash: new FakeHash(),
       parchePullTtlMin: 5,
       vaultMutex: new Map(),
+      platform: 'linux',
+      username: 'testuser',
       // No obsidianVaultPath → detection will fail → no parche vault
     };
 
@@ -259,6 +263,8 @@ describe('AC14 regression — without parche vault uses cwd/.chamba/memory/', ()
       hash: new FakeHash(),
       parchePullTtlMin: 5,
       vaultMutex: new Map(),
+      platform: 'linux',
+      username: 'testuser',
     };
 
     let parcheRequestCount = 0;

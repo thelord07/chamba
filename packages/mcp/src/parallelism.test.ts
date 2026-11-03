@@ -47,6 +47,8 @@ function makeServices(handler: ProcessHandler, files: Record<string, string> = {
     hash: new FakeHash(),
     parchePullTtlMin: 5,
     vaultMutex: new Map(),
+    platform: 'linux',
+    username: 'testuser',
   };
 }
 

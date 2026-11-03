@@ -30,6 +30,8 @@ function services(files: Record<string, string>, vaultPath?: string): Services {
     hash: new FakeHash(),
     parchePullTtlMin: 5,
     vaultMutex: new Map(),
+    platform: 'linux',
+    username: 'testuser',
     obsidianVaultPath: vaultPath,
   };
 }

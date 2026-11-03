@@ -87,6 +87,8 @@ function makeServices(parche: FakeParche, extra: Partial<Services> = {}): Servic
     hash: new FakeHash(),
     parchePullTtlMin: 5,
     vaultMutex: new Map(),
+    platform: 'linux',
+    username: 'testuser',
     ...extra,
   };
 }

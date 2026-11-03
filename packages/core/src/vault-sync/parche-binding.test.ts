@@ -257,6 +257,48 @@ describe('findWorkspaceRoot', () => {
     const root = await findWorkspaceRoot(fs, '/workspace/src', '/home/test');
     expect(root).toBeNull();
   });
+
+  // CHAMBA-015 fix: don't probe C:\.chamba\workspace.md when cwd IS the drive root
+  it('returns null immediately for a win32 drive root cwd (no probe, no crash)', async () => {
+    const fs = new MemoryFilesystem();
+    // Even if we accidentally wrote a marker under C:\, it must not be returned
+    // because C:\ is a drive root — too broad to be a workspace.
+    const root = await findWorkspaceRoot(fs, 'C:\\', '/home/test', 'win32');
+    expect(root).toBeNull();
+  });
+
+  it('returns null for bare drive letter cwd (C:) on win32', async () => {
+    const fs = new MemoryFilesystem();
+    const root = await findWorkspaceRoot(fs, 'C:', '/home/test', 'win32');
+    expect(root).toBeNull();
+  });
+
+  // ── CHAMBA-015: case-insensitive homedir guard on win32 ───────────────────
+  // Mutation target: if caseFoldLocal is removed (dir === homedir becomes case-sensitive
+  // comparison on win32), this test fails because the walker no longer stops when
+  // cwd with uppercase matches a lowercase homedir — it walks into the homedir and
+  // finds the workspace.md that must NOT be returned.
+  it('win32: homedir guard uses case-insensitive comparison — UPPERCASE cwd matches lowercase homedir', async () => {
+    const fs = new MemoryFilesystem();
+    // homedir is lowercase; workspace marker placed inside it (must NEVER be returned).
+    const homeLower = '/home/joy';
+    await fs.mkdir(`${homeLower}/.chamba`);
+    await fs.writeFile(`${homeLower}/.chamba/workspace.md`, '# home falsely as workspace\n');
+    // Place the same marker at the uppercase path so the mutation path (which
+    // doesn't stop at the boundary) would find it and return the wrong root.
+    await fs.mkdir('/home/JOY/.chamba');
+    await fs.writeFile('/home/JOY/.chamba/workspace.md', '# uppercase mirror\n');
+
+    // cwd has uppercase parent dir, different case from homeLower
+    const root = await findWorkspaceRoot(fs, '/home/JOY/proj', homeLower, 'win32');
+
+    // Must return null: homedir is NEVER a workspace root.
+    // Correct code: caseFoldLocal('/home/JOY', 'win32') === caseFoldLocal('/home/joy', 'win32')
+    //   → both fold to '/home/joy' → equal → return null ✓
+    // With mutation (dir === homedir, case-sensitive):
+    //   '/home/JOY' !== '/home/joy' → walker continues → finds marker at /home/JOY → returns '/home/JOY' ✗
+    expect(root).toBeNull();
+  });
 });
 
 // ─── resolveParcheBinding ─────────────────────────────────────────────────────

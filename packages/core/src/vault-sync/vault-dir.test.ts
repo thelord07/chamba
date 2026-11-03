@@ -243,7 +243,6 @@ describe('prepareVaultDir — Windows system dirs (D3)', () => {
   // since Windows paths don't conform to POSIX conventions.
   it.each([
     ['C:\\', 'C:\\Users\\joys', 'C:\\proj'],
-    ['C:', 'C:\\Users\\joys', 'C:\\proj'],
     ['C:\\Windows', 'C:\\Users\\joys', 'C:\\proj'],
     ['C:\\Users', 'C:\\Users\\joys', 'C:\\proj'],
     ['C:\\Program Files', 'C:\\Users\\joys', 'C:\\proj'],
@@ -264,6 +263,27 @@ describe('prepareVaultDir — Windows system dirs (D3)', () => {
         },
       ),
     ).rejects.toMatchObject({ code: 'is_system' });
+  });
+
+  it('rejects bare C: (drive-relative — unsupported_path, D1.3)', async () => {
+    // C: without a trailing separator is drive-relative (C:foo is resolved against
+    // the current directory of that drive on Windows). We reject it with a clear
+    // error rather than silently guessing the intent.
+    const fs = new MemoryFilesystem();
+    await expect(
+      prepareVaultDir(
+        { fs },
+        {
+          input: 'C:',
+          homedir: 'C:\\Users\\joys',
+          cwd: 'C:\\proj',
+          slug: 'g',
+          server: 'srv',
+          existingLinks: [],
+          platform: 'win32',
+        },
+      ),
+    ).rejects.toMatchObject({ code: 'unsupported_path' });
   });
 
   it('accepts C:\\Users\\joys\\vault on win32 (D3)', async () => {
@@ -506,36 +526,62 @@ describe('prepareVaultDir — happy path', () => {
   });
 });
 
-// ─── Windows platform: unsupported_platform ───────────────────────────────────
+// ─── Windows platform: win32 path handling (CHAMBA-015) ──────────────────────
 
-describe('prepareVaultDir — Windows platform (unsupported_platform)', () => {
-  it('C:\\Users\\joys\\vault → unsupported_platform (cannot handle Windows absolute paths cleanly)', async () => {
-    const fs = new MemoryFilesystem();
-    await expect(
-      prepareVaultDir(
-        { fs },
-        {
-          input: 'C:\\Users\\joys\\vault',
-          homedir: HOME,
-          cwd: CWD,
-          slug: 'g',
-          server: 'srv',
-          existingLinks: [],
-          platform: 'win32',
-        },
-      ),
-    ).rejects.toMatchObject({ code: 'unsupported_platform' });
+/**
+ * Minimal FilesystemPort stub with identity realpath and no-op IO.
+ * Used for win32 path tests where MemoryFilesystem's POSIX-only realpath
+ * would reject C:\… paths. realpath returns the path unchanged (identity),
+ * which is the ENOENT-tolerant lexical fallback we need for paths that don't
+ * exist yet on real Windows.
+ */
+function makeWin32Stub(): import('../ports/filesystem.js').FilesystemPort {
+  const dirs = new Set<string>();
+  return {
+    readFile: async () => '',
+    writeFile: async () => {},
+    readDir: async () => [],
+    exists: async (p) => dirs.has(p),
+    mkdir: async (p) => {
+      dirs.add(p);
+    },
+    remove: async () => {},
+    readBytes: async () => new Uint8Array(0),
+    writeBytes: async () => {},
+    rename: async () => {},
+    stat: async () => null,
+    realpath: async (p) => p, // identity — caller handles missing paths
+  };
+}
+
+describe('prepareVaultDir — Windows platform (win32 path support, CHAMBA-015)', () => {
+  it('C:\\Users\\joys\\vault → accepts and canonicalizes via realpath', async () => {
+    // CHAMBA-015 B4: Windows absolute paths are now accepted; unsupported_platform is never produced.
+    const fs = makeWin32Stub();
+    const result = await prepareVaultDir(
+      { fs },
+      {
+        input: 'C:\\Users\\joys\\vault',
+        homedir: 'C:\\Users\\joys',
+        cwd: 'C:\\Users\\joys',
+        slug: 'g',
+        server: 'srv',
+        existingLinks: [],
+        platform: 'win32',
+      },
+    );
+    expect(result.vaultDir).toBe('C:\\Users\\joys\\vault');
   });
 
-  it('C:\\Windows → is_system (system check runs before unsupported_platform)', async () => {
-    const fs = new MemoryFilesystem();
+  it('C:\\Windows → is_system (Windows system dirs are rejected)', async () => {
+    const fs = makeWin32Stub();
     await expect(
       prepareVaultDir(
         { fs },
         {
           input: 'C:\\Windows',
-          homedir: HOME,
-          cwd: CWD,
+          homedir: 'C:\\Users\\joys',
+          cwd: 'C:\\Users\\joys',
           slug: 'g',
           server: 'srv',
           existingLinks: [],
@@ -545,27 +591,29 @@ describe('prepareVaultDir — Windows platform (unsupported_platform)', () => {
     ).rejects.toMatchObject({ code: 'is_system' });
   });
 
-  it('C:\\Users\\joys\\..\\..\\Windows → unsupported_platform (dot-dot resolution requires native support)', async () => {
-    const fs = new MemoryFilesystem();
+  it('C:\\Users\\joys\\..\\..\\Windows → is_system (normalizeLocal resolves .. then rejects)', async () => {
+    // CHAMBA-015 B4: normalizeLocal resolves .. to C:\Windows which is is_system.
+    const fs = makeWin32Stub();
     await expect(
       prepareVaultDir(
         { fs },
         {
           input: 'C:\\Users\\joys\\..\\..\\Windows',
-          homedir: HOME,
-          cwd: CWD,
+          homedir: 'C:\\Users\\joys',
+          cwd: 'C:\\Users\\joys',
           slug: 'g',
           server: 'srv',
           existingLinks: [],
           platform: 'win32',
         },
       ),
-    ).rejects.toMatchObject({ code: 'unsupported_platform' });
+    ).rejects.toMatchObject({ code: 'is_system' });
   });
 
-  it('relative path on win32 joins with POSIX cwd and proceeds normally', async () => {
+  it('relative path on win32 with POSIX cwd joins and proceeds normally', async () => {
+    // A relative path like 'my-vault' on win32 with a POSIX cwd (as in tests) is joined
+    // and returns the joined path (POSIX since cwd is POSIX).
     const fs = new MemoryFilesystem();
-    // A relative path like 'my-vault' on win32 is joined with cwd (POSIX in tests)
     const result = await prepareVaultDir(
       { fs },
       {
@@ -579,5 +627,292 @@ describe('prepareVaultDir — Windows platform (unsupported_platform)', () => {
       },
     );
     expect(result.vaultDir).toBe('/proj/my-vault');
+  });
+});
+
+// ─── S15: win32 security rejections (CHAMBA-015 Test 2) ──────────────────────
+
+const WIN_HOME = 'C:\\Users\\x';
+
+describe('prepareVaultDir — win32 security rejections (S15 / CHAMBA-015)', () => {
+  it('C:\\ (drive root) → is_system', async () => {
+    const fs = makeWin32Stub();
+    await expect(
+      prepareVaultDir(
+        { fs },
+        {
+          input: 'C:\\',
+          homedir: WIN_HOME,
+          cwd: 'C:\\Users\\x',
+          slug: 'g',
+          server: 'srv',
+          existingLinks: [],
+          platform: 'win32',
+        },
+      ),
+    ).rejects.toMatchObject({ code: 'is_system' });
+  });
+
+  it('C:\\Users\\x (homedir) → is_home', async () => {
+    const fs = makeWin32Stub();
+    await expect(
+      prepareVaultDir(
+        { fs },
+        {
+          input: 'C:\\Users\\x',
+          homedir: WIN_HOME,
+          cwd: WIN_HOME,
+          slug: 'g',
+          server: 'srv',
+          existingLinks: [],
+          platform: 'win32',
+        },
+      ),
+    ).rejects.toMatchObject({ code: 'is_home' });
+  });
+
+  it('C:\\Users\\x\\.chamba → is_system', async () => {
+    const fs = makeWin32Stub();
+    await expect(
+      prepareVaultDir(
+        { fs },
+        {
+          input: 'C:\\Users\\x\\.chamba',
+          homedir: WIN_HOME,
+          cwd: WIN_HOME,
+          slug: 'g',
+          server: 'srv',
+          existingLinks: [],
+          platform: 'win32',
+        },
+      ),
+    ).rejects.toMatchObject({ code: 'is_system' });
+  });
+
+  it('C:\\Users\\x\\.ssh → is_system', async () => {
+    const fs = makeWin32Stub();
+    await expect(
+      prepareVaultDir(
+        { fs },
+        {
+          input: 'C:\\Users\\x\\.ssh',
+          homedir: WIN_HOME,
+          cwd: WIN_HOME,
+          slug: 'g',
+          server: 'srv',
+          existingLinks: [],
+          platform: 'win32',
+        },
+      ),
+    ).rejects.toMatchObject({ code: 'is_system' });
+  });
+
+  it('C:\\Users\\x\\AppData → is_system', async () => {
+    const fs = makeWin32Stub();
+    await expect(
+      prepareVaultDir(
+        { fs },
+        {
+          input: 'C:\\Users\\x\\AppData',
+          homedir: WIN_HOME,
+          cwd: WIN_HOME,
+          slug: 'g',
+          server: 'srv',
+          existingLinks: [],
+          platform: 'win32',
+        },
+      ),
+    ).rejects.toMatchObject({ code: 'is_system' });
+  });
+
+  it('C:\\Windows → is_system', async () => {
+    const fs = makeWin32Stub();
+    await expect(
+      prepareVaultDir(
+        { fs },
+        {
+          input: 'C:\\Windows',
+          homedir: WIN_HOME,
+          cwd: WIN_HOME,
+          slug: 'g',
+          server: 'srv',
+          existingLinks: [],
+          platform: 'win32',
+        },
+      ),
+    ).rejects.toMatchObject({ code: 'is_system' });
+  });
+
+  it('c:\\windows (lowercase) → is_system (case-insensitive)', async () => {
+    const fs = makeWin32Stub();
+    await expect(
+      prepareVaultDir(
+        { fs },
+        {
+          input: 'c:\\windows',
+          homedir: WIN_HOME,
+          cwd: WIN_HOME,
+          slug: 'g',
+          server: 'srv',
+          existingLinks: [],
+          platform: 'win32',
+        },
+      ),
+    ).rejects.toMatchObject({ code: 'is_system' });
+  });
+
+  it('C:\\Program Files → is_system', async () => {
+    const fs = makeWin32Stub();
+    await expect(
+      prepareVaultDir(
+        { fs },
+        {
+          input: 'C:\\Program Files',
+          homedir: WIN_HOME,
+          cwd: WIN_HOME,
+          slug: 'g',
+          server: 'srv',
+          existingLinks: [],
+          platform: 'win32',
+        },
+      ),
+    ).rejects.toMatchObject({ code: 'is_system' });
+  });
+
+  it('C:\\Users → is_system', async () => {
+    const fs = makeWin32Stub();
+    await expect(
+      prepareVaultDir(
+        { fs },
+        {
+          input: 'C:\\Users',
+          homedir: WIN_HOME,
+          cwd: WIN_HOME,
+          slug: 'g',
+          server: 'srv',
+          existingLinks: [],
+          platform: 'win32',
+        },
+      ),
+    ).rejects.toMatchObject({ code: 'is_system' });
+  });
+
+  it('C:foo (drive-relative) → unsupported_path', async () => {
+    const fs = makeWin32Stub();
+    await expect(
+      prepareVaultDir(
+        { fs },
+        {
+          input: 'C:foo',
+          homedir: WIN_HOME,
+          cwd: WIN_HOME,
+          slug: 'g',
+          server: 'srv',
+          existingLinks: [],
+          platform: 'win32',
+        },
+      ),
+    ).rejects.toMatchObject({ code: 'unsupported_path' });
+  });
+
+  it('bare C: (no separator) → unsupported_path', async () => {
+    const fs = makeWin32Stub();
+    await expect(
+      prepareVaultDir(
+        { fs },
+        {
+          input: 'C:',
+          homedir: WIN_HOME,
+          cwd: WIN_HOME,
+          slug: 'g',
+          server: 'srv',
+          existingLinks: [],
+          platform: 'win32',
+        },
+      ),
+    ).rejects.toMatchObject({ code: 'unsupported_path' });
+  });
+
+  it('\\\\?\\C:\\x (device path) → unsupported_path', async () => {
+    const fs = makeWin32Stub();
+    await expect(
+      prepareVaultDir(
+        { fs },
+        {
+          input: '\\\\?\\C:\\x',
+          homedir: WIN_HOME,
+          cwd: WIN_HOME,
+          slug: 'g',
+          server: 'srv',
+          existingLinks: [],
+          platform: 'win32',
+        },
+      ),
+    ).rejects.toMatchObject({ code: 'unsupported_path' });
+  });
+
+  it('junction to C:\\Windows (realpath returns C:\\Windows) → is_system', async () => {
+    // Simulate a junction/symlink where the canonical path resolves to C:\Windows.
+    // The stub realpath maps C:\fake-vault → C:\Windows to simulate the junction.
+    const junctionStub: import('../ports/filesystem.js').FilesystemPort = {
+      ...makeWin32Stub(),
+      realpath: async (p: string) => {
+        if (p === 'C:\\fake-vault' || p.toLowerCase() === 'c:\\fake-vault') {
+          return 'C:\\Windows';
+        }
+        return p;
+      },
+    };
+    await expect(
+      prepareVaultDir(
+        { fs: junctionStub },
+        {
+          input: 'C:\\fake-vault',
+          homedir: WIN_HOME,
+          cwd: WIN_HOME,
+          slug: 'g',
+          server: 'srv',
+          existingLinks: [],
+          platform: 'win32',
+        },
+      ),
+    ).rejects.toMatchObject({ code: 'is_system' });
+  });
+});
+
+describe('prepareVaultDir — win32 system trees and subfolders (CHAMBA-015 Test 2)', () => {
+  const prep = (input: string) =>
+    prepareVaultDir(
+      { fs: makeWin32Stub() },
+      {
+        input,
+        homedir: WIN_HOME,
+        cwd: WIN_HOME,
+        slug: 'g',
+        server: 'srv',
+        existingLinks: [],
+        platform: 'win32',
+      },
+    );
+
+  it.each([
+    'C:\\Windows\\Temp',
+    'c:\\windows\\system32\\vault',
+    'D:\\Windows\\x',
+    'C:\\Program Files\\Obsidian',
+    'C:\\Program Files (x86)\\x',
+    `${WIN_HOME}\\AppData\\Roaming\\vault`,
+    `${WIN_HOME.toUpperCase()}\\APPDATA`,
+  ])('%s → is_system', async (input) => {
+    await expect(prep(input)).rejects.toMatchObject({ code: 'is_system' });
+  });
+
+  it.each([
+    `${WIN_HOME}\\.chamba\\vaults\\cya`,
+    `${WIN_HOME}\\vaults\\cya`,
+    'D:\\workspace\\vault',
+    'C:\\WindowsData\\vault',
+  ])('%s → accepted', async (input) => {
+    await expect(prep(input)).resolves.toMatchObject({ vaultDir: input });
   });
 });

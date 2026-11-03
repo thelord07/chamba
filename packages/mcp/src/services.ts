@@ -1,4 +1,4 @@
-import { homedir } from 'node:os';
+import { homedir, userInfo } from 'node:os';
 import {
   NodeFilesystem,
   NodeHash,
@@ -66,6 +66,16 @@ export interface Services {
    * core (pure) doesn't read process.env.
    */
   workspaceRoot?: string;
+  /**
+   * OS platform string (CHAMBA-015). Injected so core stays pure and tests can
+   * exercise Windows paths on any host. Defaults to `process.platform`.
+   */
+  platform: string;
+  /**
+   * OS username (CHAMBA-015). Used for Windows ACL hardening (icacls) so core
+   * never reads `os.userInfo()` directly. Defaults to `os.userInfo().username`.
+   */
+  username: string;
 }
 
 export function createNodeServices(): Services {
@@ -84,6 +94,14 @@ export function createNodeServices(): Services {
     parchePullTtlMin: Number(process.env.CHAMBA_PARCHE_PULL_TTL_MIN ?? '5') || 5,
     vaultMutex: new Map(),
     workspaceRoot: process.env.CHAMBA_WORKSPACE_ROOT,
+    platform: process.platform,
+    username: (() => {
+      try {
+        return userInfo().username;
+      } catch {
+        return process.env.USERNAME ?? process.env.USER ?? 'unknown';
+      }
+    })(),
   };
 }
 

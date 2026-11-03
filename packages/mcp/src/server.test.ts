@@ -31,6 +31,8 @@ function buildServices(files: Record<string, string>, cwd: string): Services {
     homedir: '/home/test',
     parchePullTtlMin: 5,
     vaultMutex: new Map(),
+    platform: 'linux',
+    username: 'testuser',
   };
 }
 

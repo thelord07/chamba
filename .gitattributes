@@ -1,0 +1,17 @@
+# CHAMBA-015: normalize line endings to LF on checkout so Windows CI runners
+# and editors don't introduce CRLF into committed files.
+* text=auto eol=lf
+
+# Binary files — no line-ending conversion
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.otf binary
+*.zip binary
+*.gz binary
+*.tar binary

@@ -159,6 +159,21 @@ export {
   renderTicketCompleteness,
   TICKET_SIGNALS,
 } from './triage/ticket-completeness.js';
+// Local (OS-native) path helpers — CHAMBA-015
+export type { PathStyle } from './util/local-path.js';
+export {
+  assertNotUnsupportedPath,
+  caseFoldLocal,
+  detectStyle,
+  isAbsoluteLocal,
+  isInvalidPath,
+  joinLocal,
+  localBasename,
+  localDirname,
+  localRelative,
+  normalizeLocal,
+  toAbsoluteLocal,
+} from './util/local-path.js';
 // Path helpers
 export { basename, dirname, extname, joinPath } from './util/path.js';
 // Vault dir resolution and validation (PARCHE-009)
@@ -174,6 +189,7 @@ export {
 // Vault sync — client (PARCHE-004)
 export type { CredentialEntry, CredentialsFile } from './vault-sync/credentials.js';
 export { CredentialsStore, credentialsFileSchema } from './vault-sync/credentials.js';
+export { defaultDeviceLabel, MAX_DEVICE_LABEL_LENGTH } from './vault-sync/device-label.js';
 // Vault-sync messages and helpers (PARCHE-011)
 export {
   joinFirstHint,

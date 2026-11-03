@@ -43,6 +43,8 @@ function makeServices(overrides: Partial<Services> = {}): Services {
     hash: new FakeHash(),
     parchePullTtlMin: 5,
     vaultMutex: new Map(),
+    platform: 'linux',
+    username: 'testuser',
     ...overrides,
   };
 }

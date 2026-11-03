@@ -30,6 +30,8 @@ function makeServices(files: Record<string, string> = {}): Services {
     hash: new FakeHash(),
     parchePullTtlMin: 5,
     vaultMutex: new Map(),
+    platform: 'linux',
+    username: 'testuser',
   };
 }
 

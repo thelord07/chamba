@@ -30,6 +30,8 @@ function makeServices(files: Record<string, string>, vaultPath?: string): Servic
     hash: new FakeHash(),
     parchePullTtlMin: 5,
     vaultMutex: new Map(),
+    platform: 'linux',
+    username: 'testuser',
     obsidianVaultPath: vaultPath,
   };
 }
@@ -88,6 +90,62 @@ describe('chamba_vault_status', () => {
     const { client, server } = await connect(makeServices({}));
     const out = structured(await client.callTool({ name: 'chamba_vault_status', arguments: {} }));
     expect(out.found).toBe(false);
+    await server.close();
+  });
+
+  // CHAMBA-015 D2.5: skippedByName shown in structuredContent and text
+  it('D2.5: skippedByName reflects skippedPaths count from state (via workspace binding)', async () => {
+    const stateJson = JSON.stringify({
+      server: 'https://parche.chamba.tools',
+      slug: 'my-vault',
+      cursor: 0,
+      files: {},
+      lastSyncAt: '2026-06-10T00:00:00.000Z',
+      skippedPaths: {
+        'CON.md': 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        'LPT1.txt': 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+      },
+    });
+    const parcheJson = JSON.stringify({
+      version: 1,
+      server: 'https://parche.chamba.tools',
+      slug: 'my-vault',
+      vaultDir: '/vault',
+    });
+    // Use global scope (no workspace.md → global parche.json at homedir)
+    const svc = makeServices(
+      {
+        '/vault/.obsidian/app.json': '{}',
+        '/vault/note.md': '# Note\n',
+        '/vault/.chamba-sync/state.json': stateJson,
+        '/home/test/.chamba/parche.json': parcheJson,
+      },
+      '/vault',
+    );
+
+    const { client, server } = await connect(svc);
+    const result = await client.callTool({ name: 'chamba_vault_status', arguments: {} });
+    const out = structured(result);
+
+    expect(out.skippedByName).toBe(2);
+    // Also in text
+    const text = (result as { content: Array<{ text: string }> }).content[0]?.text ?? '';
+    expect(text).toContain('Skipped (Windows-invalid names): 2');
+
+    await server.close();
+  });
+
+  it('D2.5: skippedByName is 0 when no skippedPaths in state', async () => {
+    const svc = makeServices(
+      {
+        '/vault/.obsidian/app.json': '{}',
+        '/vault/note.md': '# Note\n',
+      },
+      '/vault',
+    );
+    const { client, server } = await connect(svc);
+    const out = structured(await client.callTool({ name: 'chamba_vault_status', arguments: {} }));
+    expect(out.skippedByName).toBe(0);
     await server.close();
   });
 });

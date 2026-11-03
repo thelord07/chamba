@@ -25,7 +25,7 @@ export function registerDoctor(server: McpServer, logger: Logger, services: Serv
       // O3: resolve workspaceRoot and its source for doctor
       const wsRoot =
         services.workspaceRoot ??
-        (await findWorkspaceRoot(services.fs, services.cwd, services.homedir));
+        (await findWorkspaceRoot(services.fs, services.cwd, services.homedir, services.platform));
       const wsRootSource: 'env' | 'cwd' | undefined = services.workspaceRoot
         ? 'env'
         : wsRoot

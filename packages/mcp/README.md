@@ -152,6 +152,44 @@ All commands run via `npx @chamba/mcp vault <subcommand>`.
 Credentials are stored in `~/.chamba/credentials.json` with mode `0600`. The token is
 **never** returned by any MCP tool, never written to the vault, and never logged.
 
+On **Windows** the file lives in `%USERPROFILE%\.chamba\credentials.json`. `chmod` doesn't
+restrict access there, so after every write chamba runs `icacls` to remove inherited
+permissions and grant access only to the current user. If that fails (for example, a
+domain account that `icacls` can't resolve), you get a warning and the command still
+finishes; the file then keeps the permissions inherited from your user profile, which is
+private by default.
+
+Note that `/inheritance:r` removes **every** inherited entry, including `SYSTEM` and
+`Administrators`: after hardening, only your user can read or write `credentials.json`.
+Backup tools or admin scripts that run as `SYSTEM` or as an administrator can no longer
+read it (an administrator can still take ownership of the file). That's intended (it holds your device token). If you need to restore their
+access, re-enable inheritance with `icacls "%USERPROFILE%\.chamba\credentials.json" /inheritance:e`;
+chamba applies the restriction again the next time it rewrites the file.
+
+### Windows
+
+The parche client works the same on Windows (PowerShell), macOS and Linux. Absolute paths
+like `D:\workspace\vault`, `d:/workspace/vault` and UNC paths (`\\server\share\vault`)
+are supported:
+
+```powershell
+cd D:\workspace
+npx @chamba/mcp vault join K7QX-M2RP --scope workspace --dir D:\workspace\vault
+# The folder already has notes: review the upload summary, then confirm
+npx @chamba/mcp vault join K7QX-M2RP --scope workspace --dir D:\workspace\vault --yes
+npx @chamba/mcp vault sync
+```
+
+- Drive-relative paths (`C:notes`, no slash after the colon) and device paths
+  (`\\?\…`, `\\.\…`) are rejected with a clear error — use a normal absolute path.
+- Files whose names are invalid on Windows (`CON.md`, `a:b.md`, names with `?` or `*`,
+  or ending in a space or dot) are **not** created on Windows machines. The sync reports
+  them, keeps them pending (they are never deleted for the rest of the group) and retries
+  on every sync; `vault status` shows how many are pending. When someone on macOS/Linux
+  pushes such a name, their sync warns that it won't sync on Windows.
+- Paths longer than 260 characters need Windows long-path support
+  (`LongPathsEnabled`); chamba doesn't add the `\\?\` prefix itself.
+
 ## Usar tu propio vault / Use your own vault
 
 ### Español

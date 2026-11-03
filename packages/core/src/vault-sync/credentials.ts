@@ -53,6 +53,12 @@ export class CredentialsStore {
   constructor(
     private readonly fs: FilesystemPort,
     private readonly homedir: string,
+    /**
+     * Optional callback invoked when `secureFile` returns a warning (e.g. icacls
+     * failed on a domain account). Never called with a token or secret. The warning
+     * text is safe to display to the user.
+     */
+    private readonly onWarn?: (msg: string) => void,
   ) {}
 
   private async load(): Promise<CredentialsFile> {
@@ -80,6 +86,19 @@ export class CredentialsStore {
     const bytes = new TextEncoder().encode(JSON.stringify(data, null, 2));
     // Write with mode 0600 so the token is never world-readable
     await this.fs.writeBytes(path, bytes, { mode: 0o600 });
+    // On Windows, additionally harden ACL via icacls so the file is private
+    // even on NTFS where chmod has no effect. Never throws — a warning is surfaced
+    // via onWarn but the credential write is always considered successful.
+    if (this.fs.secureFile) {
+      try {
+        const result = await this.fs.secureFile(path);
+        if (!result.ok && result.warning && this.onWarn) {
+          this.onWarn(result.warning);
+        }
+      } catch {
+        // secureFile must not throw, but be defensive anyway
+      }
+    }
   }
 
   async get(server: string, slug: string): Promise<CredentialEntry | null> {
