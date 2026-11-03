@@ -145,6 +145,8 @@ export { FakeNet } from './testing/fake-net.js';
 export { FakeParche } from './testing/fake-parche.js';
 export type { ProcessHandler, RecordedCall } from './testing/fake-process.js';
 export { FakeProcess } from './testing/fake-process.js';
+export type { FlakyHttpOptions } from './testing/flaky-http.js';
+export { FlakyHttp } from './testing/flaky-http.js';
 // Testing utilities
 export { MemoryFilesystem } from './testing/memory-filesystem.js';
 // Triage (ticket-completeness heuristic for /triage, no LLM)
@@ -196,6 +198,7 @@ export {
   joinInRepoHint,
   linkDirPlaceholderHint,
   linkHint,
+  parcheNetworkErrorMessage,
   syncManualHint,
   unlinkWorkspaceHint,
   VAULT_CLI,
@@ -225,6 +228,7 @@ export {
   ParcheClient,
   ParcheHttpError,
   ParcheMissingBlobsError,
+  ParcheNetworkError,
   ParcheNotFoundError,
   ParcheRateLimitedError,
 } from './vault-sync/parche-client.js';

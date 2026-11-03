@@ -15,7 +15,8 @@ import {
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { Logger } from 'pino';
 import { z } from 'zod';
-import { formatSyncOutput, redactSecrets } from '../parche/binding-ops.js';
+import { describeError } from '../fatal.js';
+import { formatSyncOutput } from '../parche/binding-ops.js';
 import { withVaultLock } from '../parche/mutex.js';
 import type { Services } from '../services.js';
 
@@ -150,7 +151,7 @@ export function registerVaultSync(server: McpServer, logger: Logger, services: S
           const syncOut = formatSyncOutput(summary);
           resultDetails.push({ slug: sl, ...syncOut });
         } catch (err) {
-          const msg = redactSecrets(err instanceof Error ? err.message : String(err));
+          const msg = describeError(err, { slug: sl });
           logger.warn({ tool: TOOL_NAME, slug: sl, err: msg }, 'parche: sync failed');
           results.push(`${sl}: error — ${msg}`);
           anyError = true;

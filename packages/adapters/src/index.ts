@@ -5,4 +5,6 @@ export { NodeHttp } from './node-http.js';
 export { NodeNet } from './node-net.js';
 export { NodeProcess } from './node-process.js';
 export { NodeSystem } from './node-system.js';
+export type { RetryingHttpOptions } from './retrying-http.js';
+export { RetryingHttp } from './retrying-http.js';
 export { SystemClock } from './system-clock.js';

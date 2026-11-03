@@ -3,7 +3,7 @@
  * Pure: no Node imports. All IO via ports (fs, http, hash, clock).
  *
  * Phases of syncOnce:
- *   1. scanLocal → planPush → HEAD/PUT blobs → push (in batches ≤500)
+ *   1. scanLocal → planPush → push (in batches ≤500); on 422 PUT only missing blobs → retry
  *   2. Fetch all pages → planPull → execute actions → save state
  *   3. If conflicts: scanLocal (for copies) → push copies
  *
@@ -251,42 +251,35 @@ async function nextTrashPath(
   return c;
 }
 
-// ─── uploadBlobs ─────────────────────────────────────────────────────────────
-
-/**
- * For each unique newHash in entries: HEAD the blob; if 404, PUT it.
- * Returns nothing; throws on failure.
- */
-async function uploadBlobs(
-  client: ParcheClient,
-  entries: PushEntry[],
-  blobSource: Map<string, string>,
-  fs: FilesystemPort,
-  signal?: AbortSignal,
-): Promise<void> {
-  const seen = new Set<string>();
-  for (const entry of entries) {
-    if (entry.newHash === null) continue;
-    if (seen.has(entry.newHash)) continue;
-    seen.add(entry.newHash);
-
-    checkAbort(signal);
-    const exists = await client.headBlob(entry.newHash, signal);
-    if (!exists) {
-      const absPath = blobSource.get(entry.newHash);
-      if (!absPath) {
-        throw new Error(`No blob source for hash ${entry.newHash}`);
-      }
-      const data = await fs.readBytes(absPath);
-      checkAbort(signal);
-      await client.putBlob(entry.newHash, data, signal);
-    }
-  }
-}
-
 // ─── pushAll ─────────────────────────────────────────────────────────────────
 
-/** Push all entries in batches of ≤batchSize. Returns updated SyncState. */
+/** Error for an unrecoverable 422: lists at most 5 short hashes. */
+function missingBlobsError(hashes: string[]): Error {
+  const shown = hashes.slice(0, 5).map((h) => h.slice(0, 8));
+  const more = hashes.length > shown.length ? ` y ${hashes.length - shown.length} más` : '';
+  return new Error(`no se pudo completar el push: faltan blobs ${shown.join(', ')}${more}`);
+}
+
+/**
+ * Push all entries in batches of ≤batchSize using a push-first strategy.
+ * Returns updated SyncState.
+ *
+ * Flow per batch:
+ *   push → if 422 missing_blobs: PUT only the reported hashes (dedup, in reported
+ *   order) → retry push. Repeat while the set of missing blobs reduces, up to
+ *   MAX_422_ROUNDS rounds of 422 per batch.
+ *
+ * Safety (parche/src/routes/push.ts): 422 is returned before the transaction, so
+ * nothing is written on 422. Push is idempotent: if the row already exists with
+ * newHash===head, it returns ok with the existing seq (even for tombstones). If a
+ * later batch fails, state is not written and the next sync re-pushes all batches —
+ * idempotent by protocol (§3), so the re-push returns ok with the existing seq.
+ *
+ * Throws without writing state when:
+ *  - A hash reported as missing has no local source.
+ *  - The set of missing hashes does not reduce vs the previous round.
+ *  - MAX_422_ROUNDS rounds of 422 are exhausted.
+ */
 async function pushAll(
   client: ParcheClient,
   slug: string,
@@ -299,50 +292,70 @@ async function pushAll(
 ): Promise<SyncState> {
   if (entries.length === 0) return state;
 
-  // Upload all blobs first
-  await uploadBlobs(client, entries, blobSource, fs, signal);
-
+  const MAX_422_ROUNDS = 3;
   let currentState = state;
 
   for (let i = 0; i < entries.length; i += batchSize) {
     checkAbort(signal);
     const batch = entries.slice(i, i + batchSize);
 
-    let response: Awaited<ReturnType<ParcheClient['push']>>;
-    try {
-      response = await client.push(slug, batch, signal);
-    } catch (err) {
-      if (err instanceof ParcheMissingBlobsError) {
-        // 422: upload the missing blobs and retry once
-        const missingBlobSource = new Map<string, string>();
-        for (const h of err.hashes) {
-          const src = blobSource.get(h);
-          if (!src) {
-            throw new Error(`422 missing_blobs: no source for hash ${h} — cannot recover`);
-          }
-          missingBlobSource.set(h, src);
+    let roundsDone = 0;
+    let prevMissingSet: Set<string> | null = null;
+    let batchResponse: Awaited<ReturnType<ParcheClient['push']>> | undefined;
+
+    for (;;) {
+      checkAbort(signal);
+      let pushErr: unknown;
+      try {
+        batchResponse = await client.push(slug, batch, signal);
+        break;
+      } catch (err) {
+        if (!(err instanceof ParcheMissingBlobsError)) throw err;
+        pushErr = err;
+      }
+
+      const missingErr = pushErr as ParcheMissingBlobsError;
+
+      // Dedup hashes in the order reported by the server
+      const seen = new Set<string>();
+      const missingHashes: string[] = [];
+      for (const h of missingErr.hashes) {
+        if (!seen.has(h)) {
+          seen.add(h);
+          missingHashes.push(h);
         }
-        for (const [h, src] of missingBlobSource) {
-          checkAbort(signal);
-          const data = await fs.readBytes(src);
-          await client.putBlob(h, data, signal);
-        }
-        // Retry once
+      }
+      const missingSet = new Set(missingHashes);
+
+      // Any missing hash without a local source → cannot complete; don't write state
+      const noSource = missingHashes.filter((h) => !blobSource.has(h));
+      if (noSource.length > 0) throw missingBlobsError(noSource);
+
+      // Set didn't reduce vs previous round (§4.0: by size; the 3-round cap bounds the rest)
+      if (prevMissingSet !== null && missingSet.size >= prevMissingSet.size) {
+        throw missingBlobsError(missingHashes);
+      }
+
+      // Rounds exhausted → don't write state
+      if (roundsDone >= MAX_422_ROUNDS) throw missingBlobsError(missingHashes);
+
+      prevMissingSet = missingSet;
+      roundsDone++;
+
+      // PUT only the reported missing blobs (checkAbort before each one).
+      for (const h of missingHashes) {
+        const src = blobSource.get(h);
+        if (src === undefined) throw missingBlobsError([h]); // unreachable: checked above
         checkAbort(signal);
-        try {
-          response = await client.push(slug, batch, signal);
-        } catch (retryErr) {
-          if (retryErr instanceof ParcheMissingBlobsError) {
-            throw new Error(`Push failed after retry: missing blobs ${retryErr.hashes.join(', ')}`);
-          }
-          throw retryErr;
-        }
-      } else {
-        throw err;
+        const data = await fs.readBytes(src);
+        checkAbort(signal);
+        await client.putBlob(h, data, signal);
       }
     }
 
-    currentState = applyPushResults(currentState, batch, response);
+    // batchResponse is always assigned before break (loop invariant)
+    if (batchResponse === undefined) throw new Error('unexpected: no push response for batch');
+    currentState = applyPushResults(currentState, batch, batchResponse);
   }
 
   return currentState;

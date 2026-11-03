@@ -11,12 +11,12 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { Logger } from 'pino';
 import { z } from 'zod';
+import { describeError } from '../fatal.js';
 import {
   checkAdoptionGate,
   finalizeAdoption,
   formatSyncOutput,
   gateStructuredDetails,
-  redactSecrets,
   relinkPrepare,
   updateBindingVaultDirForSlug,
 } from '../parche/binding-ops.js';
@@ -168,7 +168,7 @@ export function registerVaultLink(server: McpServer, logger: Logger, services: S
           } as Record<string, unknown>,
         };
       } catch (err) {
-        const msg = redactSecrets(err instanceof Error ? err.message : String(err));
+        const msg = describeError(err, { slug });
         logger.warn({ tool: TOOL_NAME, slug, err: msg }, 'parche: link failed');
         return { isError: true, content: [{ type: 'text' as const, text: msg }] };
       }

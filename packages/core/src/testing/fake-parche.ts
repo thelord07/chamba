@@ -107,6 +107,12 @@ export class FakeParche implements HttpPort {
   private readonly corruptedBlobs = new Set<string>();
   private readonly rejectedPushBlobs = new Set<string>();
   private readonly rejectedPushBlobsOnce = new Map<string, number>(); // hash → remaining rejections
+  /**
+   * CHAMBA-014 A3: extra hashes added to ANY 422 missing_blobs response, in addition
+   * to naturally missing blobs. These hashes are NOT validated (they need not appear
+   * in the push request). Useful for Test 3 (hash without local source).
+   */
+  private readonly injectedMissingBlobs: string[] = [];
   // Track total requests per path for test assertions
   readonly requestLog: Array<{ method: string; url: string }> = [];
   // Last captured join request body
@@ -122,8 +128,25 @@ export class FakeParche implements HttpPort {
     this.corruptedBlobs.add(hash);
   }
 
+  /**
+   * CHAMBA-014 A3: inject an extra hash into the next 422 missing_blobs response.
+   * The hash is appended to the missing list unconditionally (even if it's not in
+   * the push request). Call once per hash per 422 you want it injected into.
+   * Used to simulate Test 3 (server reports a hash the client has no local source for).
+   */
+  injectMissingBlob(hash: string): void {
+    this.injectedMissingBlobs.push(hash);
+  }
+
   rejectPushBlobs(hashes: string[]): void {
     for (const h of hashes) this.rejectedPushBlobs.add(h);
+  }
+
+  /** Clear every push 422 knob (rejectPushBlobs, rejectPushBlobsOnce, injectMissingBlob). */
+  clearPushBlobRejections(): void {
+    this.rejectedPushBlobs.clear();
+    this.rejectedPushBlobsOnce.clear();
+    this.injectedMissingBlobs.length = 0;
   }
 
   /**
@@ -194,6 +217,20 @@ export class FakeParche implements HttpPort {
       this.blobRefs.set(groupId, refs);
     }
     refs.add(hash);
+  }
+
+  /** Blob hashes owned by a group (inspection for tests). */
+  blobHashes(groupId: string): string[] {
+    return [...(this.blobRefs.get(groupId) ?? [])];
+  }
+
+  /** Live (non-tombstone) paths of a group → head hash (inspection for tests). */
+  livePaths(groupId: string): Map<string, string> {
+    const out = new Map<string, string>();
+    for (const f of this.files.get(groupId)?.values() ?? []) {
+      if (f.hash !== null) out.set(f.path, f.hash);
+    }
+    return out;
   }
 
   /** Seed a remote change directly. */
@@ -500,8 +537,13 @@ export class FakeParche implements HttpPort {
     }
 
     const missing = wantedHashes.filter((h) => !groupRefs.has(h));
-    if (missing.length > 0) {
-      return json({ error: 'missing_blobs', hashes: missing }, 422);
+
+    // CHAMBA-014 A3: consume injected hashes and add them to any 422 response.
+    // Injected hashes always trigger a 422 (even if the natural missing list is empty).
+    const injected = this.injectedMissingBlobs.splice(0, this.injectedMissingBlobs.length);
+    const allMissing = [...new Set([...missing, ...injected])];
+    if (allMissing.length > 0) {
+      return json({ error: 'missing_blobs', hashes: allMissing }, 422);
     }
 
     // Apply in order (simulate server transaction)

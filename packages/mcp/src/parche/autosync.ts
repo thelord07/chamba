@@ -8,6 +8,7 @@
 
 import { syncManualHint, syncOnce } from '@chamba/core';
 import type { Logger } from 'pino';
+import { describeError } from '../fatal.js';
 import type { Services } from '../services.js';
 import type { ActiveParcheVault } from './active-vault.js';
 import { withVaultLock } from './mutex.js';
@@ -88,7 +89,7 @@ export async function maybeAutoSync(
         logger.info({ tool: 'autosync', slug: vault.slug, phase }, 'auto-sync completed');
         return { ok: true as const, signal: controller.signal };
       } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
+        const msg = describeError(err, { slug: vault.slug });
         logger.warn({ tool: 'autosync', slug: vault.slug, phase, err: msg }, 'auto-sync failed');
         return { ok: false as const, msg, signal: controller.signal };
       } finally {

@@ -6,6 +6,7 @@ import {
   NodeNet,
   NodeProcess,
   NodeSystem,
+  RetryingHttp,
   SystemClock,
 } from '@chamba/adapters';
 import type {
@@ -17,6 +18,7 @@ import type {
   ProcessPort,
   SystemPort,
 } from '@chamba/core';
+import type { Logger } from 'pino';
 
 /**
  * The OS-level services every tool needs, wired to Node adapters by default.
@@ -78,14 +80,14 @@ export interface Services {
   username: string;
 }
 
-export function createNodeServices(): Services {
+export function createNodeServices(logger?: Logger): Services {
   return {
     fs: new NodeFilesystem(),
     process: new NodeProcess(),
     clock: new SystemClock(),
     system: new NodeSystem(),
     net: new NodeNet(),
-    http: new NodeHttp(),
+    http: new RetryingHttp(new NodeHttp(), { logger }),
     hash: new NodeHash(),
     cwd: process.cwd(),
     homedir: homedir(),

@@ -2,6 +2,7 @@ import { createInterface } from 'node:readline';
 import { renderDoctorReport, runDoctor } from '@chamba/core';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { runVaultCli } from './cli/vault.js';
+import { formatFatal } from './fatal.js';
 import { createLogger } from './logging.js';
 import { createServer } from './server.js';
 import { createNodeServices, obsidianSearchRoots } from './services.js';
@@ -68,7 +69,7 @@ async function main(): Promise<void> {
   }
 
   const logger = createLogger();
-  const services = createNodeServices();
+  const services = createNodeServices(logger);
   const server = createServer(logger, services);
   const transport = new StdioServerTransport();
 
@@ -86,6 +87,7 @@ async function main(): Promise<void> {
 main().catch((err) => {
   // Last-resort error path. stderr is acceptable here because the process is
   // about to die and the transport is not (or no longer) carrying protocol.
-  process.stderr.write(`chamba-mcp fatal: ${(err as Error).message}\n`);
+  // formatFatal includes cause.code/message when present and redacts pch_ tokens.
+  process.stderr.write(`chamba-mcp fatal: ${formatFatal(err)}\n`);
   process.exit(1);
 });
