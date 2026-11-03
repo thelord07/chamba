@@ -189,6 +189,7 @@ export {
 // Vault sync — client (PARCHE-004)
 export type { CredentialEntry, CredentialsFile } from './vault-sync/credentials.js';
 export { CredentialsStore, credentialsFileSchema } from './vault-sync/credentials.js';
+export { defaultDeviceLabel, MAX_DEVICE_LABEL_LENGTH } from './vault-sync/device-label.js';
 // Vault-sync messages and helpers (PARCHE-011)
 export {
   joinFirstHint,

@@ -16,6 +16,7 @@ import { hostname } from 'node:os';
 import {
   AdoptionPendingError,
   CredentialsStore,
+  defaultDeviceLabel,
   InvalidJoinInputError,
   joinFirstHint,
   joinOnce,
@@ -208,7 +209,8 @@ async function runJoin(argv: string[], deps: VaultCliDeps): Promise<void> {
 
   // Resolve label
   const resolvedHostname = deps.hostname ?? hostname();
-  const label = labelFlag !== undefined ? labelFlag : resolvedHostname;
+  // An explicit --label is sent as given; the hostname default is made protocol-valid.
+  const label = labelFlag !== undefined ? labelFlag : defaultDeviceLabel(resolvedHostname);
 
   // Parse join input
   let parsed: ReturnType<typeof parseJoinInput>;

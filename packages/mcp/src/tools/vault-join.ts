@@ -9,6 +9,7 @@
 import { hostname } from 'node:os';
 import {
   CredentialsStore,
+  defaultDeviceLabel,
   InvalidJoinInputError,
   joinInRepoHint,
   joinOnce,
@@ -92,7 +93,8 @@ export function registerVaultJoin(server: McpServer, logger: Logger, services: S
           linkServer: parsed.server,
           envUrl: services.parcheServerUrl,
         });
-        const label = deviceLabel !== undefined ? deviceLabel : hostname();
+        // An explicit deviceLabel is sent as given; the hostname default is made protocol-valid.
+        const label = deviceLabel !== undefined ? deviceLabel : defaultDeviceLabel(hostname());
 
         // PARCHE-009: if confirmUpload:true, first try to resume an existing pending vault.
         // This MUST happen BEFORE prepareVaultDir to avoid the already_linked rejection when

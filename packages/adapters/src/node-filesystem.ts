@@ -12,7 +12,7 @@ import {
   writeFile,
 } from 'node:fs/promises';
 import { userInfo } from 'node:os';
-import { dirname as pathDirname, parse as pathParse } from 'node:path';
+import { dirname as pathDirname, join as pathJoin, parse as pathParse } from 'node:path';
 import { promisify } from 'node:util';
 import type { DirEntry, FileStat, FilesystemPort, WriteBytesOptions } from '@chamba/core';
 
@@ -202,7 +202,8 @@ export class NodeFilesystem implements FilesystemPort {
             // Reached the root — resolve it (it must exist)
             try {
               const resolvedRoot = await realpath(candidate);
-              return tail.length === 0 ? resolvedRoot : `${resolvedRoot}/${tail.join('/')}`;
+              // Native separators (`C:\\x\\y` on Windows), never mixed.
+              return tail.length === 0 ? resolvedRoot : pathJoin(resolvedRoot, ...tail);
             } catch {
               // Root itself not resolvable — return path as-is
               return path;
@@ -212,7 +213,7 @@ export class NodeFilesystem implements FilesystemPort {
           candidate = parent;
           try {
             const resolvedAncestor = await realpath(candidate);
-            return tail.length === 0 ? resolvedAncestor : `${resolvedAncestor}/${tail.join('/')}`;
+            return tail.length === 0 ? resolvedAncestor : pathJoin(resolvedAncestor, ...tail);
           } catch (innerErr) {
             if (
               innerErr instanceof Error &&

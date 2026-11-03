@@ -414,6 +414,22 @@ describe('CLI error messages', () => {
     expect(parche.lastJoinRequest?.deviceLabel).toBe(FAKE_HOST);
   });
 
+  it('default label from a hostname longer than 64 chars is cut and the join succeeds', async () => {
+    // Regression (CHAMBA-015 CI on macos-latest): long runner hostnames made the server 400.
+    const parche = new FakeParche(makeClock());
+    const group = parche.seedGroup({ slug: 'team-alpha', name: 'Team Alpha' });
+    parche.addInvite({ code: 'K7QX-M2RP', groupId: group.id, role: 'editor' });
+    const svc = makeServices(parche);
+    const LONG_HOST = `sat12-${'f'.repeat(70)}.local`;
+
+    const r = await makeCli(svc, ['join', 'K7QX-M2RP', '--name', 'Joys', '--email', 'j@x.dev'], {
+      hostname: LONG_HOST,
+    });
+
+    expect(r.code).toBe(0);
+    expect(parche.lastJoinRequest?.deviceLabel).toBe(LONG_HOST.slice(0, 64));
+  });
+
   it('--label "" → deviceLabel omitted from request', async () => {
     // We need to check that FakeParche receives no deviceLabel when --label ""
     const parche = new FakeParche(makeClock());
