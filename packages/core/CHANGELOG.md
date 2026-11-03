@@ -1,5 +1,11 @@
 # @chamba/core
 
+## 1.12.0
+
+### Minor Changes
+
+- b1c5799: CHAMBA-016: hierarchical `tema/…` tags as a knowledge network. Notes carry `temas` (1–5 vocabulary paths), `summary`, `keywords`, `aliases`, `work_item`, and `related` in their frontmatter; a note can belong to several topics without being duplicated. A per-workspace `temas/VOCABULARIO.md` (controlled by the human, never invented by chamba) defines the hierarchy, aliases, and promotion/split thresholds. `buildKnowledgeGraph` derives a navigable network deterministically — root `INDEX.md`, per-node topic hubs (`temas/<path>.md`), `temas/sin-clasificar.md`, `temas/PROPUESTOS.md`, per-folder `INDEX.md`s, and optional Obsidian Bases (`.base` files filtered by `file.hasTag`) — writing only what changed, producing identical bytes on any machine and OS. New tools: `chamba_vault_topics` (bootstrap/apply/list/add/alias/promote with `dryRun:true` by default for apply and promote; `apply` with `dryRun:false` only after explicit user confirmation; `replace:true` required if vocabulary already exists), `chamba_vault_classify` (list unclassified notes paginated 50; apply with `dryRun:true` by default, `dryRun:false` only after confirmation; body preserved byte-for-byte), and `chamba_vault_reindex` (also CLI `vault reindex [--dry-run] [--adopt-manual <folder>…] [--yes]`). On a parche pull, derived files (pattern + `source: chamba` + `generated: true`) are accepted without conflict copies and reindex is scheduled; `VOCABULARIO.md` and note files follow the normal conflict flow. Manual `INDEX.md` files (no `source: chamba`) are never overwritten and are reported in `indicesManualesOmitidos`; the `adoptManual` option (dryRun by default, never automatic) renames them to `INDEX (manual).md` before generating a new one. Prompts (`agents/planner.md`, `commands/ticket.md`, `commands/vault.md`, `commands/orq.md`) updated with knowledge-network guidance: read closest nodes before choosing `temas`, several topics → one note, `summary` describes the content, `keywords` for search, `workItem` for HU grouping, unknown topics as proposals.
+
 ## 1.11.0
 
 ### Minor Changes

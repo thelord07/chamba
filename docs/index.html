@@ -68,7 +68,7 @@
 
 <script>
 const AC = 'var(--accent)', OK = 'var(--accent2)', AM = 'var(--amber)', MU = 'var(--muted)';
-const VERSION = '1.11.0';
+const VERSION = '1.12.0';
 
 const EDITORS = [
   { id: 'cursor', name: 'Cursor', file: '.cursor/mcp.json',
@@ -181,14 +181,17 @@ const CONTENT = {
       { name: 'load_skills', in: '{ task, max? }', out: 'Playbooks relevantes de .chamba/skills (index-first, sin LLM)' },
       { name: 'load_design', in: '{ task, max? }', out: 'Resuelve la fuente de diseño enlazada (Figma / mockups / prototipo .html·.zip) + la preferencia de arquitectura' },
       { name: 'design_prefs', in: '{ web?, mobile? }', out: 'Lee/guarda la arquitectura de UI (Atomic Design, FSD…): el planner pregunta una vez y reusa' },
-      { name: 'summarize_to_vault', in: '{ title, content, projectSlug? }', out: 'Escribe un resumen a la carpeta proyectos/' },
-      { name: 'save_plan', in: '{ title, content, projectSlug? }', out: 'Guarda un plan en la carpeta plans/' },
+      { name: 'summarize_to_vault', in: '{ title, content, projectSlug?, temas?, summary?, … }', out: 'Escribe un resumen a la carpeta proyectos/' },
+      { name: 'save_plan', in: '{ title, content, projectSlug?, temas?, summary?, … }', out: 'Guarda un plan en la carpeta plans/' },
       { name: 'vault_status', in: '{ }', out: 'Ruta del vault + las notas que chamba ve (diagnóstico) + el vínculo de parche activo' },
       { name: 'vault_join', in: '{ code, name, email, deviceLabel?, dir?, confirmUpload?, scope? }', out: 'Se une a un vault de grupo de parche con un código o link de invitación: crea el vault local (o usa tu carpeta con dir), guarda credenciales (0600) y hace el primer sync. Nunca devuelve el token' },
       { name: 'vault_sync', in: '{ slug? }', out: 'Sincroniza uno o todos los vaults de parche con el server: subidos, bajados y conflictos (copias, nunca pisa)' },
       { name: 'vault_link', in: '{ slug, dir, confirmUpload? }', out: 'Re-vincula un vault de parche a otra carpeta: reinicia el sync y pasa por el gate de adopción. Nunca mueve ni borra la anterior' },
       { name: 'vault_unlink', in: '{ scope? }', out: 'Quita el vínculo parche.json del workspace o el global. Conserva credenciales y archivos' },
       { name: 'vault_resync', in: '{ slug, confirmUpload? }', out: 'Reinicia el estado de sync y re-adopta el vault desde el server, si el estado local se corrompió' },
+      { name: 'vault_topics', in: '{ action, … }', out: 'Vocabulario de temas (temas/VOCABULARIO.md): list, bootstrap, apply, add, alias, promote. dryRun por defecto; los temas los decide el humano' },
+      { name: 'vault_classify', in: '{ action, page?, entries?, dryRun? }', out: 'Lista notas sin clasificar o les asigna temas/summary/keywords en el frontmatter. dryRun por defecto; el cuerpo no se toca' },
+      { name: 'vault_reindex', in: '{ dryRun?, adoptManual? }', out: 'Reconstruye hubs por tema, índices y Bases de forma determinista; nunca pisa un INDEX.md manual' },
       { name: 'parche_status', in: '{ }', out: 'Por vault: server, slug, rol, último sync, cambios pendientes y ruta. Sin token' },
       { name: 'triage_ticket', in: '{ ticket }', out: 'Chequeo de completitud del ticket (sin LLM): qué le falta (repro, esperado/actual, entorno, alcance, criterios, severidad) + las preguntas para pedir. Potencia /triage' },
       { name: 'generate_plan', in: '{ task, context? }', out: 'Plantilla de plan estructurado' },
@@ -276,7 +279,8 @@ const CONTENT = {
       { badge: 'Listo', dot: OK, title: 'v1.8.0 — vaults de grupo (cliente de parche)', desc: 'Tu equipo comparte un vault Obsidian y chamba lo mantiene sincronizado: vault join con un código de invitación, vault sync / status / leave por CLI y tres tools MCP nuevas (vault_join, vault_sync, parche_status). summarize_to_vault, load_context, remember y recall sincronizan solos en segundo plano con tope de 10 s. Las memorias del grupo viven en el vault; las personales nunca se suben. Conflictos como copias, nunca pisa. Sin LLM.' },
       { badge: 'Listo', dot: OK, title: 'v1.9.0 — tu propia carpeta de vault', desc: 'vault join --dir y vault link <slug> --dir usan cualquier carpeta como vault de parche, también tu vault Obsidian de siempre. Si la carpeta ya tiene archivos, chamba muestra qué subiría y no sincroniza nada hasta que confirmes (--yes o confirmUpload). Si la carpeta desaparece, el sync falla claro en vez de recrearla. Sin LLM.' },
       { badge: 'Listo', dot: OK, title: 'v1.10.0 — parche por workspace + /parche', desc: 'Cada workspace declara su vault de grupo en .chamba/parche.json (sin código ni token): el repo del equipo A sincroniza con el parche A y el del B con el B. Comando /parche en todos los editores y tools para re-vincular, desvincular y resincronizar un vault. Además, planner, implementer, reviewer y tester ahora consideran N+1, concurrencia sin límite, timeouts e idempotencia por defecto. Sin LLM.' },
-      { badge: 'Ahora', dot: AM, title: 'v1.11.0 — parche en redes reales + Windows', desc: 'El sync de parche ya no hace un HEAD por archivo: sube solo lo que le falta al server por una conexión keep-alive (100 archivos nuevos pasaron de 102 conexiones TCP a 1), reintenta cortes, timeouts y 502/503/504 con backoff, y te dice qué falló y qué comando re-correr en vez de fetch failed. Y el cliente de parche funciona en Windows: rutas D:\\ y UNC, credenciales con ACL solo para tu usuario, nombres inválidos en Windows se saltan sin borrar nada. CI en ubuntu, windows y macOS. Sin LLM.' },
+      { badge: 'Listo', dot: OK, title: 'v1.11.0 — parche en redes reales + Windows', desc: 'El sync de parche ya no hace un HEAD por archivo: sube solo lo que le falta al server por una conexión keep-alive (100 archivos nuevos pasaron de 102 conexiones TCP a 1), reintenta cortes, timeouts y 502/503/504 con backoff, y te dice qué falló y qué comando re-correr en vez de fetch failed. Y el cliente de parche funciona en Windows: rutas D:\\ y UNC, credenciales con ACL solo para tu usuario, nombres inválidos en Windows se saltan sin borrar nada. CI en ubuntu, windows y macOS. Sin LLM.' },
+      { badge: 'Ahora', dot: AM, title: 'v1.12.0 — red de conocimiento en el vault', desc: 'Las notas llevan temas jerárquicos (tema/dev/typescript…) de un vocabulario que controlás vos; una nota puede estar en varios temas sin duplicarse. chamba arma de forma determinista los hubs por tema, el INDEX raíz, índices por carpeta y Obsidian Bases opcionales, escribiendo solo lo que cambió y con los mismos bytes en cualquier máquina. Tres tools nuevas: vault_topics, vault_classify y vault_reindex, con dryRun por defecto. parche sincroniza lo derivado sin copias en conflicto. Sin LLM.' },
       { badge: 'Explorando', dot: MU, title: 'V2: registro de servicios, búsqueda semántica', desc: 'Registro con detección de drift y búsqueda del vault.' }
     ],
     ctaTitle: 'Pon a tu editor a trabajar la chamba',
@@ -340,14 +344,17 @@ const CONTENT = {
       { name: 'load_skills', in: '{ task, max? }', out: 'Relevant playbooks from .chamba/skills (index-first, no LLM)' },
       { name: 'load_design', in: '{ task, max? }', out: 'Resolves the linked design source (Figma / mockups / .html·.zip prototype) + the architecture preference' },
       { name: 'design_prefs', in: '{ web?, mobile? }', out: 'Get/set the UI architecture (Atomic Design, FSD…): the planner asks once and reuses it' },
-      { name: 'summarize_to_vault', in: '{ title, content, projectSlug? }', out: 'Writes a run summary to proyectos/' },
-      { name: 'save_plan', in: '{ title, content, projectSlug? }', out: 'Saves a plan to plans/' },
+      { name: 'summarize_to_vault', in: '{ title, content, projectSlug?, temas?, summary?, … }', out: 'Writes a run summary to proyectos/' },
+      { name: 'save_plan', in: '{ title, content, projectSlug?, temas?, summary?, … }', out: 'Saves a plan to plans/' },
       { name: 'vault_status', in: '{ }', out: 'Resolved vault path + the notes chamba can see + the active parche binding' },
       { name: 'vault_join', in: '{ code, name, email, deviceLabel?, dir?, confirmUpload?, scope? }', out: 'Joins a parche group vault with an invite code or link: creates the local vault (or uses your folder via dir), saves credentials (0600) and runs the first sync. Never returns the token' },
       { name: 'vault_sync', in: '{ slug? }', out: 'Syncs one or all parche vaults with the server: pushed, pulled and conflicts (copies, never overwrites)' },
       { name: 'vault_link', in: '{ slug, dir, confirmUpload? }', out: 'Re-links a parche vault to another folder: resets sync and runs the adoption gate. Never moves or deletes the old one' },
       { name: 'vault_unlink', in: '{ scope? }', out: 'Removes the workspace or global parche.json binding. Keeps credentials and files' },
       { name: 'vault_resync', in: '{ slug, confirmUpload? }', out: 'Resets sync state and re-adopts the vault from the server when local state is corrupted' },
+      { name: 'vault_topics', in: '{ action, … }', out: 'Topic vocabulary (temas/VOCABULARIO.md): list, bootstrap, apply, add, alias, promote. dryRun by default; the human decides the topics' },
+      { name: 'vault_classify', in: '{ action, page?, entries?, dryRun? }', out: 'Lists unclassified notes or sets temas/summary/keywords in their frontmatter. dryRun by default; the body is untouched' },
+      { name: 'vault_reindex', in: '{ dryRun?, adoptManual? }', out: 'Rebuilds topic hubs, indexes and Bases deterministically; never overwrites a manual INDEX.md' },
       { name: 'parche_status', in: '{ }', out: 'Per vault: server, slug, role, last sync, pending changes and path. No token' },
       { name: 'triage_ticket', in: '{ ticket }', out: 'Ticket-completeness check (no LLM): what it is missing (repro, expected/actual, environment, scope, criteria, severity) + the questions to ask back. Powers /triage' },
       { name: 'generate_plan', in: '{ task, context? }', out: 'A structured plan template' },
@@ -435,7 +442,8 @@ const CONTENT = {
       { badge: 'Shipped', dot: OK, title: 'v1.8.0 — group vaults (parche client)', desc: 'Your team shares an Obsidian vault and chamba keeps it in sync: vault join with an invite code, vault sync / status / leave from the CLI and three new MCP tools (vault_join, vault_sync, parche_status). summarize_to_vault, load_context, remember and recall sync in the background, capped at 10 s. Group memories live in the vault; personal ones are never uploaded. Conflicts become copies, never overwrites. No LLM.' },
       { badge: 'Shipped', dot: OK, title: 'v1.9.0 — your own vault folder', desc: 'vault join --dir and vault link <slug> --dir use any folder as the parche vault, including your existing Obsidian vault. If the folder already has files, chamba shows what it would upload and syncs nothing until you confirm (--yes or confirmUpload). If the folder goes missing, sync fails clearly instead of recreating it. No LLM.' },
       { badge: 'Shipped', dot: OK, title: 'v1.10.0 — parche per workspace + /parche', desc: 'Each workspace declares its group vault in .chamba/parche.json (no code, no token): team A\'s repo syncs with parche A and team B\'s with parche B. A /parche command in every editor plus tools to re-link, unlink and resync a vault. Also, planner, implementer, reviewer and tester now weigh N+1s, unbounded concurrency, timeouts and idempotency by default. No LLM.' },
-      { badge: 'Now', dot: AM, title: 'v1.11.0 — parche on real networks + Windows', desc: 'parche sync no longer sends a HEAD per file: it uploads only what the server is missing over one keep-alive connection (100 new files went from 102 TCP connections to 1), retries resets, timeouts and 502/503/504 with backoff, and tells you what failed and which command to re-run instead of fetch failed. And the parche client runs on Windows: D:\\ and UNC paths, credentials with a user-only ACL, names invalid on Windows are skipped without deleting anything. CI on ubuntu, windows and macOS. No LLM.' },
+      { badge: 'Shipped', dot: OK, title: 'v1.11.0 — parche on real networks + Windows', desc: 'parche sync no longer sends a HEAD per file: it uploads only what the server is missing over one keep-alive connection (100 new files went from 102 TCP connections to 1), retries resets, timeouts and 502/503/504 with backoff, and tells you what failed and which command to re-run instead of fetch failed. And the parche client runs on Windows: D:\\ and UNC paths, credentials with a user-only ACL, names invalid on Windows are skipped without deleting anything. CI on ubuntu, windows and macOS. No LLM.' },
+      { badge: 'Now', dot: AM, title: 'v1.12.0 — knowledge network in the vault', desc: 'Notes carry hierarchical topics (tema/dev/typescript…) from a vocabulary you control; one note can live in several topics without duplicates. chamba deterministically builds topic hubs, the root INDEX, per-folder indexes and optional Obsidian Bases, writing only what changed, with the same bytes on any machine. Three new tools: vault_topics, vault_classify and vault_reindex, dryRun by default. parche syncs the derived files without conflict copies. No LLM.' },
       { badge: 'Exploring', dot: MU, title: 'V2: service registry, semantic search', desc: 'Registry with drift detection and vault search.' }
     ],
     ctaTitle: 'Put your editor to work — la chamba',
