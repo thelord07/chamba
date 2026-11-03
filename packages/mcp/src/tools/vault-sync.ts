@@ -11,6 +11,7 @@ import {
   readState,
   resolveVaultDir,
   syncOnce,
+  VaultReindexer,
 } from '@chamba/core';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { Logger } from 'pino';
@@ -147,6 +148,28 @@ export function registerVaultSync(server: McpServer, logger: Logger, services: S
           if (summary.errors.length > 0) {
             results.push(`  errors: ${summary.errors.join('; ')}`);
             anyError = true;
+          }
+          // CHAMBA-016: derived conflict summary line
+          if ((summary.derivedConflictsResolved ?? []).length > 0) {
+            const n = (summary.derivedConflictsResolved ?? []).length;
+            results.push(
+              `  ${n} archivos generados en conflicto: se aceptó la versión remota y se regeneran`,
+            );
+          }
+          // CHAMBA-016: reindex after pull if needed (full, no deadline for explicit sync tool)
+          if (summary.needsReindex) {
+            try {
+              const reindexReport = await new VaultReindexer(services.fs, vaultDir).reindex();
+              if (reindexReport.archivosEscritos.length > 0) {
+                results.push(
+                  `  reindex: ${reindexReport.archivosEscritos.length} archivo(s) generado(s)`,
+                );
+              }
+            } catch (reindexErr) {
+              results.push(
+                `  ⚠ reindex falló: ${reindexErr instanceof Error ? reindexErr.message : String(reindexErr)}`,
+              );
+            }
           }
           const syncOut = formatSyncOutput(summary);
           resultDetails.push({ slug: sl, ...syncOut });

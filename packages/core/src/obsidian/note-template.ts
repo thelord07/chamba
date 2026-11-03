@@ -46,7 +46,11 @@ export function slugifyGitRemote(url: string): string {
  * structure — chamba only owns the frontmatter and the title heading.
  */
 export function renderNote(fields: NoteFields): string {
-  const tags = fields.tags.map((t) => slugify(t)).filter((t) => t.length > 0);
+  // Preserve `tema/…` tags as-is (slugifying would destroy the `/`).
+  // All other tags are slugified as before.
+  const tags = fields.tags
+    .map((t) => (t.startsWith('tema/') ? t : slugify(t)))
+    .filter((t) => t.length > 0);
   const frontmatter = [
     '---',
     `title: "${escapeYaml(fields.title)}"`,

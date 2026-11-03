@@ -100,7 +100,7 @@ describe('obsidian tools', () => {
     });
     expect(textOf(result)).toContain('Saved plan to /vault/plans/2026-06-09-ticket-123.md');
     const note = await svc.fs.readFile('/vault/plans/2026-06-09-ticket-123.md');
-    expect(note).toContain('tags: [chamba, plan]');
+    expect(note).toMatch(/tags:\s*\n\s*-\s*chamba\s*\n\s*-\s*plan/);
     expect(note).toContain('Do X.');
 
     await server.close();

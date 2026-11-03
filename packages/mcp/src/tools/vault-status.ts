@@ -1,4 +1,4 @@
-import { listVaultNotes, ObsidianDetector, readState } from '@chamba/core';
+import { listVaultNotes, ObsidianDetector, readState, VaultReindexer } from '@chamba/core';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { Logger } from 'pino';
 import { resolveBindingHeader } from '../parche/binding-ops.js';
@@ -109,10 +109,27 @@ export function registerVaultStatus(server: McpServer, logger: Logger, services:
       const more = names.length > MAX_LISTED ? `\n…and ${names.length - MAX_LISTED} more` : '';
       const skippedLine =
         skippedByName > 0 ? `\nSkipped (Windows-invalid names): ${skippedByName} archivo(s)` : '';
+
+      // Knowledge network summary (read-only, dryRun:true)
+      let knowledgeLine = '';
+      try {
+        const reindexer = new VaultReindexer(services.fs, detection.path);
+        const report = await reindexer.reindex({ dryRun: true });
+        const sugStr =
+          report.sugerencias.length > 0
+            ? report.sugerencias
+                .map((s) => `${s.proposed}${s.readyToPromote ? '(promover)' : ''}`)
+                .join(', ')
+            : 'ninguna';
+        knowledgeLine = `\nRed de conocimiento: ${report.notas} notas, ${report.sinClasificar} sin clasificar, ${report.propuestos} propuestas; sugerencias: ${sugStr}`;
+      } catch {
+        // Non-fatal
+      }
+
       const text =
         lines.join('\n') +
         `Vault: ${detection.path} (${source})\n` +
-        `Notes chamba can see: ${names.length}${skippedLine}\n\n${shown.map((n) => `- ${n}`).join('\n')}${more}` +
+        `Notes chamba can see: ${names.length}${skippedLine}${knowledgeLine}\n\n${shown.map((n) => `- ${n}`).join('\n')}${more}` +
         (names.length === 0
           ? '\n\n⚠️ No notes found. If your path ends in `.obsidian`, point it at the parent folder instead.'
           : '');

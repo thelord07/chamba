@@ -24,11 +24,14 @@ import { registerReviewPlan } from './tools/review-plan.js';
 import { registerSavePlan } from './tools/save-plan.js';
 import { registerSummarizeToVault } from './tools/summarize-to-vault.js';
 import { registerTriageTicket } from './tools/triage-ticket.js';
+import { registerVaultClassify } from './tools/vault-classify.js';
 import { registerVaultJoin } from './tools/vault-join.js';
 import { registerVaultLink } from './tools/vault-link.js';
+import { registerVaultReindex } from './tools/vault-reindex.js';
 import { registerVaultResync } from './tools/vault-resync.js';
 import { registerVaultStatus } from './tools/vault-status.js';
 import { registerVaultSync } from './tools/vault-sync.js';
+import { registerVaultTopics } from './tools/vault-topics.js';
 import { registerVaultUnlink } from './tools/vault-unlink.js';
 import { registerWorkspaceInit } from './tools/workspace-init.js';
 import { registerWorkspaceReload } from './tools/workspace-reload.js';
@@ -85,6 +88,9 @@ export function createServer(logger: Logger, services: Services = createNodeServ
   registerVaultResync(server, logger, services);
   registerVaultSync(server, logger, services);
   registerParcheStatus(server, logger, services);
+  registerVaultTopics(server, logger, services);
+  registerVaultClassify(server, logger, services);
+  registerVaultReindex(server, logger, services);
 
   return server;
 }

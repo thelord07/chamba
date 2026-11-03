@@ -77,6 +77,80 @@ export {
   modelsByProvider,
   resolveEffort,
 } from './models/catalog.js';
+export { buildBaseFiles, renderBaseFile } from './obsidian/knowledge/bases.js';
+// Knowledge — classify (CHAMBA-016 wave 3)
+export type {
+  ClassifyApplyResult,
+  ClassifyDiff,
+  ClassifyEntry,
+  ClassifyPlanResult,
+  ListUnclassifiedResult,
+  UnclassifiedItem,
+} from './obsidian/knowledge/classify.js';
+export {
+  classifyApply,
+  classifyPlan,
+  listUnclassified,
+} from './obsidian/knowledge/classify.js';
+export { isChambaGenerated, isDerivedPathPattern } from './obsidian/knowledge/derived-path.js';
+// Knowledge graph — derived files builder (CHAMBA-016 wave 2)
+export type {
+  GraphNote,
+  GraphOptions,
+  TopicSuggestion,
+} from './obsidian/knowledge/knowledge-graph.js';
+export { buildKnowledgeGraph, computeSuggestions } from './obsidian/knowledge/knowledge-graph.js';
+// Knowledge graph — note metadata and vocabulary (CHAMBA-016)
+export type { NoteMetadata, NoteType } from './obsidian/knowledge/note-metadata.js';
+export {
+  quoteScalar,
+  readNoteMetadata,
+  upsertNoteMetadata,
+} from './obsidian/knowledge/note-metadata.js';
+export type { ReindexOptions, ReindexReport } from './obsidian/knowledge/reindexer.js';
+export { VaultReindexer } from './obsidian/knowledge/reindexer.js';
+// Knowledge — topics (CHAMBA-016 wave 3)
+export type {
+  BootstrapFolder,
+  BootstrapIndex,
+  BootstrapStats,
+  BootstrapTag,
+  BootstrapTerm,
+  BootstrapWorkItem,
+  ClosestTopicResult,
+  PromoteDiff,
+  PromotePlanResult,
+  ProposedNode,
+  RenderVocabularyOpts,
+  RenderVocabularyResult,
+  WriteVocabularyOpts,
+} from './obsidian/knowledge/topics.js';
+export {
+  applyPromote,
+  bootstrapStats,
+  closestTopics,
+  compactTopicTree,
+  promotePlan,
+  renderVocabulary,
+  STOPWORDS_ES_EN,
+  vocabularyAdd,
+  vocabularyAlias,
+  writeVocabulary,
+} from './obsidian/knowledge/topics.js';
+export type {
+  ResolveTopicResult,
+  TopicNode,
+  Vocabulary,
+  VocabularyError,
+} from './obsidian/knowledge/vocabulary.js';
+export {
+  ancestors,
+  children,
+  editDistance,
+  emptyVocabularyTemplate,
+  parseVocabulary,
+  resolveTopic,
+} from './obsidian/knowledge/vocabulary.js';
 export type { NoteFields } from './obsidian/note-template.js';
 export { renderNote, slugify, slugifyGitRemote } from './obsidian/note-template.js';
 export type { IndexEntry } from './obsidian/vault-index.js';

@@ -6,7 +6,7 @@
  * warning string and can append it to its normal response.
  */
 
-import { syncManualHint, syncOnce } from '@chamba/core';
+import { syncManualHint, syncOnce, VaultReindexer } from '@chamba/core';
 import type { Logger } from 'pino';
 import { describeError } from '../fatal.js';
 import type { Services } from '../services.js';
@@ -25,6 +25,13 @@ import { withVaultLock } from './mutex.js';
  *  - CLI `npx @chamba/mcp vault sync` and the `chamba_vault_sync` tool have no budget and are
  *    the right choice when a user wants a reliable, unbounded sync.
  */
+/**
+ * Vaults whose post-pull reindex ran out of budget or failed. The next auto-sync of the
+ * same vault reindexes even if it pulls nothing, so derived files never stay stale for the
+ * life of the MCP server (the CLI `vault sync` always reindexes without a deadline).
+ */
+const pendingReindex = new Set<string>();
+
 export const AUTOSYNC_BUDGET_MS = 10_000;
 
 /** Result returned by maybeAutoSync. */
@@ -72,8 +79,9 @@ export async function maybeAutoSync(
     mutexKey,
     { onBusy: 'skip', logger, label: vault.slug },
     async () => {
+      const syncStart = Date.now();
       try {
-        await syncOnce(
+        const summary = await syncOnce(
           { fs: services.fs, http: services.http, hash: services.hash, clock: services.clock },
           {
             vaultDir: vault.vaultDir,
@@ -87,6 +95,43 @@ export async function maybeAutoSync(
           },
         );
         logger.info({ tool: 'autosync', slug: vault.slug, phase }, 'auto-sync completed');
+
+        // CHAMBA-016: run reindex after pull if needed
+        if (summary.needsReindex || pendingReindex.has(vault.vaultDir)) {
+          const elapsed = Date.now() - syncStart;
+          const remaining = budgetMs - elapsed;
+          // Use the lesser of 2 s and remaining budget
+          const reindexDeadline = Math.max(0, Math.min(2000, remaining));
+          try {
+            const reindexReport = await new VaultReindexer(services.fs, vault.vaultDir).reindex({
+              deadlineMs: reindexDeadline,
+            });
+            if (reindexReport.incompleto) {
+              pendingReindex.add(vault.vaultDir);
+              logger.warn(
+                { tool: 'autosync', slug: vault.slug },
+                'reindex incompleto; se completará en el siguiente sync',
+              );
+            } else {
+              pendingReindex.delete(vault.vaultDir);
+              logger.info(
+                {
+                  tool: 'autosync',
+                  slug: vault.slug,
+                  written: reindexReport.archivosEscritos.length,
+                },
+                'reindex tras pull completado',
+              );
+            }
+          } catch (reindexErr) {
+            pendingReindex.add(vault.vaultDir);
+            logger.warn(
+              { tool: 'autosync', slug: vault.slug, err: String(reindexErr) },
+              'reindex tras pull falló; se reintentará en el siguiente sync',
+            );
+          }
+        }
+
         return { ok: true as const, signal: controller.signal };
       } catch (err) {
         const msg = describeError(err, { slug: vault.slug });

@@ -10,6 +10,7 @@
  * See PARCHE-004 plan for full spec.
  */
 
+import { isChambaGenerated, isDerivedPathPattern } from '../obsidian/knowledge/derived-path.js';
 import type { ClockPort } from '../ports/clock.js';
 import type { FilesystemPort } from '../ports/filesystem.js';
 import type { HashPort } from '../ports/hash.js';
@@ -101,6 +102,19 @@ export interface SyncSummary {
    * Optional for backward-compatibility with code that constructs a partial summary.
    */
   windowsIncompatibleNames?: string[];
+  /**
+   * CHAMBA-016: true when the pull applied changes to any `.md` or `.base`
+   * file (including derived files and vocabulary), or when a derived conflict
+   * was silently resolved by accepting the remote version. Callers should run
+   * VaultReindexer.reindex() after a sync that sets this flag.
+   */
+  needsReindex?: boolean;
+  /**
+   * CHAMBA-016: vault-relative paths of derived files whose conflict was
+   * resolved silently by accepting the remote version (no copy written).
+   * Order is stable (path-alphabetical, same as action processing order).
+   */
+  derivedConflictsResolved?: string[];
 }
 
 /** Local snapshot: path → sha256 hex */
@@ -533,6 +547,8 @@ async function executePullActions(
   errors: string[];
   conflictBlobSource: Map<string, string>;
   skippedInvalidNames: string[];
+  needsReindex: boolean;
+  derivedConflictsResolved: string[];
 }> {
   const { fs, hash } = deps;
   const conflicts: Array<{ path: string; copyPath: string }> = [];
@@ -541,6 +557,8 @@ async function executePullActions(
   const errors: string[] = [];
   const conflictBlobSource = new Map<string, string>();
   const skippedInvalidNames: string[] = [];
+  const derivedConflictsResolved: string[] = [];
+  let needsReindex = false;
   const effectiveStyle = style ?? 'posix';
 
   for (const action of actions) {
@@ -585,37 +603,88 @@ async function executePullActions(
         const dir = absPath.slice(0, absPath.lastIndexOf('/'));
         await fs.mkdir(dir);
         await fs.writeBytes(absPath, data);
+        // CHAMBA-016: any write to .md or .base triggers reindex
+        if (action.path.endsWith('.md') || action.path.endsWith('.base')) {
+          needsReindex = true;
+        }
         break;
       }
 
       case 'conflict': {
-        const { path, remoteHash, localHash } = action;
+        const { path, remoteHash } = action;
 
-        // CHAMBA-015 S10 R2 note 4: if path (or copyPath) is invalid on Windows,
-        // skip the ENTIRE conflict (both steps). The local file is NOT touched.
-        // We report the path in skippedInvalidNames and do NOT write anything.
-        if (isInvalidPath(path, effectiveStyle) || isInvalidPath(action.copyPath, effectiveStyle)) {
+        // CHAMBA-015 S10 R2: if the path itself is invalid on Windows, skip entirely.
+        // For derived conflicts (no copy written), only the path needs to be valid.
+        // We check copyPath validity below only for the normal-conflict branch.
+        if (isInvalidPath(path, effectiveStyle)) {
           skippedInvalidNames.push(path);
           break;
         }
 
         const localAbsPath = joinPath(vaultDir, path);
 
-        // 1. Read local bytes
-        let localBytes: Uint8Array;
+        // 1. Read local bytes (needed for both derived and normal conflict paths)
+        let localBytes: Uint8Array | null;
         try {
           localBytes = await fs.readBytes(localAbsPath);
         } catch {
-          // If local file doesn't exist (unlikely), use empty bytes
-          localBytes = new Uint8Array(0);
+          // File doesn't exist or can't be read — treat as absent
+          localBytes = null;
         }
 
-        // Verify the local hash matches what planPull expected
-        const actualLocalHash = await hash.sha256(localBytes);
-        if (actualLocalHash !== localHash) {
-          // Use actual bytes as the copy content
-          // (file may have changed since scan — use current)
+        // CHAMBA-016: derived-path conflict resolution.
+        // Accept remote without creating a copy when:
+        //   (a) the path matches isDerivedPathPattern, AND
+        //   (b) the local file is chamba-generated (isChambaGenerated) or absent.
+        // Human local files (e.g. INDEX.md without source:chamba) → normal flow.
+        if (isDerivedPathPattern(path)) {
+          const localText = localBytes !== null ? new TextDecoder().decode(localBytes) : '';
+          const localIsGenerated = localBytes === null || isChambaGenerated(path, localText);
+
+          if (localIsGenerated) {
+            // Accept remote silently — no copy, no conflict entry
+            if (remoteHash !== null) {
+              let remoteData: Uint8Array;
+              try {
+                remoteData = await downloadBlob(client, hash, remoteHash, signal);
+              } catch (err) {
+                errors.push(
+                  `Failed to download remote blob for derived conflict "${path}": ${err instanceof Error ? err.message : String(err)}`,
+                );
+                throw err;
+              }
+              const dir = localAbsPath.slice(0, localAbsPath.lastIndexOf('/'));
+              await fs.mkdir(dir);
+              await fs.writeBytes(localAbsPath, remoteData);
+            } else {
+              // remoteHash === null: tombstone wins → move to trash
+              if (localBytes !== null) {
+                const trashRelPath = await nextTrashPath(fs, vaultDir, path);
+                const trashAbsPath = joinPath(vaultDir, trashRelPath);
+                const trashParentDir = trashAbsPath.slice(0, trashAbsPath.lastIndexOf('/'));
+                await fs.mkdir(trashParentDir);
+                await fs.rename(localAbsPath, trashAbsPath);
+                movedToTrash.push(path);
+                movedToTrashEntries.push({ path, trashPath: trashRelPath });
+              }
+            }
+            derivedConflictsResolved.push(path);
+            needsReindex = true;
+            break;
+          }
+          // Local is human — fall through to normal conflict flow below
         }
+
+        // Normal conflict flow (human file, or non-derived path).
+        // Check copyPath validity here — not needed for the derived branch above.
+        if (isInvalidPath(action.copyPath, effectiveStyle)) {
+          skippedInvalidNames.push(path);
+          break;
+        }
+
+        // Use empty bytes as fallback if local file is absent (race condition)
+        // (file may have changed since scan — use current bytes regardless)
+        const localBytesForCopy = localBytes ?? new Uint8Array(0);
 
         // 2. Write conflict copy (with dedupe)
         const { copyPath: finalCopyPath, bytes: copyBytes } = await writeConflictCopy(
@@ -623,7 +692,7 @@ async function executePullActions(
           vaultDir,
           action,
           localAuthor,
-          localBytes,
+          localBytesForCopy,
         );
         conflicts.push({ path, copyPath: finalCopyPath });
 
@@ -656,6 +725,10 @@ async function executePullActions(
           movedToTrash.push(path);
           movedToTrashEntries.push({ path, trashPath: trashRelPath });
         }
+        // CHAMBA-016: any conflict on .md/.base also triggers reindex
+        if (path.endsWith('.md') || path.endsWith('.base')) {
+          needsReindex = true;
+        }
         break;
       }
     }
@@ -668,6 +741,8 @@ async function executePullActions(
     errors,
     conflictBlobSource,
     skippedInvalidNames,
+    needsReindex,
+    derivedConflictsResolved,
   };
 }
 
@@ -774,6 +849,8 @@ export async function syncOnce(deps: SyncDeps, opts: SyncOpts): Promise<SyncSumm
     errors,
     conflictBlobSource,
     skippedInvalidNames,
+    needsReindex,
+    derivedConflictsResolved,
   } = await executePullActions(
     client,
     deps,
@@ -960,6 +1037,8 @@ export async function syncOnce(deps: SyncDeps, opts: SyncOpts): Promise<SyncSumm
     errors,
     skippedInvalidNames,
     windowsIncompatibleNames,
+    needsReindex,
+    derivedConflictsResolved,
   };
 }
 
@@ -1004,6 +1083,8 @@ const ZERO_SUMMARY: SyncSummary = {
   movedToTrash: [],
   movedToTrashEntries: [],
   errors: [],
+  needsReindex: false,
+  derivedConflictsResolved: [],
 };
 
 export async function joinOnce(deps: SyncDeps, opts: JoinOnceOpts): Promise<JoinOnceResult> {

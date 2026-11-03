@@ -51,7 +51,8 @@ check, no LLM — powers `/triage`) · `chamba_generate_plan` · `chamba_review_
 `chamba_cleanup_worktrees`
 
 **Memory + vault:** `chamba_remember` · `chamba_recall` · `chamba_summarize_to_vault` ·
-`chamba_vault_status`
+`chamba_save_plan` · `chamba_vault_status` · `chamba_vault_topics` · `chamba_vault_classify` ·
+`chamba_vault_reindex`
 
 **Parche (group vaults):** `chamba_vault_join` · `chamba_vault_link` · `chamba_vault_unlink` · `chamba_vault_resync` · `chamba_vault_sync` · `chamba_parche_status`
 
@@ -60,6 +61,171 @@ live RAM/CPU) · `chamba_qa_capabilities` (web/mobile QA probe) · `chamba_get_a
 
 Full docs, per-editor guides and examples:
 **https://github.com/thelord07/chamba**
+
+## Knowledge network
+
+One note, written once, connected to all its topics via hierarchical tags (`tema/…`).
+chamba derives a navigable network from the note metadata: a root `INDEX.md`, topic
+hubs, and optionally Obsidian Bases — without duplicating any note.
+
+### Note metadata contract
+
+```yaml
+---
+title: "HU LMS API 01 — cursos y módulos"
+date: 2026-10-29
+type: plan             # plan | resumen | investigacion | informe | decision | guia | nota
+summary: "Endpoints for course/module creation and management in LMS API with API key auth."
+tags:
+  - tema/lms/cursos/creacion
+  - tema/lms/cursos/gestion
+  - tema/lms/gamificacion
+  - chamba
+keywords: [POST /courses, módulos, api key, hu-lms-api-01]   # 0..10, each ≤ 40 chars
+aliases: ["cursos LMS API"]          # optional, native Obsidian
+work_item: hu-lms-api-01             # optional: groups plan/summary/report for the same HU/ticket
+project: lapzo-lms-api               # optional (slugifyGitRemote)
+related: ["plans/2026-10-29-hu-lms-api-01.md"]   # optional, vault-relative paths
+temas_propuestos: [lms/certificados] # optional: requested topics not yet in the vocabulary
+source: chamba
+---
+```
+
+- **Topics = `tema/…` tags** (the only source; Obsidian renders them as a tree). Declare
+  the most specific node; ancestors are implicit.
+- A note can have 1–5 topics. A ticket that touches several topics → **one note with
+  several `temas`**, never duplicate notes.
+- `summary`: one line explaining what the note is about (≤ 200 chars), written on
+  purpose — not "session summary".
+- `keywords`: concrete terms to find the note without opening it (endpoints, entity
+  names, IDs).
+- `work_item`: links a plan note and a summary note for the same HU/ticket.
+- Unknown topics go in `temas_propuestos`; chamba never invents vocabulary.
+- Tolerant parser: missing/partial/invalid frontmatter → valid note, `type: nota`,
+  no topics ⇒ "sin clasificar". Unknown fields are preserved byte-for-byte on rewrite.
+
+### Vocabulary (`temas/VOCABULARIO.md`)
+
+The human controls the vocabulary. Format:
+
+```markdown
+---
+title: "Vocabulario de temas"
+source: human
+umbral_promover: 3     # proposals with ≥ N notes are offered for approval
+umbral_dividir: 25     # nodes with > N direct notes are offered for splitting
+generar_bases: true    # set to false to disable .base file generation
+---
+# Vocabulario de temas
+- `lms` — LMS de Lapzo. Alias: plataforma
+  - `lms/cursos` — Courses and their lifecycle.
+    - `lms/cursos/creacion` — Course/module/lesson creation. Alias: crear-cursos
+    - `lms/cursos/gestion` — Editing, publishing, archiving.
+  - `lms/gamificacion` — Points, badges, rankings. Alias: gamification
+- `soporte` — Bugs and CyA support tasks.
+```
+
+Rules: slug segments `^[a-z0-9]+(-[a-z0-9]+)*$`, depth ≤ 4, every declared node must
+have its parent declared, aliases unique across the whole vocabulary (including slugs).
+
+If the vocabulary does not exist, chamba creates it empty with instructions; it never
+invents topics. All writes keep working without a vocabulary (notes go to "sin clasificar"
+with a warning).
+
+### Bootstrapping (`/vault iniciar`)
+
+Run `/vault iniciar` in your editor to start the knowledge network:
+
+1. The agent calls `chamba_vault_topics action=bootstrap` for deterministic vault
+   statistics (folder counts, existing tags, frequent terms, detected work items).
+2. The agent proposes a topic tree (≤ 30 nodes, ≤ 3 levels) and shows it to you.
+3. The agent calls `chamba_vault_topics action=apply dryRun:true` — **shows you the
+   exact `VOCABULARIO.md` content that would be written**.
+4. **Only after your explicit "yes" in a separate turn** does it call `action=apply
+   dryRun:false` (with `replace:true` if a vocabulary already exists, after confirming
+   with you). Never chained automatically. *(O1)*
+5. After writing the vocabulary, the agent offers to run backfill (`/vault clasificar`).
+
+### Daily writing
+
+`chamba_summarize_to_vault` and `chamba_save_plan` both accept:
+`summary`, `temas` (vocabulary paths, 1..5), `keywords`, `aliases`, `workItem`, `related`,
+`type` (`resumen` default for summarize; `plan` fixed for save_plan).
+
+Both tools respond with: the compact topic tree (≤ 60 lines) and the **5 closest nodes**
+to `title + summary + keywords` — so the agent can reuse before proposing. Read those
+nodes before choosing `temas`.
+
+Validation: valid paths → `tags: tema/…`; an alias is resolved to its canonical path;
+unknown paths → `temas_propuestos` (the tool says so, with suggestions). If no valid
+topic remains, the note is saved unclassified with a warning.
+
+`work_item` cross-linking: if a note with the same `workItem` already exists in the
+vault with `source: chamba`, chamba adds a `related` back-link to it. Human notes are
+never edited in this flow.
+
+### Vocabulary evolution
+
+- `temas/PROPUESTOS.md` (derived): each proposed topic with its requesting notes;
+  those reaching `umbral_promover` appear as "ready to promote".
+- `chamba_vault_topics action=add|alias`: modify `VOCABULARIO.md` — **only when the
+  user explicitly asks**.
+- `chamba_vault_topics action=promote path=<topic> description=<desc>`: **always
+  `dryRun:true` first** (shows the list of notes that will be updated); call
+  `dryRun:false` only after explicit user confirmation (bulk action).
+
+### Backfill (`chamba_vault_classify`)
+
+- `action=list`: unclassified notes (path, title, first paragraph ≤ 300), paginated 50.
+- `action=apply entries=[…]`: assign topics to up to 50 notes per call. **`dryRun:true`
+  by default** — shows a before/after diff of the frontmatter. Call `dryRun:false` only
+  after explicit user confirmation. The body is preserved byte-for-byte.
+
+### Reindex
+
+`chamba_vault_reindex` (and CLI `npx @chamba/mcp vault reindex [--dry-run]
+[--adopt-manual <folder> …] [--yes]`) rebuilds all derived files deterministically:
+
+- Root `INDEX.md`: first-level topics with total counts, folders, "sin clasificar" count,
+  link to `temas/PROPUESTOS.md` if there are proposals.
+- Hub per node `temas/<path>.md` (e.g. `temas/lms.md`, `temas/lms/cursos.md`): description,
+  aliases, link to parent, subtopics with counts, notes grouped by `type` then `work_item`.
+- `temas/sin-clasificar.md`: notes without topics.
+- `<folder>/INDEX.md` (recursive, excluding `memory/`, `.trash/`, `.obsidian/`, `temas/`):
+  entries grouped by the note's first topic.
+
+Determinism: NFC, LF, `/`, relative links, stable order (topic path → type → work_item →
+date desc → path asc, case-insensitive with exact tiebreak), no generation timestamps.
+Same notes → same bytes on any machine and OS.
+
+Reindex runs automatically: after every write (incremental) and after a parche pull that
+changed notes or derived files (full; 2 s budget; if exceeded, a warning is shown and it
+completes on the next sync).
+
+`--adopt-manual` / `adoptManual` *(O2)*: **never automatic**. To adopt a manually-written
+`INDEX.md` (no `source: chamba`), call with `adoptManual: ["folder/"]` — `dryRun:true` by
+default, shows which files will be renamed to `INDEX (manual).md` and replaced; call with
+`dryRun:false` only after explicit user confirmation. If `INDEX (manual).md` already exists,
+the tool errors. Unconfirmed manual `INDEX.md` files are reported in `indicesManualesOmitidos`.
+
+### Derived files and conflict resolution
+
+All derived files (`INDEX.md` generated by chamba, `temas/**/*.md` except `VOCABULARIO.md`,
+`temas/*.base`) carry `source: chamba` + `generated: true` (or a `generated: true` YAML
+comment for `.base` files) and the notice: "Generated by chamba from note metadata. Do not
+edit: edit the notes or `temas/VOCABULARIO.md`."
+
+On a parche pull conflict: if the local version is derived (pattern + `source: chamba` +
+`generated: true`) or does not exist → the remote is accepted without a conflict copy, and
+reindex is scheduled. `VOCABULARIO.md` and note files follow the normal conflict flow (a
+copy is created). The network converges: two clients with the same notes reach identical
+bytes without conflict copies or ping-pong.
+
+### Obsidian Bases (optional)
+
+`temas/<root>.base` per first-level topic: table filtered by `file.hasTag("tema/<root>")`,
+columns `file.name`, `type`, `summary`, `work_item`, `date`, grouped by `type`. Disable
+with `generar_bases: false` in `VOCABULARIO.md` frontmatter.
 
 ## parche — group vaults
 

@@ -1,0 +1,43 @@
+---
+title: "lms"
+description: "LMS de Lapzo"
+aliases: ["plataforma"]
+source: chamba
+generated: true
+---
+
+> Generado por chamba desde los metadatos de las notas. No editar: edita las notas o temas/VOCABULARIO.md.
+
+# lms
+
+LMS de Lapzo
+
+[← Índice raíz](../INDEX.md)
+
+## Subtemas
+
+- [cursos](lms/cursos.md) — 10 notas
+- [gamificacion](lms/gamificacion.md) — 6 notas
+
+## Notas
+
+### guia
+
+- [Guía despliegue LMS](../proyectos/guia-deploy-lms.md) — Pasos para hacer deploy del LMS en Kubernetes con Helm. · claves: deploy, kubernetes, helm, ci-cd · guia · 2026-10-27
+
+### informe
+
+- [Informe inscripciones octubre 2026](../informes/informe-inscripciones-octubre.md) — Número de nuevos estudiantes y tasa de finalización de cursos. · claves: inscripciones, finalizacion, tasa-completitud · informe · 2026-11-02
+- [Informe rendimiento LMS — octubre](../informes/informe-rendimiento-lms.md) — Métricas de rendimiento y disponibilidad del LMS en octubre. · claves: rendimiento, uptime, latencia, apdex · informe · 2026-11-01
+
+### investigacion
+
+- [Investigación competidores LMS](../investigacion/inv-lms-competidores.md) — Análisis comparativo de competidores: Moodle, Teachable, Thinkific. · claves: moodle, teachable, thinkific, competidores · investigacion · 2026-10-22
+
+### plan
+
+- [Plan Q4 2026 — LMS](../planes/plan-q4-2026.md) — Plan de trabajo del cuarto trimestre para el proyecto LMS. · claves: q4, trimestre, roadmap · plan · 2026-10-01
+
+### resumen
+
+- [Resumen Sprint LMS 01](../proyectos/resumen-sprint-lms-01.md) — Resumen del primer sprint del proyecto LMS API. · claves: sprint, lms, api, retrospectiva · resumen · 2026-10-21

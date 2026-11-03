@@ -67,6 +67,11 @@ the workspace.
    only place you stop before the final review — it applies whether the plan came
    from the planner or from `-p`. Once the plan is final, call `chamba_save_plan`
    (title: the ticket id) to persist it under the vault's `plans/` folder.
+   **Knowledge network:** read the 5 closest nodes the tool returns before choosing
+   `temas`; a ticket that touches several topics → one note with several `temas`,
+   never separate notes; `summary` says what the plan is about; `keywords` with
+   endpoints, entities, IDs; `workItem` = the ticket id; unknown topics → `temas_propuestos`,
+   never invent vocabulary.
 5. Create isolated worktrees ONLY for the repos the plan identified: call
    `chamba_create_worktrees` with the ticket and that repo list. ALL work happens
    inside these worktrees — never edit the main checkouts. Its result includes
@@ -115,6 +120,10 @@ the workspace.
    evidence screenshot in a per-run folder kept **outside any git repo**. If there's no
    `## QA plan`, skip this step. This is the only interactive touchpoint at the end.
 9. Call `chamba_summarize_to_vault` with a summary of what changed.
+   **Knowledge network:** read the 5 closest nodes the tool returns; `summary` says
+   what changed (not "session summary"); `keywords` with endpoints, entities, IDs;
+   `workItem` = the ticket id; topics that touch several areas → one note with several
+   `temas`, never separate notes; unknown topics → `temas_propuestos`.
 10. STOP and report for my review. The report MUST include:
     - the repos touched and why;
     - per repo, what changed and the test + verify results;

@@ -1,0 +1,45 @@
+---
+title: "informes — índice"
+source: chamba
+generated: true
+---
+
+> Generado por chamba desde los metadatos de las notas. No editar: edita las notas o temas/VOCABULARIO.md.
+
+# informes
+
+## infra
+
+_Infraestructura y DevOps_
+
+- [Informe infraestructura — costos octubre](informe-infra-costos.md) — Detalle de costos de infraestructura AWS en octubre.
+- [Informe rendimiento LMS — octubre](informe-rendimiento-lms.md) — Métricas de rendimiento y disponibilidad del LMS en octubre.
+
+## lms/cursos/gestion
+
+_Edición, publicación, archivado_
+
+- [Informe cursos activos octubre](informe-cursos-activos.md) — Estadísticas de cursos activos y estudiantes inscritos.
+- [Informe inscripciones octubre 2026](informe-inscripciones-octubre.md) — Número de nuevos estudiantes y tasa de finalización de cursos.
+
+## lms/gamificacion
+
+_Puntos, insignias, rankings_
+
+- [Informe gamificación — primeros resultados](informe-gamificacion.md) — Resultados iniciales del sistema de puntos e insignias.
+
+## soporte
+
+_Bugs y tareas de soporte CyA_
+
+- [Informe soporte octubre](informe-soporte-octubre.md) — Tickets de soporte atendidos en octubre.
+
+## soporte/bugs
+
+_Errores reportados por clientes_
+
+- [Informe bugs octubre 2026](informe-bugs-octubre.md) — Resumen de bugs reportados y resueltos en octubre.
+
+## Sin clasificar
+
+- [Nota pendiente de clasificar](nota-pendiente.md) — Pendiente de revisión.
