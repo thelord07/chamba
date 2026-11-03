@@ -1,5 +1,12 @@
 # @chamba/core
 
+## 1.11.0
+
+### Minor Changes
+
+- b5cbb5a: CHAMBA-014: the parche sync survives normal networks. No more `HEAD` per blob: `vault sync` pushes first and uploads only the blobs the server reports missing (422), up to 3 rounds per batch, so 86 new files are 1 push + 86 PUT + 1 push over one reused connection (measured: 100 new files went from 102 TCP connections to 1). `NodeHttp` now runs on `node:http`/`node:https` with keep-alive agents and a 5 s connect timeout (30 s total), and the new `RetryingHttp` retries transient errors (connect timeouts, resets, DNS, 502/503/504, 429 with `Retry-After` capped at 10 s) with full-jitter backoff, 4 attempts; `join` is only retried when the request never left. The caller's abort signal cuts retries at once. Errors now say what happened — `parche: no se pudo conectar a <host> tras <n> intentos (<code>: …)` with the command to re-run — instead of a bare `fetch failed`, in the CLI, the MCP tools, auto-sync and the fatal handler, never including tokens or headers.
+- 5bf4cfb: CHAMBA-015: the parche client works on Windows. `vault join/link/sync/resync/unlink` accept absolute Windows paths (`D:\workspace\vault`, `d:/…`, UNC `\\server\share\…`) via new pure local-path helpers in core (wire paths stay POSIX); drive-relative (`C:foo`) and device paths (`\\?\`, `\\.\`) are rejected with a clear error (`unsupported_path`; `unsupported_platform` is kept in the type but never produced). Windows system folders are rejected like on macOS/Linux, and path comparisons are case-insensitive on Windows. `credentials.json` gets a user-only ACL via `icacls` after every write (warning if it fails). Files whose names are invalid on Windows are skipped on pull without ever pushing a delete, retried on each sync and counted in `vault status`; pushing such a name from macOS/Linux warns. CI runs on ubuntu, windows and macOS.
+
 ## 1.10.0
 
 ### Minor Changes

@@ -1,5 +1,14 @@
 # @chamba/cursor-extras
 
+## 1.11.0
+
+### Patch Changes
+
+- Updated dependencies [b5cbb5a]
+- Updated dependencies [5bf4cfb]
+  - @chamba/core@1.11.0
+  - @chamba/adapters@1.11.0
+
 ## 1.10.0
 
 ### Minor Changes
