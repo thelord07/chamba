@@ -24,6 +24,7 @@ import {
   linkDirPlaceholderHint,
   linkHint,
   MEMORY_DIR,
+  ObsidianDetector,
   ParcheAlreadyMemberError,
   ParcheNetworkError,
   ParcheNotFoundError,
@@ -37,8 +38,10 @@ import {
   syncOnce,
   toSyncState,
   VaultDirMissingError,
+  VaultReindexer,
 } from '@chamba/core';
 import { describeError } from '../fatal.js';
+import { resolveActiveParcheVaultFull } from '../parche/active-vault.js';
 import {
   type AdoptionGateResult,
   BindingWriteError,
@@ -57,6 +60,7 @@ import {
   updateBindingVaultDirForSlug,
 } from '../parche/binding-ops.js';
 import type { Services } from '../services.js';
+import { obsidianSearchRoots } from '../services.js';
 
 export interface VaultCliDeps {
   services: Services;
@@ -637,6 +641,26 @@ async function runSync(argv: string[], deps: VaultCliDeps): Promise<void> {
         stderr(`  errors: ${summary.errors.join('; ')}`);
         anyError = true;
       }
+      // CHAMBA-016: derived conflict summary line
+      if ((summary.derivedConflictsResolved ?? []).length > 0) {
+        const n = (summary.derivedConflictsResolved ?? []).length;
+        stdout(
+          `  ${n} archivos generados en conflicto: se aceptó la versión remota y se regeneran`,
+        );
+      }
+      // CHAMBA-016: reindex after pull if needed (full, no deadline in CLI)
+      if (summary.needsReindex) {
+        try {
+          const reindexReport = await new VaultReindexer(services.fs, vaultDir).reindex();
+          if (reindexReport.archivosEscritos.length > 0) {
+            stdout(`  reindex: ${reindexReport.archivosEscritos.length} archivo(s) generado(s)`);
+          }
+        } catch (reindexErr) {
+          stderr(
+            `  ⚠ reindex falló: ${reindexErr instanceof Error ? reindexErr.message : String(reindexErr)}`,
+          );
+        }
+      }
     } catch (err) {
       let msg: string;
       if (err instanceof VaultDirMissingError) {
@@ -723,6 +747,19 @@ async function runStatus(deps: VaultCliDeps): Promise<void> {
         stdout(`skipped:   ${skippedCount} archivo(s) con nombre inválido en Windows`);
       }
       stdout(`path:      ${vaultDir}`);
+      // CHAMBA-016: knowledge-network summary (dry run — never writes)
+      if (dirExists) {
+        try {
+          const report = await new VaultReindexer(services.fs, vaultDir).reindex({ dryRun: true });
+          const ready = report.sugerencias.filter((s) => s.readyToPromote).map((s) => s.proposed);
+          stdout(
+            `red:       ${report.notas} notas, ${report.sinClasificar} sin clasificar, ${report.propuestos} propuestas` +
+              (ready.length > 0 ? ` (listas para aprobar: ${ready.join(', ')})` : ''),
+          );
+        } catch {
+          // informative only
+        }
+      }
     } catch (err) {
       stdout(`${slug}: error — ${err instanceof Error ? err.message : String(err)}`);
     }
@@ -862,6 +899,144 @@ async function runResync(argv: string[], deps: VaultCliDeps): Promise<void> {
   );
 }
 
+// ─── runReindex ───────────────────────────────────────────────────────────────
+
+/**
+ * vault reindex [--dry-run] [--adopt-manual <carpeta> ...] [--yes]
+ *
+ * Reconstruye los archivos derivados del vault (INDEX.md generados, hubs de temas, bases).
+ * Con --adopt-manual muestra el plan primero; requiere confirmación o --yes para aplicar.
+ * Sin TTY y sin --yes: solo muestra el plan y sale con código 1.
+ */
+async function runReindex(argv: string[], deps: VaultCliDeps): Promise<void> {
+  const { services, stdout, stderr, exit, prompt, isTTY } = deps;
+
+  const hasDryRunFlag = hasFlag(argv, '--dry-run');
+  const hasYes = hasFlag(argv, '--yes');
+  const dirFlag = parseFlag(argv, '--dir');
+
+  // Parse --adopt-manual (can appear multiple times)
+  const adoptManual: string[] = [];
+  for (let i = 0; i < argv.length; i++) {
+    if (argv[i] === '--adopt-manual' && argv[i + 1]) {
+      adoptManual.push(argv[i + 1] as string);
+      i++;
+    }
+  }
+
+  const hasAdoptManual = adoptManual.length > 0;
+
+  // O2: with --adopt-manual, dryRun defaults to true unless --yes is passed
+  const dryRun = hasDryRunFlag || (hasAdoptManual && !hasYes);
+
+  // Resolve vault path
+  let vaultDir: string | undefined;
+  if (dirFlag) {
+    vaultDir = dirFlag;
+  } else {
+    const vaultResult = await resolveActiveParcheVaultFull(services);
+    if (vaultResult.kind === 'bound-unsyncable' && vaultResult.dirExists) {
+      vaultDir = vaultResult.vaultDir;
+    } else if (vaultResult.kind === 'ok') {
+      vaultDir = vaultResult.vault.vaultDir;
+    } else if (vaultResult.kind !== 'bound-unsyncable') {
+      const detection = await new ObsidianDetector(services.fs).detect({
+        explicitPath: services.obsidianVaultPath,
+        searchRoots: obsidianSearchRoots(services),
+      });
+      if (detection.found) vaultDir = detection.path;
+    }
+  }
+
+  if (!vaultDir) {
+    stderr('No se encontró ningún vault. Usa --dir <ruta> o configura CHAMBA_OBSIDIAN_VAULT_PATH.');
+    exit(1);
+    return;
+  }
+
+  const reindexer = new VaultReindexer(services.fs, vaultDir);
+
+  // With --adopt-manual, always show the plan first (dryRun pass)
+  if (hasAdoptManual) {
+    const plan = await reindexer.reindex({ dryRun: true, adoptManual });
+    stdout(`Plan de adopción para: ${adoptManual.join(', ')}`);
+    stdout(`  Notas: ${plan.notas}`);
+    stdout(`  Archivos que se escribirían: ${plan.archivosEscritos.length}`);
+    for (const f of plan.archivosEscritos) stdout(`    - ${f}`);
+    if (plan.renombrados && plan.renombrados.length > 0) {
+      for (const r of plan.renombrados) stdout(`  Se renombraría: ${r.from} → ${r.to}`);
+    }
+    if (plan.indicesManualesOmitidos.length > 0) {
+      stdout(`  INDEX.md manuales omitidos: ${plan.indicesManualesOmitidos.join(', ')}`);
+    }
+    if (plan.adoptados.length > 0) {
+      stdout(`  Se adoptarían: ${plan.adoptados.join(', ')}`);
+    }
+    for (const e of plan.erroresVocabulario) {
+      stderr(`  ⚠ ${e.message}`);
+    }
+
+    if (hasYes) {
+      // Apply
+      const result = await reindexer.reindex({ dryRun: false, adoptManual });
+      stdout('');
+      stdout(`Reindex aplicado: ${result.archivosEscritos.length} archivo(s) escrito(s).`);
+      if (result.adoptados.length > 0) {
+        stdout(`Adoptados: ${result.adoptados.join(', ')}`);
+      }
+      return;
+    }
+
+    if (isTTY) {
+      const answer = await prompt(`¿Aplicar la adopción? [s/N] `);
+      if (answer.trim().toLowerCase() === 's') {
+        const result = await reindexer.reindex({ dryRun: false, adoptManual });
+        stdout('');
+        stdout(`Reindex aplicado: ${result.archivosEscritos.length} archivo(s) escrito(s).`);
+        if (result.adoptados.length > 0) {
+          stdout(`Adoptados: ${result.adoptados.join(', ')}`);
+        }
+      } else {
+        stdout('Operación cancelada.');
+      }
+      return;
+    }
+
+    // No TTY, no --yes: show plan and exit 1
+    stderr(
+      `Para aplicar la adopción, usa --yes o ejecuta en TTY interactivo: ` +
+        `npx @chamba/mcp vault reindex --adopt-manual ${adoptManual.join(' --adopt-manual ')} --yes`,
+    );
+    exit(1);
+    return;
+  }
+
+  // No --adopt-manual: normal reindex
+  const result = await reindexer.reindex({ dryRun });
+  if (dryRun) {
+    stdout(`[dryRun] Reindex calculado (sin escribir):`);
+  } else {
+    stdout('Reindex completado:');
+  }
+  stdout(`  Notas: ${result.notas}`);
+  stdout(`  Temas: ${result.temas}`);
+  stdout(`  Sin clasificar: ${result.sinClasificar}`);
+  stdout(`  Propuestos: ${result.propuestos}`);
+  stdout(`  Archivos escritos: ${result.archivosEscritos.length}`);
+  for (const f of result.archivosEscritos) stdout(`    ✓ ${f}`);
+  if (result.indicesManualesOmitidos.length > 0) {
+    stdout(`  INDEX.md manuales (omitidos): ${result.indicesManualesOmitidos.join(', ')}`);
+  }
+  if (result.erroresVocabulario.length > 0) {
+    for (const e of result.erroresVocabulario) stderr(`  ⚠ ${e.message}`);
+  }
+  if (result.sugerencias.length > 0) {
+    stdout(
+      `  Sugerencias: ${result.sugerencias.map((s) => `${s.proposed}${s.readyToPromote ? '(promover)' : ''}`).join(', ')}`,
+    );
+  }
+}
+
 // ─── Main dispatcher ──────────────────────────────────────────────────────────
 
 /**
@@ -898,11 +1073,15 @@ export async function runVaultCli(argv: string[], deps: VaultCliDeps): Promise<v
       // PARCHE-010 O3: reset state + re-adopt in-place
       await runResync(rest, deps);
       break;
+    case 'reindex':
+      // CHAMBA-016: rebuild derived vault files
+      await runReindex(rest, deps);
+      break;
     default: {
       const { stderr, exit } = deps;
       stderr(
         'Usage: vault <subcommand> [args]\n' +
-          'Subcommands: join, link, sync, status, leave, unlink, resync',
+          'Subcommands: join, link, sync, status, leave, unlink, resync, reindex',
       );
       exit(1);
     }

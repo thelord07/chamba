@@ -1,0 +1,41 @@
+---
+title: "investigacion — índice"
+source: chamba
+generated: true
+---
+
+> Generado por chamba desde los metadatos de las notas. No editar: edita las notas o temas/VOCABULARIO.md.
+
+# investigacion
+
+## infra
+
+_Infraestructura y DevOps_
+
+- [Investigación costos de infraestructura](inv-infra-costos.md) — Análisis de costos de AWS vs GCP para el LMS.
+- [Investigación herramientas Kubernetes](inv-kubernetes-herramientas.md) — Evaluación de herramientas de monitoreo y despliegue para Kubernetes.
+
+## lms
+
+_LMS de Lapzo_
+
+- [Investigación competidores LMS](inv-lms-competidores.md) — Análisis comparativo de competidores: Moodle, Teachable, Thinkific.
+
+## lms/cursos/creacion
+
+_Alta de cursos, módulos y lecciones_
+
+- [Investigación diseño de APIs REST](inv-api-design-rest.md) — Patrones de diseño REST para APIs de LMS: versionado, paginación, auth.
+
+## lms/gamificacion
+
+_Puntos, insignias, rankings_
+
+- [Investigación métricas de gamificación](inv-gamificacion-metricas.md) — Qué métricas medir en un sistema de gamificación: engagement, retención.
+- [Investigación gamificación — mejores prácticas](inv-gamificacion-mejores-practicas.md) — Análisis de plataformas exitosas con gamificación: Duolingo, Coursera.
+
+## soporte
+
+_Bugs y tareas de soporte CyA_
+
+- [Investigación herramientas de soporte](inv-soporte-herramientas.md) — Evaluación de Zendesk vs Intercom vs soporte interno.

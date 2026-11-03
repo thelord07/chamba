@@ -1,0 +1,32 @@
+---
+title: "gamificacion"
+description: "Puntos, insignias, rankings"
+aliases: ["gamification"]
+source: chamba
+generated: true
+---
+
+> Generado por chamba desde los metadatos de las notas. No editar: edita las notas o temas/VOCABULARIO.md.
+
+# lms/gamificacion
+
+Puntos, insignias, rankings
+
+Tema padre: [lms](../lms.md)
+
+## Notas
+
+### informe
+
+- [Informe gamificación — primeros resultados](../../informes/informe-gamificacion.md) — Resultados iniciales del sistema de puntos e insignias. · claves: gamificacion, resultados, usuarios-activos · informe · 2026-11-01
+
+### investigacion
+
+- [Investigación métricas de gamificación](../../investigacion/inv-gamificacion-metricas.md) — Qué métricas medir en un sistema de gamificación: engagement, retención. · claves: metricas, engagement, retencion, dau · investigacion · 2026-10-19
+- [Investigación gamificación — mejores prácticas](../../investigacion/inv-gamificacion-mejores-practicas.md) — Análisis de plataformas exitosas con gamificación: Duolingo, Coursera. · claves: duolingo, coursera, mejores-practicas, gamificacion · investigacion · 2026-10-18
+
+### plan
+
+- [HU LMS API 01 — cursos y módulos](../../proyectos/hu-lms-api-01-cursos-modulos.md) — Endpoints de creación y gestión de cursos/módulos en LMS API con auth por API key. · claves: POST /courses, módulos, api key, hu-lms-api-01 · plan · 2026-10-29
+- [HU LMS API 02 — gamificación](../../proyectos/hu-lms-api-02-gamificacion.md) — Sistema de puntos e insignias para la plataforma LMS. · claves: puntos, insignias, ranking, hu-lms-api-02 · plan · 2026-10-30
+- [Plan gamificación Q4](../../planes/plan-gamificacion-q4.md) — Implementación del sistema de gamificación en Q4. · claves: gamificacion, puntos, q4 · plan · 2026-10-05

@@ -45,6 +45,10 @@ El modelo de tu editor hace el razonamiento y llama a las tools de chamba. Eso s
   de vuelta, y persiste conocimiento como markdown plano. Las notas se agrupan por
   proyecto (por git remote) y cada carpeta mantiene un `INDEX.md` liviano, así el recall
   escanea un índice barato en vez de leer todas las notas.
+- **Red de conocimiento.** Una nota, escrita una sola vez, conectada a todos sus temas
+  con tags `tema/…` jerárquicos. chamba deriva hubs por tema, índices y Bases de Obsidian
+  desde los metadatos, sin duplicar nada. Vocabulario por workspace, reindex determinista.
+  Ver [`packages/mcp/README.md` — Knowledge network](./packages/mcp/README.md#knowledge-network).
 - **Seguro por defecto.** Ningún agente de chamba borra ni destruye nada por su cuenta
   — un drop/reset/truncate de DB, borrar archivos o datos, un force-push o borrar una
   rama se detienen y te piden confirmación explícita primero (un hook de Claude Code

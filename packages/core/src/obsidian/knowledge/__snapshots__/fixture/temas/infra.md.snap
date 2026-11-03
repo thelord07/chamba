@@ -1,0 +1,40 @@
+---
+title: "infra"
+description: "Infraestructura y DevOps"
+source: chamba
+generated: true
+---
+
+> Generado por chamba desde los metadatos de las notas. No editar: edita las notas o temas/VOCABULARIO.md.
+
+# infra
+
+Infraestructura y DevOps
+
+[← Índice raíz](../INDEX.md)
+
+## Notas
+
+### decision
+
+- [Decisión arquitectura de infraestructura](../proyectos/decision-arquitectura-infra.md) — Kubernetes con Helm charts para el despliegue del LMS. · claves: kubernetes, helm, docker, ci-cd · decision · 2026-10-25
+
+### guia
+
+- [Guía despliegue LMS](../proyectos/guia-deploy-lms.md) — Pasos para hacer deploy del LMS en Kubernetes con Helm. · claves: deploy, kubernetes, helm, ci-cd · guia · 2026-10-27
+
+### informe
+
+- [Informe infraestructura — costos octubre](../informes/informe-infra-costos.md) — Detalle de costos de infraestructura AWS en octubre. · claves: aws, costos, billing, ec2, rds · informe · 2026-11-01
+- [Informe rendimiento LMS — octubre](../informes/informe-rendimiento-lms.md) — Métricas de rendimiento y disponibilidad del LMS en octubre. · claves: rendimiento, uptime, latencia, apdex · informe · 2026-11-01
+
+### investigacion
+
+- [Investigación bases de datos para LMS](../proyectos/investigacion-bases-datos.md) — Comparativa de PostgreSQL vs MongoDB para el vault de LMS. · claves: postgresql, mongodb, rendimiento · investigacion · 2026-10-20
+- [Investigación costos de infraestructura](../investigacion/inv-infra-costos.md) — Análisis de costos de AWS vs GCP para el LMS. · claves: aws, gcp, costos, cloud · investigacion · 2026-10-16
+- [Investigación herramientas Kubernetes](../investigacion/inv-kubernetes-herramientas.md) — Evaluación de herramientas de monitoreo y despliegue para Kubernetes. · claves: kubernetes, prometheus, grafana, argocd · investigacion · 2026-10-15
+
+### plan
+
+- [Plan alta disponibilidad](../planes/plan-infra-ha.md) — Plan para implementar alta disponibilidad en la infraestructura del LMS. · claves: ha, alta-disponibilidad, failover, rds · plan · 2026-10-22
+- [Plan migración a Kubernetes](../planes/plan-migracion-infra.md) — Pasos para migrar la infraestructura del LMS a Kubernetes. · claves: kubernetes, migracion, pasos · plan · 2026-10-10

@@ -1,0 +1,35 @@
+---
+title: "creacion"
+description: "Alta de cursos, módulos y lecciones"
+aliases: ["crear-cursos"]
+source: chamba
+generated: true
+---
+
+> Generado por chamba desde los metadatos de las notas. No editar: edita las notas o temas/VOCABULARIO.md.
+
+# lms/cursos/creacion
+
+Alta de cursos, módulos y lecciones
+
+Tema padre: [lms/cursos](../cursos.md)
+
+## Notas
+
+### decision
+
+- [Decisión autenticación API key](../../../proyectos/decision-auth-api-key.md) — Se elige autenticación por API key para integraciones B2B del LMS. · claves: auth, api-key, b2b, seguridad · decision · 2026-10-26
+
+### investigacion
+
+- [Investigación diseño de APIs REST](../../../investigacion/inv-api-design-rest.md) — Patrones de diseño REST para APIs de LMS: versionado, paginación, auth. · claves: rest, versionado, paginacion, jwt, openapi · investigacion · 2026-10-14
+
+### plan
+
+- [HU LMS API 01 — cursos y módulos](../../../proyectos/hu-lms-api-01-cursos-modulos.md) — Endpoints de creación y gestión de cursos/módulos en LMS API con auth por API key. · claves: POST /courses, módulos, api key, hu-lms-api-01 · plan · 2026-10-29
+- [HU LMS API 04 — lecciones](../../../proyectos/hu-lms-api-04-creacion-leccion.md) — Endpoints para crear y editar lecciones dentro de módulos. · claves: lecciones, módulos, contenido · plan · 2026-11-02
+- [Plan creación de cursos](../../../planes/plan-cursos-creacion.md) — Roadmap para el módulo de creación de cursos. · claves: creacion, cursos, roadmap · plan · 2026-10-12
+
+### resumen
+
+- [Resumen Sprint LMS 01](../../../proyectos/resumen-sprint-lms-01.md) — Resumen del primer sprint del proyecto LMS API. · claves: sprint, lms, api, retrospectiva · resumen · 2026-10-21

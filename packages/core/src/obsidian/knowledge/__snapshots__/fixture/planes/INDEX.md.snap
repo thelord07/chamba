@@ -1,0 +1,46 @@
+---
+title: "planes — índice"
+source: chamba
+generated: true
+---
+
+> Generado por chamba desde los metadatos de las notas. No editar: edita las notas o temas/VOCABULARIO.md.
+
+# planes
+
+## infra
+
+_Infraestructura y DevOps_
+
+- [Plan alta disponibilidad](plan-infra-ha.md) — Plan para implementar alta disponibilidad en la infraestructura del LMS.
+- [Plan migración a Kubernetes](plan-migracion-infra.md) — Pasos para migrar la infraestructura del LMS a Kubernetes.
+
+## lms
+
+_LMS de Lapzo_
+
+- [Plan Q4 2026 — LMS](plan-q4-2026.md) — Plan de trabajo del cuarto trimestre para el proyecto LMS.
+
+## lms/cursos/creacion
+
+_Alta de cursos, módulos y lecciones_
+
+- [Plan creación de cursos](plan-cursos-creacion.md) — Roadmap para el módulo de creación de cursos.
+
+## lms/gamificacion
+
+_Puntos, insignias, rankings_
+
+- [Plan gamificación Q4](plan-gamificacion-q4.md) — Implementación del sistema de gamificación en Q4.
+
+## soporte
+
+_Bugs y tareas de soporte CyA_
+
+- [Plan soporte Q4](plan-soporte-q4.md) — Prioridades de soporte para el cuarto trimestre.
+
+## soporte/bugs
+
+_Errores reportados por clientes_
+
+- [Plan atención bugs críticos](plan-soporte-bugs-criticos.md) — Protocolo de atención para bugs críticos de soporte.

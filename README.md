@@ -47,6 +47,10 @@ chamba (the tool) handles the supervising, validating and plumbing around it.
   back, and persist knowledge as plain markdown. Notes are grouped per project (by git
   remote) and each folder keeps a lightweight `INDEX.md`, so recall scans a cheap index
   instead of reading every note.
+- **Knowledge network.** One note, written once, connected to all its topics via
+  hierarchical `tema/…` tags. chamba derives a navigable network (topic hubs, root index,
+  Obsidian Bases) from note metadata — no duplication, per-workspace vocabulary, deterministic
+  reindex. See [`packages/mcp/README.md` — Knowledge network](./packages/mcp/README.md#knowledge-network).
 - **Safe by default.** No chamba agent deletes or destroys anything on its own — a DB
   drop/reset/truncate, deleting files or data, a force-push or a branch delete all stop
   and ask for your explicit confirmation first (a Claude Code hook enforces it too).

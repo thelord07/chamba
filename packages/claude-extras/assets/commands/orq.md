@@ -27,6 +27,10 @@ primitive — adapt to what you have.
    don't re-raise an issue you already addressed.
 4. Save the approved plan with `chamba_save_plan` (it lands under the vault's
    `plans/` folder), then show it to me and wait for my go-ahead.
+   **Knowledge network:** read the 5 closest nodes the tool returns before choosing
+   `temas`; several topics → one note with several `temas`, never separate notes;
+   `summary` says what the plan is about; `keywords` with endpoints, entities, IDs;
+   `workItem` if it belongs to a ticket/HU; unknown topics → `temas_propuestos`.
 5. If this is a git repo, call `chamba_create_worktree` per worker for isolation.
 6. Delegate implementation to the **implementer** subagent (in its worktree) and
    the tests to the **tester** subagent; run them. When you fan out across several
@@ -35,4 +39,8 @@ primitive — adapt to what you have.
    and never in parallel when files overlap. Don't launch every worker at once on a
    small machine. `chamba_conflict_preview` is a dry-run; never merge.
 7. When done, call `chamba_summarize_to_vault` with a summary of what changed.
+   **Knowledge network:** read the 5 closest nodes the tool returns; `summary` says
+   what changed (not "session summary"); `keywords` with endpoints, entities, IDs;
+   `workItem` if it belongs to a ticket/HU; several topics → one note with several
+   `temas`; unknown topics → `temas_propuestos`.
 8. Leave any worktree branches open — do not merge. Tell me the merge command.

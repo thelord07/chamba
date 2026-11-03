@@ -1,0 +1,50 @@
+---
+title: "proyectos — índice"
+source: chamba
+generated: true
+---
+
+> Generado por chamba desde los metadatos de las notas. No editar: edita las notas o temas/VOCABULARIO.md.
+
+# proyectos
+
+## infra
+
+_Infraestructura y DevOps_
+
+- [Decisión arquitectura de infraestructura](decision-arquitectura-infra.md) — Kubernetes con Helm charts para el despliegue del LMS.
+- [Guía despliegue LMS](guia-deploy-lms.md) — Pasos para hacer deploy del LMS en Kubernetes con Helm.
+- [Investigación bases de datos para LMS](investigacion-bases-datos.md) — Comparativa de PostgreSQL vs MongoDB para el vault de LMS.
+
+## lms/cursos/creacion
+
+_Alta de cursos, módulos y lecciones_
+
+- [Decisión autenticación API key](decision-auth-api-key.md) — Se elige autenticación por API key para integraciones B2B del LMS.
+- [HU LMS API 01 — cursos y módulos](hu-lms-api-01-cursos-modulos.md) — Endpoints de creación y gestión de cursos/módulos en LMS API con auth por API key.
+- [HU LMS API 04 — lecciones](hu-lms-api-04-creacion-leccion.md) — Endpoints para crear y editar lecciones dentro de módulos.
+- [Resumen Sprint LMS 01](resumen-sprint-lms-01.md) — Resumen del primer sprint del proyecto LMS API.
+
+## lms/cursos/gestion
+
+_Edición, publicación, archivado_
+
+- [HU LMS API 03 — publicación de cursos](hu-lms-api-03-publicacion.md) — Flujo de publicación y archivado de cursos.
+- [HU LMS API 05 — inscripciones](hu-lms-api-05-inscripciones.md) — Endpoints para inscribir y desactivar estudiantes en cursos.
+
+## lms/gamificacion
+
+_Puntos, insignias, rankings_
+
+- [HU LMS API 02 — gamificación](hu-lms-api-02-gamificacion.md) — Sistema de puntos e insignias para la plataforma LMS.
+
+## soporte/bugs
+
+_Errores reportados por clientes_
+
+- [Soporte #001 — error de login](hu-soporte-01-error-login.md) — Error intermitente en el login de clientes enterprise.
+
+## Sin clasificar
+
+- [Nota con tema propuesto](nota-tema-propuesto.md) — Nota con un tema que no está en el vocabulario.
+- [Nota sin clasificar](nota-sin-tema.md) — Nota de trabajo sin tema asignado.

@@ -1,0 +1,31 @@
+---
+title: "gestion"
+description: "Edición, publicación, archivado"
+source: chamba
+generated: true
+---
+
+> Generado por chamba desde los metadatos de las notas. No editar: edita las notas o temas/VOCABULARIO.md.
+
+# lms/cursos/gestion
+
+Edición, publicación, archivado
+
+Tema padre: [lms/cursos](../cursos.md)
+
+## Notas
+
+### informe
+
+- [Informe cursos activos octubre](../../../informes/informe-cursos-activos.md) — Estadísticas de cursos activos y estudiantes inscritos. · claves: cursos-activos, estudiantes, estadisticas · informe · 2026-11-02
+- [Informe inscripciones octubre 2026](../../../informes/informe-inscripciones-octubre.md) — Número de nuevos estudiantes y tasa de finalización de cursos. · claves: inscripciones, finalizacion, tasa-completitud · informe · 2026-11-02
+
+### investigacion
+
+- [Investigación diseño de APIs REST](../../../investigacion/inv-api-design-rest.md) — Patrones de diseño REST para APIs de LMS: versionado, paginación, auth. · claves: rest, versionado, paginacion, jwt, openapi · investigacion · 2026-10-14
+
+### plan
+
+- [HU LMS API 01 — cursos y módulos](../../../proyectos/hu-lms-api-01-cursos-modulos.md) — Endpoints de creación y gestión de cursos/módulos en LMS API con auth por API key. · claves: POST /courses, módulos, api key, hu-lms-api-01 · plan · 2026-10-29
+- [HU LMS API 03 — publicación de cursos](../../../proyectos/hu-lms-api-03-publicacion.md) — Flujo de publicación y archivado de cursos. · claves: publicar, archivar, estado-curso · plan · 2026-11-01
+- [HU LMS API 05 — inscripciones](../../../proyectos/hu-lms-api-05-inscripciones.md) — Endpoints para inscribir y desactivar estudiantes en cursos. · claves: inscribir, estudiantes, matricular · plan · 2026-11-01

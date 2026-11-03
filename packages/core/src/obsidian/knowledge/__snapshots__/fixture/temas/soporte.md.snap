@@ -1,0 +1,32 @@
+---
+title: "soporte"
+description: "Bugs y tareas de soporte CyA"
+source: chamba
+generated: true
+---
+
+> Generado por chamba desde los metadatos de las notas. No editar: edita las notas o temas/VOCABULARIO.md.
+
+# soporte
+
+Bugs y tareas de soporte CyA
+
+[← Índice raíz](../INDEX.md)
+
+## Subtemas
+
+- [bugs](soporte/bugs.md) — 3 notas
+
+## Notas
+
+### informe
+
+- [Informe soporte octubre](../informes/informe-soporte-octubre.md) — Tickets de soporte atendidos en octubre. · claves: soporte, tickets, octubre, nps · informe · 2026-11-01
+
+### investigacion
+
+- [Investigación herramientas de soporte](../investigacion/inv-soporte-herramientas.md) — Evaluación de Zendesk vs Intercom vs soporte interno. · claves: zendesk, intercom, soporte, ticketing · investigacion · 2026-10-11
+
+### plan
+
+- [Plan soporte Q4](../planes/plan-soporte-q4.md) — Prioridades de soporte para el cuarto trimestre. · claves: soporte, prioridades, q4 · plan · 2026-10-08

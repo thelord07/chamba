@@ -1,0 +1,28 @@
+---
+title: "bugs"
+description: "Errores reportados por clientes"
+source: chamba
+generated: true
+---
+
+> Generado por chamba desde los metadatos de las notas. No editar: edita las notas o temas/VOCABULARIO.md.
+
+# soporte/bugs
+
+Errores reportados por clientes
+
+Tema padre: [soporte](../soporte.md)
+
+## Notas
+
+### informe
+
+- [Informe bugs octubre 2026](../../informes/informe-bugs-octubre.md) — Resumen de bugs reportados y resueltos en octubre. · claves: bugs, octubre, tickets · informe · 2026-11-01
+
+### plan
+
+- [Plan atención bugs críticos](../../planes/plan-soporte-bugs-criticos.md) — Protocolo de atención para bugs críticos de soporte. · claves: bugs, criticos, protocolo, sla · plan · 2026-10-20
+
+### resumen
+
+- [Soporte #001 — error de login](../../proyectos/hu-soporte-01-error-login.md) — Error intermitente en el login de clientes enterprise. · claves: login, enterprise, auth, sso · resumen · 2026-10-28

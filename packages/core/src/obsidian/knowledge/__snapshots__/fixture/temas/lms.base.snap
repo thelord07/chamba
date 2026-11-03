@@ -1,0 +1,11 @@
+# generated: true — source: chamba — Generado por chamba desde los metadatos de las notas. No editar: edita las notas o temas/VOCABULARIO.md.
+filters:
+  and:
+    - file.hasTag("tema/lms")
+views:
+  - type: table
+    name: lms
+    order: [file.name, note.type, note.summary, note.work_item, note.date]
+    groupBy:
+      property: note.type
+      direction: ASC

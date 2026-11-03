@@ -13,10 +13,64 @@ const NO_VAULT_ERROR =
   'No Obsidian vault configured. Set CHAMBA_OBSIDIAN_VAULT_PATH or run chamba_workspace_init to bootstrap one';
 
 const DESCRIPTION =
-  'Save a plan to the Obsidian vault under `plans/[<owner-repo>/]<date>-<slug>.md` with valid ' +
-  'YAML frontmatter. Use this when a plan is finalized so every plan is persisted alongside ' +
-  'the run summaries (which go under `proyectos/`). Grouped per project (git remote) and ' +
-  'indexed for cheap recall. Fails clearly if no vault is configured.';
+  'Guarda un plan en el vault de Obsidian bajo `plans/[<owner-repo>/]<fecha>-<slug>.md`. ' +
+  'Una sola nota puede tener varios temas (1-5); nunca crees notas separadas por tema. ' +
+  'Lo desconocido va como propuesta, no lo inventes. ' +
+  'Devuelve la ruta guardada, advertencias, temas aplicados/propuestos, árbol compacto y 5 nodos más cercanos.';
+
+/** Format the extended knowledge-network response lines (shared with summarize). */
+function formatKnowledgeResponse(
+  prefix: string,
+  notePath: string,
+  result: Awaited<ReturnType<InstanceType<typeof VaultWriter>['write']>>,
+  syncWarning: string | undefined,
+): string {
+  const lines: string[] = [];
+
+  lines.push(`${prefix} ${notePath}`);
+
+  if (syncWarning) {
+    lines.push('');
+    lines.push(`⚠ ${syncWarning}`);
+  }
+
+  if (result.warnings.length > 0) {
+    lines.push('');
+    lines.push('⚠ Advertencias:');
+    for (const w of result.warnings) {
+      lines.push(`- ${w}`);
+    }
+  }
+
+  lines.push('');
+  lines.push(
+    `Temas aplicados: ${result.temasAplicados.length > 0 ? result.temasAplicados.join(', ') : 'ninguno'}`,
+  );
+  lines.push(
+    `Temas propuestos: ${result.temasPropuestos.length > 0 ? result.temasPropuestos.join(', ') : 'ninguno'}`,
+  );
+
+  if (result.arbol) {
+    lines.push('');
+    lines.push('Red de conocimiento:');
+    lines.push(result.arbol);
+  }
+
+  if (result.cercanos.length > 0) {
+    lines.push('');
+    lines.push('5 nodos más cercanos:');
+    for (const c of result.cercanos) {
+      lines.push(`- ${c.path} (${c.score})`);
+    }
+  }
+
+  if (result.related.length > 0) {
+    lines.push('');
+    lines.push(`Notas relacionadas: ${result.related.join(', ')}`);
+  }
+
+  return lines.join('\n');
+}
 
 /** Register `chamba_save_plan`: write a plan to the vault's `plans/` folder. */
 export function registerSavePlan(server: McpServer, logger: Logger, services: Services): void {
@@ -29,9 +83,40 @@ export function registerSavePlan(server: McpServer, logger: Logger, services: Se
         title: z.string().describe('Plan title — usually the ticket id or task name.'),
         content: z.string().describe('The plan markdown (goal, acceptance criteria, subtasks…).'),
         projectSlug: z.string().optional().describe('Optional slug for the filename.'),
+        summary: z.string().max(200).optional().describe('Resumen de 1 línea (≤200 chars).'),
+        temas: z
+          .array(z.string())
+          .min(1)
+          .max(5)
+          .optional()
+          .describe('1 a 5 temas del vocabulario.'),
+        keywords: z
+          .array(z.string().max(40))
+          .max(10)
+          .optional()
+          .describe('Palabras clave (≤10, cada ≤40 chars).'),
+        aliases: z.array(z.string()).optional().describe('Aliases Obsidian de la nota.'),
+        workItem: z
+          .string()
+          .optional()
+          .describe('ID del work item (hu-..., cu-...) que enlaza plan ↔ resumen.'),
+        related: z
+          .array(z.string())
+          .optional()
+          .describe('Rutas relativas al vault de notas relacionadas.'),
       },
     },
-    async ({ title, content, projectSlug }) => {
+    async ({
+      title,
+      content,
+      projectSlug,
+      summary,
+      temas,
+      keywords,
+      aliases,
+      workItem,
+      related,
+    }) => {
       // O2: full discriminated resolution
       const vaultResult = await resolveActiveParcheVaultFull(services);
 
@@ -73,16 +158,23 @@ export function registerSavePlan(server: McpServer, logger: Logger, services: Se
       }
 
       const writer = new VaultWriter(services.fs, services.clock);
-      const { notePath } = await writer.write({
+      const result = await writer.write({
         vaultPath,
         title,
         content,
         projectSlug,
         subdir: VAULT_PLANS_DIR,
         tags: ['chamba', 'plan'],
+        summary,
+        temas,
+        keywords,
+        aliases,
+        workItem,
+        related,
+        type: 'plan',
         projectRemoteUrl: await readGitRemote(services.process, services.cwd),
       });
-      logger.info({ tool: TOOL_NAME, notePath }, 'plan saved to vault');
+      logger.info({ tool: TOOL_NAME, notePath: result.notePath }, 'plan saved to vault');
 
       // PARCHE-011: push sync after writing (only with parche vault and autoSync enabled)
       // O2: if bound-unsyncable with dir existing, show hint
@@ -94,9 +186,7 @@ export function registerSavePlan(server: McpServer, logger: Logger, services: Se
         syncWarning = syncResult.warning;
       }
 
-      const text = syncWarning
-        ? `Saved plan to ${notePath}\n\n⚠ ${syncWarning}`
-        : `Saved plan to ${notePath}`;
+      const text = formatKnowledgeResponse('Saved plan to', result.notePath, result, syncWarning);
 
       return { content: [{ type: 'text', text }] };
     },

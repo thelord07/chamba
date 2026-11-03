@@ -13,10 +13,71 @@ const NO_VAULT_ERROR =
   'No Obsidian vault configured. Set CHAMBA_OBSIDIAN_VAULT_PATH or use the obsidian-mcp server';
 
 const DESCRIPTION =
-  'Write a structured summary note to the Obsidian vault under ' +
-  '`proyectos/[<owner-repo>/]<date>-<slug>.md` with valid YAML frontmatter. When the ' +
-  'workspace has a git remote, notes are grouped in a per-project subfolder and indexed ' +
-  'so recall stays cheap. Fails clearly if no vault is configured.';
+  'Escribe una nota de resumen estructurada en el vault de Obsidian. ' +
+  'Una sola nota puede tener varios temas (1-5); nunca crees notas separadas por tema. ' +
+  'Lo desconocido va como propuesta, no lo inventes. ' +
+  'Agrupa notas bajo `proyectos/[<owner-repo>/]<fecha>-<slug>.md` con frontmatter YAML válido. ' +
+  'Devuelve la ruta escrita, advertencias, temas aplicados/propuestos, árbol compacto y 5 nodos más cercanos.';
+
+/** Format the extended knowledge-network response lines. */
+function formatKnowledgeResponse(
+  notePath: string,
+  result: Awaited<ReturnType<InstanceType<typeof VaultWriter>['write']>>,
+  syncWarning: string | undefined,
+): string {
+  const lines: string[] = [];
+
+  // First line: path
+  lines.push(`Wrote note to ${notePath}`);
+
+  // Sync warning
+  if (syncWarning) {
+    lines.push('');
+    lines.push(`⚠ ${syncWarning}`);
+  }
+
+  // Warnings from knowledge resolution
+  if (result.warnings.length > 0) {
+    lines.push('');
+    lines.push('⚠ Advertencias:');
+    for (const w of result.warnings) {
+      lines.push(`- ${w}`);
+    }
+  }
+
+  // Temas
+  lines.push('');
+  lines.push(
+    `Temas aplicados: ${result.temasAplicados.length > 0 ? result.temasAplicados.join(', ') : 'ninguno'}`,
+  );
+  lines.push(
+    `Temas propuestos: ${result.temasPropuestos.length > 0 ? result.temasPropuestos.join(', ') : 'ninguno'}`,
+  );
+
+  // Compact tree
+  if (result.arbol) {
+    lines.push('');
+    lines.push('Red de conocimiento:');
+    lines.push(result.arbol);
+  }
+
+  // 5 closest nodes
+  if (result.cercanos.length > 0) {
+    lines.push('');
+    lines.push('5 nodos más cercanos:');
+    for (const c of result.cercanos) {
+      lines.push(`- ${c.path} (${c.score})`);
+    }
+  }
+
+  // Related notes
+  if (result.related.length > 0) {
+    lines.push('');
+    lines.push(`Notas relacionadas: ${result.related.join(', ')}`);
+  }
+
+  return lines.join('\n');
+}
 
 /** Register `chamba_summarize_to_vault`: write a note to the vault. */
 export function registerSummarizeToVault(
@@ -33,9 +94,46 @@ export function registerSummarizeToVault(
         title: z.string().describe('Note title.'),
         content: z.string().describe('Markdown body (summary, plan, decisions, next steps).'),
         projectSlug: z.string().optional().describe('Optional slug for the filename.'),
+        summary: z.string().max(200).optional().describe('Resumen de 1 línea (≤200 chars).'),
+        temas: z
+          .array(z.string())
+          .min(1)
+          .max(5)
+          .optional()
+          .describe('1 a 5 temas del vocabulario.'),
+        keywords: z
+          .array(z.string().max(40))
+          .max(10)
+          .optional()
+          .describe('Palabras clave (≤10, cada ≤40 chars).'),
+        aliases: z.array(z.string()).optional().describe('Aliases Obsidian de la nota.'),
+        workItem: z
+          .string()
+          .optional()
+          .describe('ID del work item (hu-..., cu-...) que enlaza plan ↔ resumen.'),
+        related: z
+          .array(z.string())
+          .optional()
+          .describe('Rutas relativas al vault de notas relacionadas.'),
+        type: z
+          .enum(['resumen', 'nota', 'plan'])
+          .optional()
+          .default('resumen')
+          .describe('Tipo de nota (default: resumen).'),
       },
     },
-    async ({ title, content, projectSlug }) => {
+    async ({
+      title,
+      content,
+      projectSlug,
+      summary,
+      temas,
+      keywords,
+      aliases,
+      workItem,
+      related,
+      type,
+    }) => {
       // O2: full discriminated resolution — never fall through from a binding
       const vaultResult = await resolveActiveParcheVaultFull(services);
 
@@ -77,14 +175,21 @@ export function registerSummarizeToVault(
       }
 
       const writer = new VaultWriter(services.fs, services.clock);
-      const { notePath } = await writer.write({
+      const result = await writer.write({
         vaultPath,
         title,
         content,
         projectSlug,
+        summary,
+        temas,
+        keywords,
+        aliases,
+        workItem,
+        related,
+        type,
         projectRemoteUrl: await readGitRemote(services.process, services.cwd),
       });
-      logger.info({ tool: TOOL_NAME, notePath }, 'note written to vault');
+      logger.info({ tool: TOOL_NAME, notePath: result.notePath }, 'note written to vault');
 
       // C5: push auto-sync after writing if active vault is a parche vault (and autoSync enabled)
       // O2: if bound-unsyncable with dir existing, show hint instead
@@ -96,9 +201,7 @@ export function registerSummarizeToVault(
         syncWarning = syncResult.warning;
       }
 
-      const text = syncWarning
-        ? `Wrote note to ${notePath}\n\n⚠ ${syncWarning}`
-        : `Wrote note to ${notePath}`;
+      const text = formatKnowledgeResponse(result.notePath, result, syncWarning);
 
       return { content: [{ type: 'text' as const, text }] };
     },

@@ -480,3 +480,51 @@ describe('PARCHE-009 AC10 — autosync with custom vault dir', () => {
     await mcpServer.close();
   });
 });
+
+// ─── CHAMBA-016: post-pull reindex that fails is completed on the next auto-sync ─
+
+describe('CHAMBA-016 — auto-sync reindex retries on the next pass', () => {
+  it('a failed post-pull reindex runs again on the next auto-sync even with nothing to pull', async () => {
+    const parche = new FakeParche(makeClock());
+    const group = parche.seedGroup({ slug: 'team-alpha', name: 'Team Alpha' });
+    const token = parche.addDevice(group.id, { userId: 'u1', label: 'laptop', role: 'editor' });
+    const hash = new FakeHash();
+    const bytes = new TextEncoder().encode(
+      '---\ntitle: Remota\nsummary: Bajada por auto-sync.\n---\n\nCuerpo\n',
+    );
+    const h = await hash.sha256(bytes);
+    parche.seedBlob(group.id, h, bytes);
+    parche.seedChange(group.id, {
+      path: 'proyectos/remota.md',
+      hash: h,
+      author: 'Ana',
+      device: 'ana-laptop',
+      at: '2026-06-09T09:00:00Z',
+    });
+
+    const { svc, vaultDir } = await makeServicesWithParcheVault({ parche, token });
+    svc.parchePullTtlMin = 0; // pull on every tool call
+    await svc.fs.writeFile('/proj/.chamba/workspace.md', '# Workspace\n');
+
+    // The first reindex fails while writing the root INDEX.md.
+    let failOnce = true;
+    const realWrite = svc.fs.writeFile.bind(svc.fs);
+    svc.fs.writeFile = async (p: string, c: string) => {
+      if (failOnce && p === `${vaultDir}/INDEX.md`) {
+        failOnce = false;
+        throw new Error('disk hiccup');
+      }
+      return realWrite(p, c);
+    };
+
+    const { client, server } = await connect(svc);
+    await client.callTool({ name: 'chamba_load_context', arguments: { task: 'a' } });
+    expect(await svc.fs.readFile(`${vaultDir}/proyectos/remota.md`)).toContain('Remota');
+    expect(await svc.fs.exists(`${vaultDir}/INDEX.md`)).toBe(false);
+
+    // Nothing new to pull, but the pending reindex runs now.
+    await client.callTool({ name: 'chamba_load_context', arguments: { task: 'b' } });
+    expect(await svc.fs.readFile(`${vaultDir}/INDEX.md`)).toContain('generated: true');
+    await server.close();
+  });
+});

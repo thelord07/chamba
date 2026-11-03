@@ -1124,6 +1124,8 @@ describe('PARCHE-009 AC2 extended — status/sync/leave with custom dir', () => 
     const allOut = r.out.join('\n');
     expect(allOut).toContain('path:');
     expect(allOut).toContain(vaultDir);
+    // CHAMBA-016: knowledge-network line (dry run, nothing written)
+    expect(allOut).toMatch(/red: +\d+ notas, \d+ sin clasificar, \d+ propuestas/);
   });
 
   it('vault sync syncs files under custom dir', async () => {
@@ -2133,5 +2135,53 @@ describe('vault link same dir — idempotent when not pending, recovery when pen
     // pendingAdoption must be cleared
     const state = await readState(fs, vaultDir);
     expect(state?.pendingAdoption).toBeUndefined();
+  });
+});
+
+// ─── CHAMBA-016: vault sync regenerates the knowledge network after a pull ─────
+
+describe('CHAMBA-016 — vault sync reindexes after pulling notes', () => {
+  it('a pulled note produces the generated INDEX.md and the CLI reports it', async () => {
+    const parche = new FakeParche(makeClock());
+    const group = parche.seedGroup({ slug: 'team-alpha', name: 'Team Alpha' });
+    parche.addInvite({ code: 'K7QX-M2RP', groupId: group.id, role: 'editor' });
+    const fs = new MemoryFilesystem();
+    const hash = new FakeHash();
+    const vaultDir = '/local/vault';
+    await fs.mkdir(`${vaultDir}/.obsidian`);
+    const svc = makeServices(parche, { fs, hash });
+    const joined = await makeCli(svc, [
+      'join',
+      'K7QX-M2RP',
+      '--name',
+      'Joys',
+      '--email',
+      'j@x.dev',
+      '--dir',
+      vaultDir,
+      '--yes',
+    ]);
+    expect(joined.code).toBe(0);
+
+    const note =
+      '---\ntitle: Nota remota\nsummary: Algo que trajo otro dispositivo.\n---\n\nCuerpo\n';
+    const bytes = new TextEncoder().encode(note);
+    const h = await hash.sha256(bytes);
+    parche.seedBlob(group.id, h, bytes);
+    parche.seedChange(group.id, {
+      path: 'proyectos/nota-remota.md',
+      hash: h,
+      author: 'Ana',
+      device: 'ana-laptop',
+      at: '2026-10-29T10:00:00Z',
+    });
+
+    const r = await makeCli(svc, ['sync', 'team-alpha']);
+    expect(r.code).toBe(0);
+    expect(r.out.join('\n')).toMatch(/reindex: \d+ archivo\(s\) generado\(s\)/);
+    const rootIndex = await fs.readFile(`${vaultDir}/INDEX.md`);
+    expect(rootIndex).toContain('generated: true');
+    const folderIndex = await fs.readFile(`${vaultDir}/proyectos/INDEX.md`);
+    expect(folderIndex).toContain('[Nota remota](nota-remota.md)');
   });
 });

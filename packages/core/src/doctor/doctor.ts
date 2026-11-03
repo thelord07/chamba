@@ -1,4 +1,5 @@
 import { loadConfig } from '../config/loader.js';
+import { VaultReindexer } from '../obsidian/knowledge/reindexer.js';
 import type { FilesystemPort } from '../ports/filesystem.js';
 import type { ProcessPort } from '../ports/process.js';
 import type { SystemResources } from '../ports/system.js';
@@ -280,10 +281,38 @@ async function checkVault(input: DoctorInput): Promise<DoctorCheck> {
       };
     }
     const inRepo = gitRoot ? ', inside a git repo but gitignored' : '';
+
+    // Knowledge network summary (read-only, dryRun:true — never writes)
+    let knowledgeLine = '';
+    let hasVocabErrors = false;
+    try {
+      const reindexer = new VaultReindexer(input.fs, detection.path);
+      const report = await reindexer.reindex({ dryRun: true });
+      hasVocabErrors = report.erroresVocabulario.length > 0;
+      const sugStr =
+        report.sugerencias.length > 0
+          ? report.sugerencias
+              .map((s) => `${s.proposed}${s.readyToPromote ? ' (listo para promover)' : ''}`)
+              .join(', ')
+          : 'ninguna';
+      knowledgeLine = `; Red de conocimiento: ${report.notas} notas, ${report.sinClasificar} sin clasificar, ${report.propuestos} propuestas; sugerencias: ${sugStr}`;
+    } catch {
+      // Non-fatal: knowledge check is informative only
+    }
+
+    if (hasVocabErrors) {
+      return {
+        ...base,
+        status: 'warn',
+        detail: `${detection.path} (${source}, ${notes} notes${inRepo})${knowledgeLine}`,
+        hint: 'Hay errores en temas/VOCABULARIO.md. Usa chamba_vault_topics con action:list para ver los detalles.',
+      };
+    }
+
     return {
       ...base,
       status: 'ok',
-      detail: `${detection.path} (${source}, ${notes} notes${inRepo})`,
+      detail: `${detection.path} (${source}, ${notes} notes${inRepo})${knowledgeLine}`,
     };
   }
   return {

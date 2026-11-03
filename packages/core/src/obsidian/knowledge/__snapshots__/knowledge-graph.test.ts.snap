@@ -1,0 +1,24 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`Test 4: fixture snapshot > matches the committed snapshots (root, hubs, indexes, .base) 1`] = `
+[
+  "INDEX.md",
+  "informes/INDEX.md",
+  "investigacion/INDEX.md",
+  "planes/INDEX.md",
+  "proyectos/INDEX.md",
+  "temas/PROPUESTOS.md",
+  "temas/infra.base",
+  "temas/infra.md",
+  "temas/lms.base",
+  "temas/lms.md",
+  "temas/lms/cursos.md",
+  "temas/lms/cursos/creacion.md",
+  "temas/lms/cursos/gestion.md",
+  "temas/lms/gamificacion.md",
+  "temas/sin-clasificar.md",
+  "temas/soporte.base",
+  "temas/soporte.md",
+  "temas/soporte/bugs.md",
+]
+`;
