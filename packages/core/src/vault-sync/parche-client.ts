@@ -81,6 +81,53 @@ export class ParcheCaseCollisionError extends ParcheHttpError {
   }
 }
 
+/**
+ * Thrown by RetryingHttp (adapters) when a network operation fails after all
+ * retry attempts. Never includes query strings, headers, token or body — only
+ * the host (from URL), attempt count, error code and a short human-readable
+ * message.
+ *
+ * Note: `host` is extracted from the URL with `new URL(url).host`. If the URL
+ * is malformed, `host` falls back to `'<desconocido>'`. The raw URL (which may
+ * contain query params or tokens) is never stored.
+ */
+export class ParcheNetworkError extends Error {
+  override name = 'ParcheNetworkError';
+  /** URL host (port only if non-default; never path or query). */
+  readonly host: string;
+  /** Total attempts made before giving up. */
+  readonly attempts: number;
+  /** OS / undici error code, e.g. `'ECONNRESET'`, `'UND_ERR_CONNECT_TIMEOUT'`. */
+  readonly code: string;
+  /** Short human-readable description of the error. */
+  readonly shortMessage: string;
+  override readonly cause: unknown;
+
+  constructor(opts: {
+    url: string;
+    attempts: number;
+    code: string;
+    shortMessage: string;
+    cause?: unknown;
+  }) {
+    const plural = opts.attempts === 1 ? 'intento' : 'intentos';
+    super(
+      `parche: no se pudo conectar tras ${opts.attempts} ${plural} (${opts.code}: ${opts.shortMessage})`,
+    );
+    let host: string;
+    try {
+      host = new URL(opts.url).host;
+    } catch {
+      host = '<desconocido>';
+    }
+    this.host = host;
+    this.attempts = opts.attempts;
+    this.code = opts.code;
+    this.shortMessage = opts.shortMessage;
+    this.cause = opts.cause;
+  }
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const decoder = new TextDecoder();
@@ -175,7 +222,13 @@ export class ParcheClient {
     throw new ParcheHttpError(res.status, json, `Unexpected changes response: ${res.status}`);
   }
 
-  /** HEAD /api/blob/:hash — check if blob exists for this group. */
+  /**
+   * HEAD /api/blob/:hash — check if blob exists for this group.
+   *
+   * Not used in the sync path (CHAMBA-014): `pushAll` uses a push-first strategy
+   * and only uploads blobs reported as missing by the server (422). This method
+   * is kept for tooling or diagnostics outside the sync path.
+   */
   async headBlob(hash: string, signal?: AbortSignal): Promise<boolean> {
     const res = await this.req({
       method: 'HEAD',

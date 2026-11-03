@@ -357,8 +357,8 @@ describe('AC9 — Nota.md + nota.md → CaseCollisionError, no push', () => {
 
 // ─── AC10: 422 retry ─────────────────────────────────────────────────────────
 
-describe('AC10 — 422 missing_blobs: uploads missing and retries once', () => {
-  it('always-422 push eventually throws "Push failed after retry"', async () => {
+describe('AC10 — 422 missing_blobs: push-first, PUT only missing, up to 3 rounds', () => {
+  it('always-422 push throws "no se pudo completar el push" after ≤3 rounds', async () => {
     const parche = new FakeParche(makeClock());
     const group = setupGroup(parche);
     const hash = new FakeHash();
@@ -369,10 +369,17 @@ describe('AC10 — 422 missing_blobs: uploads missing and retries once', () => {
     await fs.writeBytes(`${VAULT}/note.md`, noteBytes);
     const noteHash = await hash.sha256(noteBytes);
 
+    // Permanent rejection: every push returns 422 → set never reduces → error
     parche.rejectPushBlobs([noteHash]);
 
     const deps = { fs, http: parche, hash, clock: makeClock() };
-    await expect(syncOnce(deps, makeSyncOpts(token))).rejects.toThrow(/Push failed after retry/);
+    await expect(syncOnce(deps, makeSyncOpts(token))).rejects.toThrow(
+      /no se pudo completar el push: faltan blobs/,
+    );
+
+    // At most 3 rounds of 422 (1 initial push + up to 3 retries = ≤4 push calls total)
+    const pushCalls = parche.requestLog.filter((r) => r.url.includes('/push'));
+    expect(pushCalls.length).toBeLessThanOrEqual(4);
   });
 
   it('transient 422: pushed === 1, exactly 2 requests to /push, PUT of missing hash between them', async () => {
@@ -386,12 +393,8 @@ describe('AC10 — 422 missing_blobs: uploads missing and retries once', () => {
     await fs.writeBytes(`${VAULT}/note.md`, noteBytes);
     const noteHash = await hash.sha256(noteBytes);
 
-    // First push call returns 422, second succeeds
-    // But the blob must NOT be pre-uploaded (HEAD returns 404, but we skip the PUT
-    // before push by using rejectPushBlobsOnce so push gets 422 and re-uploads)
-    // Strategy: make HEAD say blob exists (so pre-flight skips PUT), then push returns 422
-    // We achieve this by seeding the blob but using rejectPushBlobsOnce for push
-    // Actually simpler: use rejectPushBlobsOnce which rejects push once, forcing re-upload + retry
+    // push-first: the first push returns 422 (rejectPushBlobsOnce), runner PUTs the blob,
+    // then retries push successfully. No HEAD calls in this flow.
     parche.rejectPushBlobsOnce([noteHash]);
 
     const deps = { fs, http: parche, hash, clock: makeClock() };
@@ -1734,5 +1737,457 @@ describe('S17 / Test 4 — pull invalid Windows names (CHAMBA-015 hot-path)', ()
     expect(state?.skippedPaths).toBeDefined();
     const skippedCount = Object.keys(state?.skippedPaths ?? {}).length;
     expect(skippedCount).toBeGreaterThan(0);
+  });
+});
+
+// ─── CHAMBA-014 Tests 1–3: push-first flow ────────────────────────────────────
+
+describe('CHAMBA-014 Test 1 — 20 new files: 0 HEAD, push(422) → PUT×20 → push(ok)', () => {
+  it('syncs 20 new files with push-first: no HEAD, one round of 422', async () => {
+    const parche = new FakeParche(makeClock());
+    const group = setupGroup(parche);
+    const token = makeToken(parche, group);
+    const deps = makeDeps(parche);
+    const { fs } = deps;
+
+    // Seed 20 local files (blobs NOT pre-seeded in FakeParche, so first push → 422)
+    const enc = new TextEncoder();
+    for (let i = 0; i < 20; i++) {
+      await fs.writeBytes(`${VAULT}/note${i}.md`, enc.encode(`# Note ${i}`));
+    }
+
+    const summary = await syncOnce(deps, makeSyncOpts(token));
+
+    expect(summary.pushed).toBe(20);
+    expect(summary.errors).toHaveLength(0);
+
+    // 0 HEAD requests — critical acceptance criterion (§7.3)
+    const headRequests = parche.requestLog.filter((r) => r.method === 'HEAD');
+    expect(headRequests).toHaveLength(0);
+
+    // Exactly 2 /push requests (one 422, one ok)
+    const pushRequests = parche.requestLog.filter((r) => r.url.includes('/push'));
+    expect(pushRequests).toHaveLength(2);
+
+    // 20 PUT /blob/ requests between the two pushes
+    const pushIdx1 = parche.requestLog.findIndex((r) => r.url.includes('/push'));
+    const pushIdx2 = parche.requestLog.findIndex((r, i) => i > pushIdx1 && r.url.includes('/push'));
+    expect(pushIdx2).toBeGreaterThan(pushIdx1);
+    const between = parche.requestLog.slice(pushIdx1 + 1, pushIdx2);
+    const putsBetween = between.filter((r) => r.method === 'PUT' && r.url.includes('/blob/'));
+    expect(putsBetween).toHaveLength(20);
+  });
+});
+
+describe('CHAMBA-014 Test 2 — rondas de 422', () => {
+  it('two rounds completes: second 422 with smaller set → upload → push ok', async () => {
+    const parche = new FakeParche(makeClock());
+    const group = setupGroup(parche);
+    const token = makeToken(parche, group);
+    const deps = makeDeps(parche);
+    const { fs, hash } = deps;
+
+    // Seed 3 files. Use rejectPushBlobsOnce for 2 of the hashes to simulate 2 rounds.
+    const enc = new TextEncoder();
+    const bytes1 = enc.encode('# File 1');
+    const bytes2 = enc.encode('# File 2');
+    const bytes3 = enc.encode('# File 3');
+    const h1 = await hash.sha256(bytes1);
+    const h2 = await hash.sha256(bytes2);
+
+    await fs.writeBytes(`${VAULT}/f1.md`, bytes1);
+    await fs.writeBytes(`${VAULT}/f2.md`, bytes2);
+    await fs.writeBytes(`${VAULT}/f3.md`, bytes3);
+
+    // Round 1: rejectPushBlobsOnce fires first → 422 [h1, h2] → PUT h1, h2.
+    // Round 2: natural check → only f3's blob is missing → 422 [h3] → PUT h3.
+    // Round 3: push ok.
+    parche.rejectPushBlobsOnce([h1, h2]);
+
+    const summary = await syncOnce(deps, makeSyncOpts(token));
+
+    expect(summary.pushed).toBe(3);
+    expect(summary.errors).toHaveLength(0);
+
+    const seq = parche.requestLog
+      .filter((r) => r.url.includes('/push') || r.url.includes('/api/blob/'))
+      .map((r) => (r.url.includes('/push') ? 'push' : r.method));
+    expect(seq).toEqual(['push', 'PUT', 'PUT', 'push', 'PUT', 'push']);
+    expect(parche.blobHashes(group.id)).toHaveLength(3);
+    expect(parche.livePaths(group.id).size).toBe(3);
+  });
+
+  it('missing set keeps shrinking but needs a 4th round → stops at the 3-round cap', async () => {
+    const parche = new FakeParche(makeClock());
+    const group = setupGroup(parche);
+    const token = makeToken(parche, group);
+    const deps = makeDeps(parche);
+    const { fs, hash } = deps;
+
+    const enc = new TextEncoder();
+    const hs: string[] = [];
+    for (let i = 1; i <= 4; i++) {
+      const bytes = enc.encode(`# Cap ${i}`);
+      hs.push(await hash.sha256(bytes));
+      await fs.writeBytes(`${VAULT}/cap${i}.md`, bytes);
+    }
+    // 422 sets: {1,2,3,4} → {1,2,3} → {1,2} → {1}: always shrinking, so only the cap stops it.
+    const [h1, h2, h3, h4] = hs as [string, string, string, string];
+    parche.rejectPushBlobsOnce([h1, h1, h1, h1, h2, h2, h2, h3, h3, h4]);
+
+    await expect(syncOnce(deps, makeSyncOpts(token))).rejects.toThrow(
+      /no se pudo completar el push: faltan blobs/,
+    );
+    const pushCalls = parche.requestLog.filter((r) => r.url.includes('/push'));
+    expect(pushCalls).toHaveLength(4);
+    expect(await readState(fs, VAULT)).toBeNull();
+  });
+
+  it('set does not reduce → error after ≤3 rounds, state not written', async () => {
+    const parche = new FakeParche(makeClock());
+    const group = setupGroup(parche);
+    const token = makeToken(parche, group);
+    const deps = makeDeps(parche);
+    const { fs, hash } = deps;
+
+    const enc = new TextEncoder();
+    const bytes = enc.encode('# Stuck note');
+    const noteHash = await hash.sha256(bytes);
+    await fs.writeBytes(`${VAULT}/note.md`, bytes);
+
+    // Permanent rejection: every push returns 422 for noteHash — set never reduces
+    parche.rejectPushBlobs([noteHash]);
+
+    // Pre-write a state to verify it's not modified on failure
+    await writeState(fs, VAULT, {
+      server: SERVER,
+      slug: SLUG,
+      groupId: group.id,
+      cursor: 0,
+      files: {},
+      lastSyncAt: '2026-01-01T00:00:00Z',
+    });
+
+    await expect(syncOnce(deps, makeSyncOpts(token))).rejects.toThrow(
+      /no se pudo completar el push: faltan blobs/,
+    );
+
+    // Push calls ≤ 4 (initial + up to 3 rounds before the "not reducing" error)
+    const pushCalls = parche.requestLog.filter((r) => r.url.includes('/push'));
+    expect(pushCalls.length).toBeLessThanOrEqual(4);
+
+    // State not modified — cursor still 0, files still {}
+    const state = await readState(fs, VAULT);
+    expect(state?.cursor).toBe(0);
+    expect(Object.keys(state?.files ?? {})).toHaveLength(0);
+
+    // Next sync against the SAME server, once it stops rejecting, completes.
+    parche.clearPushBlobRejections();
+    const summary2 = await syncOnce(deps, makeSyncOpts(token));
+    expect(summary2.pushed).toBe(1);
+    expect(summary2.errors).toHaveLength(0);
+    expect((await readState(fs, VAULT))?.files['note.md']?.syncedHash).toBe(noteHash);
+  });
+});
+
+describe('CHAMBA-014 Test 3 — hash sin fuente local', () => {
+  it('server reports a hash the client has no local source for → explicit error, state not written', async () => {
+    const parche = new FakeParche(makeClock());
+    const group = setupGroup(parche);
+    const token = makeToken(parche, group);
+    const deps = makeDeps(parche);
+    const { fs } = deps;
+
+    const enc = new TextEncoder();
+    const bytes = enc.encode('# Local note');
+    await fs.writeBytes(`${VAULT}/local.md`, bytes);
+
+    // Inject a hash that doesn't exist locally (not in blobSource).
+    // FakeParche will include this hash in the 422 response alongside the naturally
+    // missing localHash. pushAll sees ghostHash has no blobSource entry → throws.
+    const ghostHash = 'a'.repeat(64); // valid 64-char hex string, but not a local file
+    parche.injectMissingBlob(ghostHash);
+
+    let thrown: Error | null = null;
+    try {
+      await syncOnce(deps, makeSyncOpts(token));
+    } catch (err) {
+      if (err instanceof Error) thrown = err;
+    }
+
+    expect(thrown).not.toBeNull();
+    expect(thrown?.message).toMatch(/no se pudo completar el push: faltan blobs/);
+    // Error must include the short hash of the ghost blob (first 8 chars)
+    expect(thrown?.message).toContain(ghostHash.slice(0, 8));
+
+    // State not written — no state.json should have been created
+    const state = await readState(fs, VAULT);
+    if (state !== null) {
+      expect(state.cursor).toBe(0);
+      expect(Object.keys(state.files)).toHaveLength(0);
+    }
+  });
+});
+
+// ─── CHAMBA-014: ParcheNetworkError unit tests ────────────────────────────────
+
+describe('CHAMBA-014 — ParcheNetworkError', () => {
+  it('extracts host from URL (no query/token)', async () => {
+    const { ParcheNetworkError } = await import('./parche-client.js');
+    // URL.host for standard ports (443 for https) does not include the port number.
+    // Use a non-standard port to verify port inclusion in host.
+    const err = new ParcheNetworkError({
+      url: 'https://parche.example.com:8443/api/join?token=pch_TESTSECRET123&foo=bar',
+      attempts: 3,
+      code: 'ECONNRESET',
+      shortMessage: 'connection reset',
+    });
+    expect(err.host).toBe('parche.example.com:8443');
+    expect(err.message).not.toContain('pch_TESTSECRET');
+    expect(err.message).not.toContain('token');
+    expect(err.host).not.toContain('?');
+    expect(err.host).not.toContain('pch_TESTSECRET');
+  });
+
+  it('strips default HTTPS port from host', async () => {
+    const { ParcheNetworkError } = await import('./parche-client.js');
+    // Standard ports are stripped by URL.host (per URL spec)
+    const err = new ParcheNetworkError({
+      url: 'https://parche.example.com:443/api/join?token=pch_TESTSECRET123',
+      attempts: 1,
+      code: 'ETIMEDOUT',
+      shortMessage: 'timed out',
+    });
+    // port 443 is default for https — URL.host omits it
+    expect(err.host).toBe('parche.example.com');
+    expect(err.host).not.toContain('pch_TESTSECRET');
+    expect(err.message).not.toContain('pch_TESTSECRET');
+  });
+
+  it('falls back to <desconocido> for malformed URL', async () => {
+    const { ParcheNetworkError } = await import('./parche-client.js');
+    const err = new ParcheNetworkError({
+      url: 'not-a-url',
+      attempts: 1,
+      code: 'ETIMEDOUT',
+      shortMessage: 'timed out',
+    });
+    expect(err.host).toBe('<desconocido>');
+  });
+
+  it('name is ParcheNetworkError', async () => {
+    const { ParcheNetworkError } = await import('./parche-client.js');
+    const err = new ParcheNetworkError({
+      url: 'https://example.com',
+      attempts: 2,
+      code: 'ECONNREFUSED',
+      shortMessage: 'refused',
+    });
+    expect(err.name).toBe('ParcheNetworkError');
+    expect(err.attempts).toBe(2);
+    expect(err.code).toBe('ECONNREFUSED');
+  });
+});
+
+// ─── CHAMBA-014: parcheNetworkErrorMessage unit tests ────────────────────────
+
+describe('CHAMBA-014 — parcheNetworkErrorMessage', () => {
+  it('produces exact format with slug', async () => {
+    const { ParcheNetworkError } = await import('./parche-client.js');
+    const { parcheNetworkErrorMessage } = await import('./messages.js');
+
+    const err = new ParcheNetworkError({
+      url: 'https://parche.chamba.tools/api/g/cya/push?token=pch_TESTSECRET999',
+      attempts: 3,
+      code: 'UND_ERR_CONNECT_TIMEOUT',
+      shortMessage: 'connect timeout',
+    });
+
+    const msg = parcheNetworkErrorMessage(err, { slug: 'cya' });
+
+    // Exact format check (§4.3)
+    expect(msg).toBe(
+      'parche: no se pudo conectar a parche.chamba.tools tras 3 intentos ' +
+        '(UND_ERR_CONNECT_TIMEOUT: connect timeout). ' +
+        'Lo ya subido queda guardado; vuelve a correr `npx @chamba/mcp vault sync cya`.',
+    );
+
+    // No secrets
+    expect(msg).not.toContain('pch_TESTSECRET');
+    expect(msg).not.toContain('Authorization');
+    expect(msg).not.toContain('token=');
+  });
+
+  it('singular "intento" when attempts=1', async () => {
+    const { ParcheNetworkError } = await import('./parche-client.js');
+    const { parcheNetworkErrorMessage } = await import('./messages.js');
+
+    const err = new ParcheNetworkError({
+      url: 'https://parche.example.com',
+      attempts: 1,
+      code: 'ECONNREFUSED',
+      shortMessage: 'refused',
+    });
+
+    const msg = parcheNetworkErrorMessage(err, { slug: 'test' });
+    expect(msg).toContain('1 intento');
+    expect(msg).not.toContain('1 intentos');
+  });
+
+  it('uses retryHint when provided (e.g. for join)', async () => {
+    const { ParcheNetworkError } = await import('./parche-client.js');
+    const { parcheNetworkErrorMessage } = await import('./messages.js');
+
+    const err = new ParcheNetworkError({
+      url: 'https://parche.example.com',
+      attempts: 2,
+      code: 'ECONNREFUSED',
+      shortMessage: 'refused',
+    });
+
+    const msg = parcheNetworkErrorMessage(err, { retryHint: 'npx @chamba/mcp vault join <code>' });
+    expect(msg).toContain('npx @chamba/mcp vault join <code>');
+    expect(msg).not.toContain('vault sync');
+  });
+
+  it('generic hint when no slug or retryHint given', async () => {
+    const { ParcheNetworkError } = await import('./parche-client.js');
+    const { parcheNetworkErrorMessage } = await import('./messages.js');
+
+    const err = new ParcheNetworkError({
+      url: 'https://parche.example.com',
+      attempts: 2,
+      code: 'ETIMEDOUT',
+      shortMessage: 'timed out',
+    });
+
+    const msg = parcheNetworkErrorMessage(err);
+    expect(msg).toContain('vault sync <slug>');
+  });
+});
+
+// ─── CHAMBA-014: FlakyHttp unit tests ────────────────────────────────────────
+
+describe('CHAMBA-014 — FlakyHttp', () => {
+  it('deterministic by seed: same seed produces same failure sequence', async () => {
+    const { FlakyHttp } = await import('../testing/flaky-http.js');
+    const enc = new TextEncoder();
+
+    // Build a minimal pass-through HttpPort
+    const okHttp = {
+      async request(_req: import('../ports/http.js').HttpRequest) {
+        return { status: 200, headers: {}, body: enc.encode('ok') };
+      },
+    };
+
+    const req = { method: 'GET', url: 'https://example.com/', headers: {} };
+
+    // Run with seed 42, rate 0.5 — collect success/fail pattern for 10 calls
+    async function runSequence(seed: number): Promise<boolean[]> {
+      const flaky = new FlakyHttp(okHttp, { seed, rate: 0.5 });
+      const results: boolean[] = [];
+      for (let i = 0; i < 10; i++) {
+        try {
+          await flaky.request(req);
+          results.push(true);
+        } catch {
+          results.push(false);
+        }
+      }
+      return results;
+    }
+
+    const seq1 = await runSequence(42);
+    const seq2 = await runSequence(42);
+    expect(seq1).toEqual(seq2);
+
+    // Different seed → different sequence (with high probability)
+    const seq3 = await runSequence(99);
+    // It's possible (but unlikely) for two seeds to produce the same sequence.
+    // We just check that the determinism works, not that they're different.
+    expect(seq1).toHaveLength(10);
+    expect(seq3).toHaveLength(10);
+  });
+
+  it('pre mode: throws without delegating', async () => {
+    const { FlakyHttp } = await import('../testing/flaky-http.js');
+    let delegated = false;
+    const wrapped = {
+      async request(_req: import('../ports/http.js').HttpRequest) {
+        delegated = true;
+        return { status: 200, headers: {}, body: new Uint8Array(0) };
+      },
+    };
+    const flaky = new FlakyHttp(wrapped, { seed: 1, rate: 0 });
+    flaky.failNext(1, 'ECONNRESET', 'pre');
+    await expect(
+      flaky.request({ method: 'GET', url: 'https://x.com', headers: {} }),
+    ).rejects.toThrow('ECONNRESET');
+    expect(delegated).toBe(false);
+  });
+
+  it('post mode: delegates then throws', async () => {
+    const { FlakyHttp } = await import('../testing/flaky-http.js');
+    let delegated = false;
+    const wrapped = {
+      async request(_req: import('../ports/http.js').HttpRequest) {
+        delegated = true;
+        return { status: 200, headers: {}, body: new Uint8Array(0) };
+      },
+    };
+    const flaky = new FlakyHttp(wrapped, { seed: 1, rate: 0 });
+    flaky.failNext(1, 'ECONNRESET', 'post');
+    await expect(
+      flaky.request({ method: 'GET', url: 'https://x.com', headers: {} }),
+    ).rejects.toThrow('ECONNRESET');
+    expect(delegated).toBe(true);
+  });
+
+  it('failNext: explicit fails consumed in order', async () => {
+    const { FlakyHttp } = await import('../testing/flaky-http.js');
+    const enc = new TextEncoder();
+    const wrapped = {
+      async request(_req: import('../ports/http.js').HttpRequest) {
+        return { status: 200, headers: {}, body: enc.encode('ok') };
+      },
+    };
+    const flaky = new FlakyHttp(wrapped, { seed: 1, rate: 0 });
+    flaky.failNext(2, 'ETIMEDOUT');
+
+    // First two calls fail
+    await expect(
+      flaky.request({ method: 'GET', url: 'https://x.com', headers: {} }),
+    ).rejects.toThrow();
+    await expect(
+      flaky.request({ method: 'GET', url: 'https://x.com', headers: {} }),
+    ).rejects.toThrow();
+    // Third call succeeds
+    const res = await flaky.request({ method: 'GET', url: 'https://x.com', headers: {} });
+    expect(res.status).toBe(200);
+  });
+
+  it('match filter: only matching requests fail', async () => {
+    const { FlakyHttp } = await import('../testing/flaky-http.js');
+    const enc = new TextEncoder();
+    const wrapped = {
+      async request(_req: import('../ports/http.js').HttpRequest) {
+        return { status: 200, headers: {}, body: enc.encode('ok') };
+      },
+    };
+    const flaky = new FlakyHttp(wrapped, {
+      seed: 1,
+      rate: 0,
+      match: (req) => req.url.includes('/push'),
+    });
+    flaky.failNext(1, 'ECONNRESET');
+
+    // Non-matching request succeeds
+    const res = await flaky.request({ method: 'GET', url: 'https://x.com/changes', headers: {} });
+    expect(res.status).toBe(200);
+
+    // Matching request fails (explicit fail still in queue)
+    await expect(
+      flaky.request({ method: 'POST', url: 'https://x.com/push', headers: {} }),
+    ).rejects.toThrow('ECONNRESET');
   });
 });

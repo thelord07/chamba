@@ -15,6 +15,7 @@ import {
   joinOnce,
   linkHint,
   ParcheAlreadyMemberError,
+  ParcheNetworkError,
   ParcheNotFoundError,
   ParcheRateLimitedError,
   parseJoinInput,
@@ -23,6 +24,7 @@ import {
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { Logger } from 'pino';
 import { z } from 'zod';
+import { describeError } from '../fatal.js';
 import {
   checkAdoptionGate,
   finalizeAdoption,
@@ -31,7 +33,6 @@ import {
   getAdoptionSummary,
   persistBindingAfterJoin,
   prepareJoinVaultDir,
-  redactSecrets,
   resolveDefaultDir,
   resolveJoinScope,
   resumeJoin,
@@ -87,6 +88,8 @@ export function registerVaultJoin(server: McpServer, logger: Logger, services: S
       },
     },
     async ({ code, name, email, deviceLabel, dir, confirmUpload, scope: scopeInput }) => {
+      // Set once the join itself succeeded: later network errors come from the first sync.
+      let joinedSlug: string | undefined;
       try {
         const parsed = parseJoinInput(code);
         const server_ = resolveServerUrl({
@@ -241,6 +244,7 @@ export function registerVaultJoin(server: McpServer, logger: Logger, services: S
             onCredWarn: (msg) => credWarnings.push(msg),
           },
         );
+        joinedSlug = result.slug;
         const credWarningText = credWarnings.map((w) => `\n⚠ ${w}`).join('');
 
         // Build adoption summary via binding-ops (keeps buildAdoptionSummary out of tools/)
@@ -353,6 +357,14 @@ export function registerVaultJoin(server: McpServer, logger: Logger, services: S
         if (err instanceof InvalidJoinInputError) {
           // R1/AC4: never repeat the user input (it may contain a pch_ token)
           msg = 'código o link inválido';
+        } else if (err instanceof ParcheNetworkError) {
+          // CHAMBA-014 §4.3: before the join completes, retry the join; after it, the sync.
+          msg = describeError(
+            err,
+            joinedSlug
+              ? { slug: joinedSlug }
+              : { retryHint: 'npx @chamba/mcp vault join <código>' },
+          );
         } else if (err instanceof ParcheNotFoundError) {
           msg = 'código inválido, vencido o agotado';
         } else if (err instanceof ParcheAlreadyMemberError) {
@@ -361,7 +373,7 @@ export function registerVaultJoin(server: McpServer, logger: Logger, services: S
         } else if (err instanceof ParcheRateLimitedError) {
           msg = 'demasiados intentos, espera un minuto';
         } else {
-          msg = redactSecrets(err instanceof Error ? err.message : String(err));
+          msg = describeError(err);
         }
         logger.warn({ tool: TOOL_NAME, err: msg }, 'parche: join failed');
         return {

@@ -64,3 +64,37 @@ export function unlinkWorkspaceHint(): string {
 export function joinFirstHint(): string {
   return `${VAULT_CLI} join <código>`;
 }
+
+// ─── Network error message (CHAMBA-014) ──────────────────────────────────────
+
+import type { ParcheNetworkError } from './parche-client.js';
+
+/**
+ * Produces the canonical user-facing message for a `ParcheNetworkError`.
+ *
+ * Format (CHAMBA-014 §4.3):
+ *   parche: no se pudo conectar a <host> tras <n> intento(s) (<code>: <shortMessage>).
+ *   Lo ya subido queda guardado; vuelve a correr `npx @chamba/mcp vault sync <slug>`.
+ *
+ * Never includes query strings, headers, tokens or body.
+ *
+ * @param err  The network error.
+ * @param opts Optional overrides: `slug` for the sync command hint, or
+ *             `retryHint` to replace the entire retry command string (e.g. for join).
+ */
+export function parcheNetworkErrorMessage(
+  err: ParcheNetworkError,
+  opts?: { slug?: string; retryHint?: string },
+): string {
+  const plural = err.attempts === 1 ? 'intento' : 'intentos';
+  const retryCmd = opts?.retryHint
+    ? opts.retryHint
+    : opts?.slug
+      ? `${VAULT_CLI} sync ${opts.slug}`
+      : `${VAULT_CLI} sync <slug>`;
+  return (
+    `parche: no se pudo conectar a ${err.host} tras ${err.attempts} ${plural} ` +
+    `(${err.code}: ${err.shortMessage}). ` +
+    `Lo ya subido queda guardado; vuelve a correr \`${retryCmd}\`.`
+  );
+}

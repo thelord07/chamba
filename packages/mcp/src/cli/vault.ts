@@ -25,6 +25,7 @@ import {
   linkHint,
   MEMORY_DIR,
   ParcheAlreadyMemberError,
+  ParcheNetworkError,
   ParcheNotFoundError,
   ParcheRateLimitedError,
   parseJoinInput,
@@ -37,6 +38,7 @@ import {
   toSyncState,
   VaultDirMissingError,
 } from '@chamba/core';
+import { describeError } from '../fatal.js';
 import {
   type AdoptionGateResult,
   BindingWriteError,
@@ -294,6 +296,8 @@ async function runJoin(argv: string[], deps: VaultCliDeps): Promise<void> {
     }
   }
 
+  // Set once the join itself succeeded: later network errors come from the first sync.
+  let joinedSlug: string | undefined;
   try {
     const result = await joinOnce(
       { fs: services.fs, http: services.http, hash: services.hash, clock: services.clock },
@@ -313,6 +317,7 @@ async function runJoin(argv: string[], deps: VaultCliDeps): Promise<void> {
         onCredWarn: (msg) => stderr(`⚠ ${msg}`),
       },
     );
+    joinedSlug = result.slug;
 
     // Compute adoption summary via binding-ops (keeps buildAdoptionSummary out of cli/)
     const summary = await getAdoptionSummary(services, result.vaultDir);
@@ -381,6 +386,12 @@ async function runJoin(argv: string[], deps: VaultCliDeps): Promise<void> {
     let msg: string;
     if (err instanceof InvalidJoinInputError) {
       msg = 'código o link inválido';
+    } else if (err instanceof ParcheNetworkError) {
+      // CHAMBA-014 §4.3: before the join completes, retry the join; after it, the sync.
+      msg = describeError(
+        err,
+        joinedSlug ? { slug: joinedSlug } : { retryHint: 'npx @chamba/mcp vault join <código>' },
+      );
     } else if (err instanceof ParcheNotFoundError) {
       msg = 'código inválido, vencido o agotado';
     } else if (err instanceof ParcheAlreadyMemberError) {
@@ -388,7 +399,7 @@ async function runJoin(argv: string[], deps: VaultCliDeps): Promise<void> {
     } else if (err instanceof ParcheRateLimitedError) {
       msg = 'demasiados intentos, espera un minuto';
     } else {
-      msg = redactSecrets(err instanceof Error ? err.message : String(err));
+      msg = describeError(err);
     }
     stderr(msg);
     exit(1);
@@ -502,12 +513,20 @@ async function runLink(argv: string[], deps: VaultCliDeps): Promise<void> {
   }
 
   // Confirmed: finalize via binding-ops (clears pendingAdoption + syncOnce)
-  const syncResult = await finalizeAdoption(services, {
-    server,
-    slug,
-    vaultDir: canonicalDir,
-    cred,
-  });
+  let syncResult: Awaited<ReturnType<typeof finalizeAdoption>>;
+  try {
+    syncResult = await finalizeAdoption(services, {
+      server,
+      slug,
+      vaultDir: canonicalDir,
+      cred,
+    });
+  } catch (err) {
+    const msg = describeError(err, { slug });
+    stderr(msg);
+    exit(1);
+    return;
+  }
 
   stdout(`Vault "${slug}" re-vinculado a "${canonicalDir}"`);
   stdout(
@@ -619,13 +638,15 @@ async function runSync(argv: string[], deps: VaultCliDeps): Promise<void> {
         anyError = true;
       }
     } catch (err) {
+      let msg: string;
       if (err instanceof VaultDirMissingError) {
-        stderr(`${slug}: ${err.message}`);
+        msg = err.message;
       } else if (err instanceof AdoptionPendingError) {
-        stderr(`${slug}: ${err.message}`);
+        msg = err.message;
       } else {
-        stderr(`${slug}: ${err instanceof Error ? err.message : String(err)}`);
+        msg = describeError(err, { slug });
       }
+      stderr(`${slug}: ${msg}`);
       anyError = true;
     }
   }
@@ -825,7 +846,15 @@ async function runResync(argv: string[], deps: VaultCliDeps): Promise<void> {
   }
 
   // Confirmed: finalize adoption (clear pendingAdoption + syncOnce)
-  const syncResult = await finalizeAdoption(services, { server, slug, vaultDir, cred });
+  let syncResult: Awaited<ReturnType<typeof finalizeAdoption>>;
+  try {
+    syncResult = await finalizeAdoption(services, { server, slug, vaultDir, cred });
+  } catch (err) {
+    const msg = describeError(err, { slug });
+    stderr(msg);
+    exit(1);
+    return;
+  }
 
   stdout(`Vault "${slug}" re-sincronizado en "${vaultDir}"`);
   stdout(
