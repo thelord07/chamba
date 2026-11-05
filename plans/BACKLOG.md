@@ -222,6 +222,7 @@ Encontrado dogfooding en **finalis**. El check "Git repo" corría `git rev-parse
 - ✅ **1.11.0** — CHAMBA-014: sync de parche resiliente a la red (push-first, keep-alive, reintentos con backoff, errores claros); CHAMBA-015: cliente de parche en Windows + CI ubuntu/windows/macOS.
 - ✅ **1.12.0** — CHAMBA-016: red de conocimiento en el vault (temas jerárquicos, vocabulario humano, hubs/índices/Bases deterministas); tools `vault_topics`, `vault_classify`, `vault_reindex`.
 - ✅ **1.13.0** — CHAMBA-017: navegación de la red de conocimiento (`chamba_vault_navigate`, mapa del vault en `load_context`, regla "navega antes de leer" en los prompts).
+- 🔜 **1.13.1** — CHAMBA-019: subcomandos de `/vault` en inglés (`/vault init`, `/vault classify`); alias deprecados `iniciar`/`clasificar` con mensaje de aviso (se eliminan en la próxima minor); `argument-hint` en `vault.md`; test de consistencia `commands-consistency.test.ts`. Archivos tocados: `packages/core/src/obsidian/vault-writer.ts`, `packages/core/src/obsidian/knowledge/topics.ts`, `packages/mcp/src/tools/vault-topics.ts`, `packages/mcp/README.md`, `packages/claude-extras/assets/commands/vault.md`, `packages/claude-extras/src/knowledge-network-prompts.test.ts`, `packages/claude-extras/src/commands-consistency.test.ts`. Changeset: `vault-subcommands-english` (patch). **Recordatorio:** eliminar los alias `iniciar` y `clasificar` de `vault.md` en la próxima minor (1.14.0).
 
 ## Orden sugerido (lo que sigue)
 1. ✅ **1.0.0** — Tier 3 completo. Pulido y estabilización: superficie de tools revisada, docs

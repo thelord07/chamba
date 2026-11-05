@@ -1,5 +1,12 @@
 ---
 description: Show the connected Obsidian vault and the notes chamba can see; manage the knowledge network
+argument-hint: "[status|init|classify|reindex] [args]"
+---
+
+Interpret `$ARGUMENTS` as the subcommand (default: `status`).
+
+**Compatibility (deprecated):** `/vault iniciar` → `/vault init`, `/vault clasificar` → `/vault classify`. If the first word of `$ARGUMENTS` is `iniciar`, respond first with the exact line `Usa /vault init (iniciar está deprecado)` and then continue with the `/vault init` flow. If the first word is `clasificar`, respond first with `Usa /vault classify (clasificar está deprecado)` and then continue with the `/vault classify` flow. These aliases are removed in the next minor.
+
 ---
 
 ## `/vault` — default (status)
@@ -18,7 +25,7 @@ tell me to set `CHAMBA_OBSIDIAN_VAULT_PATH` to the **vault root** (the folder th
 
 ---
 
-## `/vault iniciar` — bootstrap the knowledge network (O1)
+## `/vault init` — bootstrap the knowledge network (O1)
 
 Use this to create or replace `temas/VOCABULARIO.md` for the first time.
 
@@ -36,12 +43,12 @@ Use this to create or replace `temas/VOCABULARIO.md` for the first time.
 5. Only after explicit approval: call `chamba_vault_topics action=apply dryRun:false`
    (add `replace:true` if `VOCABULARIO.md` already exists — confirm with the user
    first since this overwrites the current vocabulary).
-6. After writing the vocabulary, offer the backfill: run `/vault clasificar` to
+6. After writing the vocabulary, offer the backfill: run `/vault classify` to
    classify existing unclassified notes against the new vocabulary.
 
 ---
 
-## `/vault clasificar` — backfill unclassified notes
+## `/vault classify` — backfill unclassified notes
 
 Use this to classify notes that have no `temas` yet, in batches of ≤ 50.
 

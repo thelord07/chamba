@@ -6,7 +6,7 @@
  *
  * AC5 / §10: prompts must say:
  *   - one note with several `temas`, never separate notes (for planner, ticket, vault)
- *   - vault.md describes `iniciar` and `clasificar` modes with dryRun / confirmation
+ *   - vault.md describes `init` and `classify` modes with dryRun / confirmation
  *
  * CHAMBA-017 / test 8: all 5 assets (planner, diagnostician, ticket, recall, vault)
  *   - contain `chamba_vault_navigate`
@@ -90,15 +90,20 @@ describe('knowledge-network prompts (CHAMBA-016 §10)', () => {
   describe('vault.md', () => {
     const content = read(commandPath('vault'));
 
-    it('describes the `iniciar` mode', () => {
-      expect(content).toContain('iniciar');
+    it('describes the `init` mode', () => {
+      expect(content).toContain('/vault init');
     });
 
-    it('describes the `clasificar` mode', () => {
-      expect(content).toContain('clasificar');
+    it('describes the `classify` mode', () => {
+      expect(content).toContain('/vault classify');
     });
 
-    it('describes dryRun for iniciar/apply', () => {
+    it('keeps the deprecated aliases note', () => {
+      expect(content).toMatch(/iniciar está deprecado/);
+      expect(content).toMatch(/clasificar está deprecado/);
+    });
+
+    it('describes dryRun for init/apply', () => {
       expect(content).toContain('dryRun');
     });
 
