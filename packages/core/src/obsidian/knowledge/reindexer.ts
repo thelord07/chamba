@@ -32,31 +32,11 @@
  */
 
 import type { DirEntry, FilesystemPort } from '../../ports/filesystem.js';
-import { isInvalidPath } from '../../util/local-path.js';
 import { isChambaGenerated, isDerivedPathPattern } from './derived-path.js';
-import type { GraphNote, TopicSuggestion } from './knowledge-graph.js';
+import type { TopicSuggestion } from './knowledge-graph.js';
 import { buildKnowledgeGraph, computeSuggestions } from './knowledge-graph.js';
-import { readNoteMetadata } from './note-metadata.js';
+import { loadGraphNotes, loadVocabulary, VAULT_SKIP_DIRS } from './vault-notes.js';
 import type { VocabularyError } from './vocabulary.js';
-import { parseVocabulary } from './vocabulary.js';
-
-// ─── Constants ────────────────────────────────────────────────────────────────
-
-/** Maximum bytes we parse per note (string length, not byte count). */
-const MAX_READ_CHARS = 8192;
-
-/** Folders to skip during recursive scan (and derived-file collection). */
-const SKIP_DIRS = new Set([
-  'memory',
-  '.trash',
-  '.obsidian',
-  'temas',
-  'node_modules',
-  '.git',
-  '.chamba-sync',
-]);
-
-const VOCAB_PATH = 'temas/VOCABULARIO.md';
 
 // ─── Public types ─────────────────────────────────────────────────────────────
 
@@ -143,37 +123,11 @@ export class VaultReindexer {
     let incompleto = false;
 
     // ── 1. Scan notes ────────────────────────────────────────────────────────
-    const notePaths = await this.scanNotes(this.vaultDir, '');
-    const graphNotes: GraphNote[] = [];
-
-    for (const relPath of notePaths) {
-      const absPath = joinPath(this.vaultDir, relPath);
-      try {
-        const raw = await this.fs.readFile(absPath);
-        const content = raw.length > MAX_READ_CHARS ? raw.slice(0, MAX_READ_CHARS) : raw;
-        const metadata = readNoteMetadata(content, relPath);
-        graphNotes.push({ path: relPath, metadata });
-      } catch {
-        // Unreadable file — skip silently
-      }
-    }
+    const graphNotes = await loadGraphNotes(this.fs, this.vaultDir);
 
     // ── 2. Read vocabulary ───────────────────────────────────────────────────
-    const vocabAbsPath = joinPath(this.vaultDir, VOCAB_PATH);
-    let vocabulary = null;
-    if (await this.fs.exists(vocabAbsPath)) {
-      try {
-        const vocabContent = await this.fs.readFile(vocabAbsPath);
-        const result = parseVocabulary(vocabContent);
-        vocabulary = result.vocabulary;
-        erroresVocabulario.push(...result.errors);
-      } catch (err) {
-        erroresVocabulario.push({
-          code: 'INVALID_SEGMENT',
-          message: `Error al leer ${VOCAB_PATH}: ${String(err)}`,
-        });
-      }
-    }
+    const { vocabulary, errors: vocabErrors } = await loadVocabulary(this.fs, this.vaultDir);
+    erroresVocabulario.push(...vocabErrors);
 
     // ── 3. Build knowledge graph ─────────────────────────────────────────────
     const graphMap = buildKnowledgeGraph(graphNotes, vocabulary);
@@ -350,47 +304,6 @@ export class VaultReindexer {
   // ─── Private helpers ───────────────────────────────────────────────────────
 
   /**
-   * Recursively scan `dir` (absolute) for `.md` note files, returning
-   * vault-relative paths (using `/`).
-   *
-   * - Skips SKIP_DIRS at any level.
-   * - Skips dotdirs (names starting with `.`) other than `temas`-family already excluded.
-   * - Excludes `INDEX.md` files (they are derived or manual, not notes).
-   * - Ignores filenames that are invalid on Windows (`isInvalidPath`).
-   */
-  private async scanNotes(absDir: string, relPrefix: string): Promise<string[]> {
-    const result: string[] = [];
-    let entries: DirEntry[];
-    try {
-      entries = await this.fs.readDir(absDir);
-    } catch {
-      return result;
-    }
-
-    for (const entry of entries) {
-      const name = entry.name;
-      const relPath = relPrefix === '' ? name : `${relPrefix}/${name}`;
-
-      if (entry.isDirectory) {
-        const topPart = relPath.split('/')[0] ?? '';
-        if (SKIP_DIRS.has(topPart.toLowerCase())) continue;
-        if (name.startsWith('.')) continue; // skip dotdirs
-        const subAbs = `${absDir}/${name}`;
-        const subResults = await this.scanNotes(subAbs, relPath);
-        result.push(...subResults);
-      } else if (entry.isFile) {
-        if (!name.endsWith('.md')) continue;
-        if (name === 'INDEX.md') continue; // skip derived/manual indexes
-        // Check for Windows-invalid path
-        if (isInvalidPath(relPath, 'win32')) continue;
-        result.push(relPath);
-      }
-    }
-
-    return result;
-  }
-
-  /**
    * Collect existing derived files (paths matching isDerivedPathPattern) in the vault.
    * Returns a Set of vault-relative paths.
    */
@@ -417,9 +330,9 @@ export class VaultReindexer {
       const relPath = relPrefix === '' ? name : `${relPrefix}/${name}`;
 
       if (entry.isDirectory) {
-        // M1: apply same skip-set as scanNotes
+        // M1: apply same skip-set as scanNotes (via shared VAULT_SKIP_DIRS)
         const topPart = relPath.split('/')[0] ?? '';
-        if (SKIP_DIRS.has(topPart.toLowerCase())) continue;
+        if (VAULT_SKIP_DIRS.has(topPart.toLowerCase())) continue;
         if (name.startsWith('.')) continue; // skip dotdirs
         await this.collectDerivedRecursive(`${absDir}/${name}`, relPath, result);
       } else if (entry.isFile) {

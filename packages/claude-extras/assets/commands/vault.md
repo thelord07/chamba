@@ -64,6 +64,21 @@ Use this to classify notes that have no `temas` yet, in batches of ≤ 50.
 
 ---
 
+## Navigate before reading
+
+When working with the vault (diagnosing, writing a plan, or saving a summary):
+
+1. `chamba_load_context` returns the **Mapa del vault** — read the relevant topic nodes
+   before opening any note.
+2. Call `chamba_vault_navigate` with `tema` or `path` for each relevant node; descend
+   to subtopics only when their description applies to the task.
+3. Use `readBody:true` only on notes whose `summary`/`keywords` contain ≥ 2 task
+   keywords — do not open notes that are off the path.
+4. Record the navigation in a **Contexto consultado** section: paths you read + one
+   line listing notes discarded by summary.
+
+---
+
 ## Writing notes (daily flow)
 
 When calling `chamba_summarize_to_vault` or `chamba_save_plan`:

@@ -10,8 +10,58 @@ const TOOL_NAME = 'chamba_load_context';
 
 const DESCRIPTION =
   'Load context for a task: a summary of the workspace plus, when an Obsidian ' +
-  'vault is available, the notes most relevant to the task (keyword search). ' +
-  'Returns a markdown block the model can reason over before planning.';
+  'vault is available, a relevance map of topics and notes (mapa mode) or the ' +
+  'most relevant notes (keyword search). ' +
+  'Returns a markdown block the model can reason over before planning. ' +
+  'When mapa is present in structuredContent, use chamba_vault_navigate on each ' +
+  'nodo.ruta to explore the knowledge network.';
+
+const LOAD_CONTEXT_MAX_TOKENS = 2000;
+
+const MAPA_OUTPUT_SCHEMA = z.object({
+  mapa: z
+    .object({
+      nodos: z.array(
+        z.object({
+          ruta: z.string(),
+          descripcion: z.string(),
+          conteoSubarbol: z.number(),
+          notas: z.array(
+            z.object({
+              titulo: z.string(),
+              ruta: z.string(),
+              type: z.string(),
+              summary: z.string().optional(),
+              keywords: z.array(z.string()),
+              workItem: z.string().optional(),
+              date: z.string().optional(),
+              score: z.number(),
+            }),
+          ),
+        }),
+      ),
+      workItems: z.array(
+        z.object({
+          id: z.string(),
+          notas: z.array(
+            z.object({
+              titulo: z.string(),
+              ruta: z.string(),
+              type: z.string(),
+              summary: z.string().optional(),
+              keywords: z.array(z.string()),
+              workItem: z.string().optional(),
+              date: z.string().optional(),
+              score: z.number(),
+            }),
+          ),
+        }),
+      ),
+      recortado: z.boolean(),
+      reglasRecortadas: z.boolean().optional(),
+    })
+    .optional(),
+});
 
 /** Register `chamba_load_context`: workspace summary + relevant vault notes. */
 export function registerLoadContext(server: McpServer, logger: Logger, services: Services): void {
@@ -31,6 +81,7 @@ export function registerLoadContext(server: McpServer, logger: Logger, services:
           .optional()
           .describe("Include each repo's coding rules across editors (default true)."),
       },
+      outputSchema: MAPA_OUTPUT_SCHEMA,
     },
     async ({ task, includeObsidian, includeRules }) => {
       // O2: full discriminated resolution
@@ -75,6 +126,7 @@ export function registerLoadContext(server: McpServer, logger: Logger, services:
         task,
         vaultPath,
         includeRules,
+        maxTokens: LOAD_CONTEXT_MAX_TOKENS,
       });
       logger.info(
         { tool: TOOL_NAME, vault: vaultPath ?? null, notes: built.relevantNotes.length },
@@ -83,7 +135,14 @@ export function registerLoadContext(server: McpServer, logger: Logger, services:
 
       const text = syncWarning ? `${built.context}\n\n⚠ ${syncWarning}` : built.context;
 
-      return { content: [{ type: 'text' as const, text }] };
+      if (built.mapa) {
+        return {
+          content: [{ type: 'text' as const, text }],
+          structuredContent: { mapa: built.mapa },
+        };
+      }
+
+      return { content: [{ type: 'text' as const, text }], structuredContent: { mapa: undefined } };
     },
   );
 }

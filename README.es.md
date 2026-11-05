@@ -48,6 +48,8 @@ El modelo de tu editor hace el razonamiento y llama a las tools de chamba. Eso s
 - **Red de conocimiento.** Una nota, escrita una sola vez, conectada a todos sus temas
   con tags `tema/…` jerárquicos. chamba deriva hubs por tema, índices y Bases de Obsidian
   desde los metadatos, sin duplicar nada. Vocabulario por workspace, reindex determinista.
+  `chamba_vault_navigate` permite navegar el árbol de temas y abrir solo las notas cuyo
+  `summary`/`keywords` sean pertinentes, manteniendo el contexto liviano.
   Ver [`packages/mcp/README.md` — Knowledge network](./packages/mcp/README.md#knowledge-network).
 - **Seguro por defecto.** Ningún agente de chamba borra ni destruye nada por su cuenta
   — un drop/reset/truncate de DB, borrar archivos o datos, un force-push o borrar una

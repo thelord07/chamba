@@ -52,7 +52,7 @@ check, no LLM — powers `/triage`) · `chamba_generate_plan` · `chamba_review_
 
 **Memory + vault:** `chamba_remember` · `chamba_recall` · `chamba_summarize_to_vault` ·
 `chamba_save_plan` · `chamba_vault_status` · `chamba_vault_topics` · `chamba_vault_classify` ·
-`chamba_vault_reindex`
+`chamba_vault_reindex` · `chamba_vault_navigate`
 
 **Parche (group vaults):** `chamba_vault_join` · `chamba_vault_link` · `chamba_vault_unlink` · `chamba_vault_resync` · `chamba_vault_sync` · `chamba_parche_status`
 
@@ -207,6 +207,120 @@ completes on the next sync).
 default, shows which files will be renamed to `INDEX (manual).md` and replaced; call with
 `dryRun:false` only after explicit user confirmation. If `INDEX (manual).md` already exists,
 the tool errors. Unconfirmed manual `INDEX.md` files are reported in `indicesManualesOmitidos`.
+
+### Navigating the vault (Navegar el vault)
+
+`chamba_vault_navigate` lets you walk the knowledge network step by step — from the
+root map down to a specific note — reading only what is relevant to the current task.
+
+**Recommended flow: root → tema → subtema → nota**
+
+**Step 1 — Get the map** (`chamba_load_context`)
+
+```
+chamba_load_context({ task: "endpoint para editar cursos y otorgar insignias en LMS API" })
+```
+
+The result includes a `## Mapa del vault` section (when a root `INDEX.md` exists):
+
+```
+## Mapa del vault
+
+### Temas relevantes
+- `lms/cursos/gestion` — Editing, publishing, archiving. · 8 notas
+  - [HU LMS API 01 — cursos y módulos](proyectos/2026-10-29-hu-lms-api-01.md)
+    — Endpoints for course/module creation · claves: cursos, módulos · plan · 2026-10-29
+- `lms/gamificacion` — Points, badges, rankings. · 5 notas
+  - [LMS — sistema de insignias](proyectos/2026-11-01-insignias.md)
+    — Badge award logic and event hooks · claves: insignias, gamificacion · resumen · 2026-11-01
+
+Usa `chamba_vault_navigate` con `tema` o `path` para profundizar; lee cuerpos solo de las notas cuyo summary/keywords sean pertinentes.
+```
+
+**Step 2 — Explore a topic node** (`chamba_vault_navigate { tema: "lms" }`)
+
+```
+chamba_vault_navigate({ tema: "lms" })
+```
+
+```
+# Nodo: `lms`
+LMS de Lapzo.
+
+## Subtemas
+- `lms/cursos` — Courses and their lifecycle. · 20 nota(s)
+- `lms/gamificacion` — Points, badges, rankings. · 5 nota(s)
+
+## Notas directas
+(ninguna)
+
+## Co-temas
+- `soporte` (3)
+- `infra` (2)
+```
+
+**Step 3 — Descend to a subtopic** (`chamba_vault_navigate { tema: "lms/cursos/gestion" }`)
+
+```
+chamba_vault_navigate({ tema: "lms/cursos/gestion" })
+```
+
+```
+# Nodo: `lms/cursos/gestion`
+Editing, publishing, archiving.
+
+Padre: `lms/cursos`
+
+## Subtemas
+(ninguno)
+
+## Notas directas
+- [HU LMS API 01 — cursos y módulos](proyectos/2026-10-29-hu-lms-api-01.md) — Endpoints for course/module creation · claves: cursos, módulos, api key · plan · 2026-10-29
+```
+
+**Step 4 — Read a specific note** (`chamba_vault_navigate { path: "...", readBody: true }`)
+
+Only open notes whose `summary`/`keywords` match the task; skip the rest:
+
+```
+chamba_vault_navigate({ path: "proyectos/2026-10-29-hu-lms-api-01.md", readBody: true })
+```
+
+```
+# Nota: HU LMS API 01 — cursos y módulos
+Ruta: `proyectos/2026-10-29-hu-lms-api-01.md`
+Tipo: plan
+Fecha: 2026-10-29
+Work item: hu-lms-api-01
+
+Endpoints for course/module creation and management in LMS API with API key auth.
+
+Temas: `lms/cursos/creacion`, `lms/cursos/gestion`
+Palabras clave: cursos, módulos, api key, hu-lms-api-01
+
+## Backlinks
+- [LMS — resumen sprint 3](proyectos/2026-11-02-sprint-3.md)
+
+## Cuerpo
+# HU LMS API 01 — cursos y módulos
+...
+```
+
+**Notes**
+
+- `path` must be a **vault-relative `.md` path**. Absolute paths, `..` segments,
+  hidden directories (any path segment starting with `.`), and non-`.md` extensions
+  are rejected.
+- `tema` accepts both canonical paths (`lms/cursos/gestion`) and aliases (`crear-cursos`,
+  `plataforma`). Unknown topics return a `Sugerencias:` list.
+- **Reindex before answer:** `chamba_vault_navigate` runs `chamba_vault_reindex`
+  (write-only-changed, 2 s budget) before responding. This regenerates any stale derived
+  files (`temas/*.md`, `INDEX.md`). It only writes chamba-generated files and never
+  pushes — derived changes travel to the team on the next parche sync.
+- **Legacy vaults** (no root `INDEX.md`): `chamba_load_context` returns `## Relevant notes`
+  instead of `## Mapa del vault`. Navigate still works for explicit `tema`/`path` calls.
+- Record what you read in a **## Contexto consultado** section of your plan or ticket:
+  paths opened + one line listing notes discarded by summary.
 
 ### Derived files and conflict resolution
 

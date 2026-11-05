@@ -81,6 +81,7 @@ describe('chamba MCP server', () => {
       'chamba_vault_classify',
       'chamba_vault_join',
       'chamba_vault_link',
+      'chamba_vault_navigate',
       'chamba_vault_reindex',
       'chamba_vault_resync',
       'chamba_vault_status',

@@ -49,3 +49,9 @@ describe('cursor-extras copy-assets — agent files', () => {
     expect(readCopy('implementer')).toContain('Performance & concurrency');
   });
 });
+
+describe('cursor-extras copy-assets — navigate before reading (CHAMBA-017)', () => {
+  it('planner.md copy contains chamba_vault_navigate', () => {
+    expect(readCopy('planner')).toContain('chamba_vault_navigate');
+  });
+});

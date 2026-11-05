@@ -1,6 +1,10 @@
+import { buildContextMap, type MapaStruct } from '../obsidian/knowledge/context-map.js';
+import { isChambaGenerated } from '../obsidian/knowledge/derived-path.js';
+import { loadGraphNotes, loadVocabulary } from '../obsidian/knowledge/vault-notes.js';
 import { INDEX_FILE, parseIndexNote } from '../obsidian/vault-index.js';
 import type { FilesystemPort } from '../ports/filesystem.js';
 import { dirname, joinPath } from '../util/path.js';
+import { extractKeywords, occurrences } from './keywords.js';
 import { readRuleExcerpts } from './rules.js';
 import type { Workspace } from './workspace.js';
 
@@ -26,35 +30,16 @@ export interface ContextBuildInput {
 export interface BuiltContext {
   context: string;
   relevantNotes: string[];
+  /** Present in mapa mode (vault with chamba-generated root INDEX.md). */
+  mapa?: MapaStruct;
 }
+
+export type { MapaStruct };
 
 const DEFAULT_MAX_TOKENS = 2000;
 const NOTE_SCAN_MAX_DEPTH = 8;
 const MAX_NOTES = 5;
 const SKIP_DIRS = new Set(['.obsidian', '.trash', 'node_modules', '.git']);
-
-const STOPWORDS = new Set([
-  'the',
-  'and',
-  'for',
-  'with',
-  'add',
-  'use',
-  'that',
-  'this',
-  'into',
-  'from',
-  'all',
-  'can',
-  'should',
-  'una',
-  'unos',
-  'para',
-  'con',
-  'los',
-  'las',
-  'del',
-]);
 
 /**
  * Build the context block injected into the editor model's reasoning: a summary
@@ -65,8 +50,60 @@ export class ContextBuilder {
   constructor(private readonly fs: FilesystemPort) {}
 
   async build(input: ContextBuildInput): Promise<BuiltContext> {
-    const sections: string[] = [this.workspaceSection(input.workspace)];
+    const workspaceSection = this.workspaceSection(input.workspace);
+    const maxChars = (input.maxTokens ?? DEFAULT_MAX_TOKENS) * 4;
     let relevantNotes: string[] = [];
+    let mapa: MapaStruct | undefined;
+
+    // ── Gate: check for chamba-generated root INDEX.md → mapa mode ──────────
+    if (input.vaultPath) {
+      const indexPath = joinPath(input.vaultPath, 'INDEX.md');
+      let useMapa = false;
+      try {
+        const indexContent = await this.fs.readFile(indexPath);
+        if (isChambaGenerated('INDEX.md', indexContent)) useMapa = true;
+      } catch {
+        // INDEX.md does not exist → legacy mode
+      }
+
+      if (useMapa) {
+        // ── MAPA MODE: workspace → mapa → coding rules ─────────────────────
+        const graphNotes = await loadGraphNotes(this.fs, input.vaultPath);
+        const { vocabulary: vocab } = await loadVocabulary(this.fs, input.vaultPath);
+        const { section: mapaSection, mapa: mapaStruct } = buildContextMap(
+          graphNotes,
+          vocab,
+          input.task,
+          { maxTokens: input.maxTokens ?? DEFAULT_MAX_TOKENS },
+        );
+        mapa = mapaStruct;
+        relevantNotes = mapaStruct.nodos.flatMap((n) => n.notas.map((note) => note.ruta));
+
+        const sections: string[] = [workspaceSection, mapaSection];
+
+        const hasRules = input.includeRules !== false && input.workspace.ruleSources.length > 0;
+        if (hasRules) {
+          const rulesSection = await this.codingRulesSection(input.workspace);
+          sections.push(rulesSection);
+        }
+
+        const full = sections.join('\n\n');
+        let context = clamp(full, maxChars);
+
+        // Detect if clamp cut the rules section: any overflow while rules are
+        // present means partial rules — keep partial rules + notice, total ≤ maxChars.
+        if (hasRules && full.length > maxChars) {
+          mapa.reglasRecortadas = true;
+          const notice = '\n\n> (reglas recortadas por presupuesto; lee los archivos de reglas)';
+          context = clamp(full, maxChars - notice.length) + notice;
+        }
+
+        return { context, relevantNotes, mapa };
+      }
+    }
+
+    // ── LEGACY MODE: workspace → coding rules → relevant notes ──────────────
+    const sections: string[] = [workspaceSection];
 
     if (input.includeRules !== false && input.workspace.ruleSources.length > 0) {
       sections.push(await this.codingRulesSection(input.workspace));
@@ -78,7 +115,6 @@ export class ContextBuilder {
       sections.push(this.notesSection(notes));
     }
 
-    const maxChars = (input.maxTokens ?? DEFAULT_MAX_TOKENS) * 4;
     const context = clamp(sections.join('\n\n'), maxChars);
     return { context, relevantNotes };
   }
@@ -236,26 +272,6 @@ export async function listVaultNotes(fs: FilesystemPort, root: string): Promise<
 }
 
 // --- helpers ------------------------------------------------------------------
-
-function extractKeywords(task: string): string[] {
-  const seen = new Set<string>();
-  for (const raw of task.toLowerCase().split(/[^a-z0-9áéíóúñ]+/i)) {
-    const w = raw.trim();
-    if (w.length >= 3 && !STOPWORDS.has(w)) seen.add(w);
-  }
-  return [...seen];
-}
-
-function occurrences(haystack: string, needle: string): number {
-  if (needle.length === 0) return 0;
-  let count = 0;
-  let idx = haystack.indexOf(needle);
-  while (idx !== -1) {
-    count++;
-    idx = haystack.indexOf(needle, idx + needle.length);
-  }
-  return count;
-}
 
 /** Total keyword hits in a (already lower-cased) haystack. */
 function scoreText(haystack: string, keywords: string[]): number {
