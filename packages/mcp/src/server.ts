@@ -27,6 +27,7 @@ import { registerTriageTicket } from './tools/triage-ticket.js';
 import { registerVaultClassify } from './tools/vault-classify.js';
 import { registerVaultJoin } from './tools/vault-join.js';
 import { registerVaultLink } from './tools/vault-link.js';
+import { registerVaultNavigate } from './tools/vault-navigate.js';
 import { registerVaultReindex } from './tools/vault-reindex.js';
 import { registerVaultResync } from './tools/vault-resync.js';
 import { registerVaultStatus } from './tools/vault-status.js';
@@ -91,6 +92,7 @@ export function createServer(logger: Logger, services: Services = createNodeServ
   registerVaultTopics(server, logger, services);
   registerVaultClassify(server, logger, services);
   registerVaultReindex(server, logger, services);
+  registerVaultNavigate(server, logger, services);
 
   return server;
 }

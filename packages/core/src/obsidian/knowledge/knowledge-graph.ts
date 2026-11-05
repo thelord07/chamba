@@ -133,7 +133,7 @@ function relativeFrom(fromFile: string, toFile: string): string {
  * Case-insensitive comparison using Unicode code points for stability.
  * Tie broken by case-sensitive code-point comparison.
  */
-function stableCmp(a: string, b: string): number {
+export function stableCmp(a: string, b: string): number {
   const la = a.toLowerCase();
   const lb = b.toLowerCase();
   if (la < lb) return -1;
@@ -152,7 +152,7 @@ type NoteSortKey = {
   date: string;
 };
 
-function sortNotes(notes: GraphNote[]): GraphNote[] {
+export function sortNotes(notes: GraphNote[]): GraphNote[] {
   const keyed: NoteSortKey[] = notes.map((n) => ({
     note: n,
     type: n.metadata.type ?? 'nota',

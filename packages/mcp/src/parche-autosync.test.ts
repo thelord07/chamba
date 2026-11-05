@@ -11,12 +11,16 @@ import { CredentialsStore, FakeHash, FakeParche, MemoryFilesystem, writeState } 
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { pino } from 'pino';
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { AUTOSYNC_BUDGET_MS } from './parche/autosync.js';
+import { resetPendingReindex } from './parche/reindex-state.js';
 import { createServer } from './server.js';
 import type { Services } from './services.js';
 
 const silentLogger = pino({ level: 'silent' });
+
+beforeEach(() => resetPendingReindex());
+afterEach(() => resetPendingReindex());
 
 const FAKE_NOW = '2026-06-09T10:00:00.000Z';
 // Make the lastSyncAt old enough to trigger a pull (> 5 min)
@@ -525,6 +529,62 @@ describe('CHAMBA-016 — auto-sync reindex retries on the next pass', () => {
     // Nothing new to pull, but the pending reindex runs now.
     await client.callTool({ name: 'chamba_load_context', arguments: { task: 'b' } });
     expect(await svc.fs.readFile(`${vaultDir}/INDEX.md`)).toContain('generated: true');
+    await server.close();
+  });
+});
+
+// ─── M16: autosync skips reindex when lock busy, retries on next sync ─────────
+
+describe('M16 — autosync skips reindex when reindex lock is busy, retries next sync', () => {
+  it('when reindex lock is held during autosync, marks pending and completes on next run', async () => {
+    const parche = new FakeParche(makeClock());
+    const group = parche.seedGroup({ slug: 'team-alpha', name: 'Team Alpha' });
+    const token = parche.addDevice(group.id, { userId: 'u1', label: 'laptop', role: 'editor' });
+
+    // Seed a file change so autosync has something to pull
+    const hash = new FakeHash();
+    const bytes = new TextEncoder().encode('---\ntitle: M16 Note\nsource: human\n---\n# M16\n');
+    const h = await hash.sha256(bytes);
+    parche.seedBlob(group.id, h, bytes);
+    parche.seedChange(group.id, {
+      path: 'proyectos/m16-note.md',
+      hash: h,
+      author: 'Ana',
+      device: 'laptop',
+      at: '2026-06-09T09:00:00Z',
+    });
+
+    const { svc, vaultDir } = await makeServicesWithParcheVault({ parche, token });
+    svc.parchePullTtlMin = 0; // pull on every tool call
+    await svc.fs.writeFile('/proj/.chamba/workspace.md', '# Workspace\n');
+
+    // Pre-occupy the reindex lock (MemoryFilesystem.realpath is lexical so key = vaultDir)
+    let resolveExternal!: () => void;
+    const externalLock = new Promise<void>((resolve) => {
+      resolveExternal = resolve;
+    });
+    const lockKey = `reindex|${vaultDir}`;
+    svc.vaultMutex.set(lockKey, externalLock);
+
+    const { client, server } = await connect(svc);
+
+    // First sync: pulls M16 note, but reindex is SKIPPED (lock busy)
+    await client.callTool({ name: 'chamba_load_context', arguments: { task: 'test m16' } });
+
+    expect(await svc.fs.exists(`${vaultDir}/proyectos/m16-note.md`)).toBe(true);
+    // INDEX.md must NOT exist (reindex was skipped)
+    expect(await svc.fs.exists(`${vaultDir}/INDEX.md`)).toBe(false);
+
+    // Release the lock
+    resolveExternal();
+    svc.vaultMutex.delete(lockKey);
+
+    // Second sync: nothing new to pull, but pending reindex runs now
+    await client.callTool({ name: 'chamba_load_context', arguments: { task: 'test m16 retry' } });
+
+    // INDEX.md must now exist (reindex completed)
+    expect(await svc.fs.exists(`${vaultDir}/INDEX.md`)).toBe(true);
+
     await server.close();
   });
 });

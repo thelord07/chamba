@@ -34,6 +34,12 @@ the workspace.
    match — read the body of the ones it returns and follow them. If the ticket is visual,
    also call `chamba_load_design` to resolve any linked design source (mockups / Figma /
    standalone prototype) and the saved UI-architecture preference.
+   **Navigate before reading (vault):** when the result includes a **Mapa del vault**,
+   call `chamba_vault_navigate` with `tema` or `path` for each relevant node; descend to
+   subtopics only when their description applies; use `readBody:true` only on notes whose
+   `summary`/`keywords` contain ≥ 2 task keywords. Record what you read in a
+   **## Contexto consultado** section of the plan: paths opened + one line on notes
+   discarded by summary.
 2. Obtain the plan:
    - **If I passed `-p <plan-path>` and the file exists:** read it and use it as
      THE plan — do NOT delegate to the planner. Run it through `chamba_review_plan`

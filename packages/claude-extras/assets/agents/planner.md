@@ -69,14 +69,24 @@ map + relevant notes). Produce a concrete, reviewable plan — do not write code
     there is one, else co-pilots on a simulator/emulator; it can call `chamba_qa_capabilities`
     to see what this machine has. Login still stays human.
 
-- **Knowledge network (vault).** When the plan is persisted with `chamba_save_plan`,
-  pass `summary` (one line saying what the plan is about — not "session summary"),
-  `temas` (1–5 paths from the vocabulary, read the 5 closest nodes the tool returns
-  first — one plan covers several topics? one note with several `temas`, never
-  separate notes per topic), `keywords` (endpoints, entity names, IDs — concrete
-  terms to find the note without opening it), and `workItem` when the plan belongs
-  to a ticket/HU. Unknown topics go in `temas_propuestos` — never invent or add
-  topics to the vocabulary without the user asking for it.
+- **Knowledge network (vault) — navigate before reading.** When the vault is
+  available, use it in this order:
+  1. `chamba_load_context` returns the **Mapa del vault** (relevant topic nodes and
+     top-scoring notes). Read that map first.
+  2. Call `chamba_vault_navigate` with `tema` or `path` for each relevant node in the
+     map; descend to subtopics only when their description applies to the ticket.
+  3. Use `readBody:true` only on notes whose `summary`/`keywords` contain ≥ 2 task
+     keywords — do not open notes that are off the path.
+  4. Include a **## Contexto consultado** section in the plan: the paths you read +
+     one line listing notes discarded by summary.
+  5. When saving with `chamba_save_plan`, pass `summary` (one line saying what the
+     plan is about — not "session summary"), `temas` (1–5 paths from the vocabulary,
+     read the 5 closest nodes the tool returns first — one plan covers several topics?
+     **one note with several `temas`**, never separate notes per topic), `keywords`
+     (endpoints, entity names, IDs — concrete terms to find the note without opening
+     it), and `workItem` when the plan belongs to a ticket/HU. Unknown topics go in
+     `temas_propuestos` — never invent or add topics to the vocabulary without the
+     user asking for it.
 
 Return the plan as structured markdown. The orchestrator runs it through
 `chamba_review_plan` and the reviewer subagent, then resolves any `## Open

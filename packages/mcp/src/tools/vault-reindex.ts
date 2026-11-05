@@ -11,6 +11,7 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { Logger } from 'pino';
 import { z } from 'zod';
 import { resolveActiveParcheVaultFull } from '../parche/active-vault.js';
+import { withVaultLock } from '../parche/mutex.js';
 import { obsidianSearchRoots, type Services } from '../services.js';
 
 const TOOL_NAME = 'chamba_vault_reindex';
@@ -146,6 +147,61 @@ export function registerVaultReindex(server: McpServer, logger: Logger, services
         'vault-reindex',
       );
 
+      // Acquire the shared reindex lock (same key used by vault-navigate + autosync).
+      // dryRun does not write, so we skip the lock for dry runs.
+      let vaultRealPath = vaultPath;
+      try {
+        vaultRealPath = await services.fs.realpath(vaultPath);
+      } catch {
+        /* fall back to raw path */
+      }
+      const reindexLockKey = `reindex|${vaultRealPath}`;
+
+      if (!effectiveDryRun) {
+        const lockResult = await withVaultLock(
+          services.vaultMutex,
+          reindexLockKey,
+          { onBusy: 'skip', logger, label: 'vault-reindex' },
+          async () => {
+            const r = await new VaultReindexer(services.fs, vaultPath).reindex({
+              dryRun: false,
+              adoptManual: adoptManual ?? [],
+            });
+            return r;
+          },
+        );
+
+        if (lockResult.skipped) {
+          return {
+            content: [
+              {
+                type: 'text' as const,
+                text: 'Otro reindex en curso para este vault; reintenta en unos segundos.',
+              },
+            ],
+          };
+        }
+
+        const report = lockResult.result;
+        if (!report) {
+          return {
+            isError: true,
+            content: [{ type: 'text' as const, text: 'Reindex falló inesperadamente.' }],
+          };
+        }
+
+        const reportText = formatReport(report);
+
+        if (hasAdoptManual) {
+          return {
+            content: [{ type: 'text' as const, text: reportText }],
+          };
+        }
+
+        return { content: [{ type: 'text' as const, text: reportText }] };
+      }
+
+      // dryRun path: no lock needed
       const reindexer = new VaultReindexer(services.fs, vaultPath);
       const report = await reindexer.reindex({
         dryRun: effectiveDryRun,

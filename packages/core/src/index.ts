@@ -92,6 +92,15 @@ export {
   classifyPlan,
   listUnclassified,
 } from './obsidian/knowledge/classify.js';
+// Knowledge — context map (CHAMBA-017)
+export type {
+  BuildContextMapOptions,
+  MapaNode,
+  MapaNoteItem,
+  MapaStruct,
+  MapaWorkItem,
+} from './obsidian/knowledge/context-map.js';
+export { buildContextMap } from './obsidian/knowledge/context-map.js';
 export { isChambaGenerated, isDerivedPathPattern } from './obsidian/knowledge/derived-path.js';
 // Knowledge graph — derived files builder (CHAMBA-016 wave 2)
 export type {
@@ -99,7 +108,28 @@ export type {
   GraphOptions,
   TopicSuggestion,
 } from './obsidian/knowledge/knowledge-graph.js';
-export { buildKnowledgeGraph, computeSuggestions } from './obsidian/knowledge/knowledge-graph.js';
+export {
+  buildKnowledgeGraph,
+  computeSuggestions,
+} from './obsidian/knowledge/knowledge-graph.js';
+// Knowledge — navigator (CHAMBA-017)
+export type {
+  BacklinkItem,
+  CoTopic,
+  NavNodeItem,
+  NavNodeView,
+  NavNoteOptions,
+  NavNoteView,
+  NavRootView,
+  VaultNav,
+  VaultNavNode,
+} from './obsidian/knowledge/navigator.js';
+export {
+  buildVaultNav,
+  navNode,
+  navNote,
+  navRoot,
+} from './obsidian/knowledge/navigator.js';
 // Knowledge graph — note metadata and vocabulary (CHAMBA-016)
 export type { NoteMetadata, NoteType } from './obsidian/knowledge/note-metadata.js';
 export {
@@ -109,6 +139,9 @@ export {
 } from './obsidian/knowledge/note-metadata.js';
 export type { ReindexOptions, ReindexReport } from './obsidian/knowledge/reindexer.js';
 export { VaultReindexer } from './obsidian/knowledge/reindexer.js';
+// Knowledge — safe path validation (CHAMBA-017)
+export type { SafePathResult } from './obsidian/knowledge/safe-path.js';
+export { safeVaultRelPath } from './obsidian/knowledge/safe-path.js';
 // Knowledge — topics (CHAMBA-016 wave 3)
 export type {
   BootstrapFolder,
@@ -137,6 +170,12 @@ export {
   vocabularyAlias,
   writeVocabulary,
 } from './obsidian/knowledge/topics.js';
+// Knowledge — vault note scanning (CHAMBA-017, consumed by mcp navigate)
+export type { LoadVocabularyResult } from './obsidian/knowledge/vault-notes.js';
+export {
+  loadGraphNotes,
+  loadVocabulary,
+} from './obsidian/knowledge/vault-notes.js';
 export type {
   ResolveTopicResult,
   TopicNode,

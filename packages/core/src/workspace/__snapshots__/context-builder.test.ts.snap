@@ -1,0 +1,26 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`ContextBuilder > fallback: vault without root INDEX.md uses current behaviour (snapshot) 1`] = `
+"## Workspace context
+
+A tiny HTTP API.
+
+Languages: TypeScript
+Framework: Express
+
+Projects:
+- proj (\`.\`)
+
+## Coding rules
+
+Follow these per-repo rules (any editor). Read the full file for details:
+
+### \`CLAUDE.md\` — Claude Code (api)
+
+# API rules
+Use named exports.
+
+## Relevant notes
+
+- \`/vault/proyectos/cursos-api.md\` — # Cursos API"
+`;
