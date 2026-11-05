@@ -221,6 +221,7 @@ Encontrado dogfooding en **finalis**. El check "Git repo" corría `git rev-parse
 - ✅ **1.10.0** — parche por workspace (`.chamba/parche.json`) + comando `/parche` y tools `vault_link/unlink/resync`; agentes conscientes de rendimiento y concurrencia; catálogo de modelos 5.5; CI compila antes del typecheck.
 - ✅ **1.11.0** — CHAMBA-014: sync de parche resiliente a la red (push-first, keep-alive, reintentos con backoff, errores claros); CHAMBA-015: cliente de parche en Windows + CI ubuntu/windows/macOS.
 - ✅ **1.12.0** — CHAMBA-016: red de conocimiento en el vault (temas jerárquicos, vocabulario humano, hubs/índices/Bases deterministas); tools `vault_topics`, `vault_classify`, `vault_reindex`.
+- ✅ **1.13.0** — CHAMBA-017: navegación de la red de conocimiento (`chamba_vault_navigate`, mapa del vault en `load_context`, regla "navega antes de leer" en los prompts).
 
 ## Orden sugerido (lo que sigue)
 1. ✅ **1.0.0** — Tier 3 completo. Pulido y estabilización: superficie de tools revisada, docs
