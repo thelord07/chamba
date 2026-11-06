@@ -1,5 +1,11 @@
 # @chamba/core
 
+## 1.13.1
+
+### Patch Changes
+
+- f8d3097: /vault: subcomandos en inglés (`/vault init`, `/vault classify`); `iniciar`/`clasificar` quedan como alias deprecados (se eliminan en la próxima minor); `argument-hint` en vault.md.
+
 ## 1.13.0
 
 ### Minor Changes
