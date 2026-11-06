@@ -29,7 +29,7 @@ const TOOL_NAME = 'chamba_vault_topics';
 
 const DESCRIPTION =
   'Gestiona el vocabulario de temas del vault de Obsidian. ' +
-  'Acciones: list (árbol + sugerencias), bootstrap (estadísticas para /vault iniciar), ' +
+  'Acciones: list (árbol + sugerencias), bootstrap (estadísticas para /vault init), ' +
   'apply (escribir VOCABULARIO.md — dryRun:true por defecto, muestra el contenido exacto; ' +
   'NUNCA llames apply con dryRun:false en el mismo turno que bootstrap ni sin aprobación ' +
   'explícita del usuario en un turno aparte), ' +

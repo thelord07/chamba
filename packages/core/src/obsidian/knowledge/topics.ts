@@ -5,7 +5,7 @@
  * Functions provided:
  *   - closestTopics      — deterministic scoring of vocab nodes vs. a query
  *   - compactTopicTree   — ≤60-line Markdown tree from vocabulary
- *   - bootstrapStats     — deterministic vault statistics for /vault iniciar
+ *   - bootstrapStats     — deterministic vault statistics for /vault init
  *   - renderVocabulary   — build VOCABULARIO.md from a proposed node list
  *   - writeVocabulary    — write VOCABULARIO.md with replace/dryRun guards
  *   - promotePlan        — diff for moving temas_propuestos → tags (read-only)
@@ -475,7 +475,7 @@ const SKIP_DIRS_BOOTSTRAP = new Set([
 ]);
 
 /**
- * Compute deterministic vault statistics for the /vault iniciar bootstrap flow.
+ * Compute deterministic vault statistics for the /vault init bootstrap flow.
  * Two calls on the same vault yield identical results (order stable).
  */
 export async function bootstrapStats(

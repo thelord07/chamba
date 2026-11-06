@@ -119,7 +119,7 @@ export class VaultWriter {
         temasPropuestos.push(...input.temas.map((t) => t.replace(/^tema\//, '')));
         warnings.push(
           'No existe temas/VOCABULARIO.md. Los temas solicitados se guardaron como temas_propuestos. ' +
-            'Para crear la estructura de temas, usa /vault iniciar.',
+            'Para crear la estructura de temas, usa /vault init.',
         );
       } else {
         for (const tema of input.temas.slice(0, 5)) {
@@ -219,7 +219,7 @@ export class VaultWriter {
     // ── Build response extras ─────────────────────────────────────────────────
     const arbol = vocabulary
       ? compactTopicTree(vocabulary)
-      : '_No hay vocabulario de temas. Usa /vault iniciar para crearlo._\n';
+      : '_No hay vocabulario de temas. Usa /vault init para crearlo._\n';
 
     const cercanos: ClosestTopicResult[] = vocabulary
       ? closestTopics(vocabulary, {

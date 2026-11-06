@@ -132,9 +132,9 @@ If the vocabulary does not exist, chamba creates it empty with instructions; it 
 invents topics. All writes keep working without a vocabulary (notes go to "sin clasificar"
 with a warning).
 
-### Bootstrapping (`/vault iniciar`)
+### Bootstrapping (`/vault init`)
 
-Run `/vault iniciar` in your editor to start the knowledge network:
+Run `/vault init` in your editor to start the knowledge network:
 
 1. The agent calls `chamba_vault_topics action=bootstrap` for deterministic vault
    statistics (folder counts, existing tags, frequent terms, detected work items).
@@ -144,7 +144,7 @@ Run `/vault iniciar` in your editor to start the knowledge network:
 4. **Only after your explicit "yes" in a separate turn** does it call `action=apply
    dryRun:false` (with `replace:true` if a vocabulary already exists, after confirming
    with you). Never chained automatically. *(O1)*
-5. After writing the vocabulary, the agent offers to run backfill (`/vault clasificar`).
+5. After writing the vocabulary, the agent offers to run backfill (`/vault classify`).
 
 ### Daily writing
 
