@@ -4,18 +4,20 @@
  * Clasificador heurístico de ruta para un ticket/task. Sin LLM.
  *
  * Rutas: trivial < small < substantial < risky
- * Reglas §3.1:
- *   - Riesgo fuerte  → risky (no se puede bajar)
- *   - enoughToStart:false → ≥ substantial
- *   - ≥2 repos → ≥ substantial
- *   - trivial: requiere ≥1 señal trivial Y cero riesgo/alcance
- *   - sin señales → small por defecto
- *   - señal trivial + alcance/riesgo → la ruta mayor con confidence: low
- *   - low confidence si hay contradicción señal trivial vs señal de riesgo
+ * Reglas (§3.1 + review CHAMBA-020):
+ *   - Riesgo fuerte, o ≥2 términos distintos de auth/payment → risky
+ *   - Cualquier riesgo débil o señal de alcance (refactor, migrar, ≥2 repos,
+ *     ≥4 criterios, repo no previsto) → ≥ substantial
+ *   - trivial: ≥1 señal trivial y cero riesgo/alcance; ahí la incompletitud
+ *     no sube la ruta (se reporta como pregunta)
+ *   - enoughToStart:false (sin señal trivial) → ≥ substantial
+ *   - sin señales → small
+ *   - señal trivial + riesgo/alcance → confidence: low
  */
 
 import { checkTicketCompleteness } from '../triage/ticket-completeness.js';
-import { matchRiskTerms, TRIVIAL_TERMS, termRegex } from './risk-terms.js';
+import type { RiskCategory } from './risk-terms.js';
+import { matchRiskTerms, SCOPE_TERMS, TRIVIAL_TERMS, termRegex } from './risk-terms.js';
 
 /**
  * Determine if a task description is "enough to start" for routing purposes.
@@ -76,29 +78,38 @@ export interface ClassifyTaskResult {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function routeLevel(r: Route): number {
-  return { trivial: 0, small: 1, substantial: 2, risky: 3 }[r];
+function normalizeText(text: string): string {
+  return text.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 }
 
-function maxRoute(a: Route, b: Route): Route {
-  return routeLevel(a) >= routeLevel(b) ? a : b;
+/** Terms from `list` found in `text` (reuses termRegex from risk-terms). */
+function matchTerms(text: string, list: readonly string[]): string[] {
+  const normalized = normalizeText(text);
+  return list.filter((t) => termRegex(normalizeText(t)).test(normalized));
 }
 
-function routeName(r: Route): string {
-  return { trivial: 'trivial', small: 'small', substantial: 'substantial', risky: 'risky' }[r];
-}
+/**
+ * M2 (review CHAMBA-020): version bump of a dependency to an explicit semver
+ * ("subir versión de lodash a 4.17.22", "bump zod to 3.23.8") is a trivial signal.
+ */
+const DEPENDENCY_BUMP_RE =
+  /(?<![\w])(subir|sube|actualizar|actualiza|bump|upgrade|update)(?![\w])[^\n]{0,60}?(?<![\w.])\d+\.\d+\.\d+(?![\w.])/;
 
-/** Check if text contains any trivial-signal term (reuses termRegex from risk-terms). */
-function matchTrivialTerms(text: string): string[] {
-  const normalized = text.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
-  const matched: string[] = [];
-  for (const tt of TRIVIAL_TERMS) {
-    const normalizedTerm = tt.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
-    const re = termRegex(normalizedTerm);
-    if (re.test(normalized)) matched.push(tt);
+function matchTrivialSignals(text: string): string[] {
+  const matched = matchTerms(text, TRIVIAL_TERMS);
+  const normalized = normalizeText(text);
+  if (DEPENDENCY_BUMP_RE.test(normalized)) {
+    // With "from a.b.c to x.y.z", only a patch change counts as trivial.
+    const versions = [...normalized.matchAll(/(?<![\w.])(\d+)\.(\d+)\.\d+(?![\w.])/g)];
+    const [from, to] = versions;
+    const patchOnly = !from || !to || (from[1] === to[1] && from[2] === to[2]);
+    if (patchOnly) matched.push('dependency-bump');
   }
   return matched;
 }
+
+/** Categories where ≥2 distinct weak terms mean the change *is* about that area. */
+const RISKY_BY_COUNT: readonly RiskCategory[] = ['auth', 'payment'];
 
 // ─── Classifier ───────────────────────────────────────────────────────────────
 
@@ -108,159 +119,112 @@ function matchTrivialTerms(text: string): string[] {
 export function classifyTask(input: ClassifyTaskInput): ClassifyTaskResult {
   const { task, repos = [], planText = '', acceptanceCriteria = [], knownRepos = [] } = input;
 
-  // Build composite text for analysis (join criteria array elements)
   const criteriaText = acceptanceCriteria.join('\n');
   const fullText = [task, planText, criteriaText].filter(Boolean).join('\n');
 
   const reasons: string[] = [];
   const signals: string[] = [];
 
-  // ── 1. Completeness check ──────────────────────────────────────────────────
+  // ── Signals ────────────────────────────────────────────────────────────────
   const enoughToStart = isTaskEnoughToStart(task);
 
-  // ── 2. Risk terms ──────────────────────────────────────────────────────────
   const riskMatches = matchRiskTerms(fullText);
-  const hasStrongRisk = riskMatches.some((m) => m.strong);
+  const strongRisk = riskMatches.filter((m) => m.strong);
   const hasAnyRisk = riskMatches.length > 0;
+  for (const rm of riskMatches) signals.push(`risk:${rm.category}:${rm.term}`);
 
-  for (const rm of riskMatches.slice(0, 3)) {
-    signals.push(`risk:${rm.category}:${rm.term}`);
+  const byCategory = new Map<RiskCategory, string[]>();
+  for (const rm of riskMatches) {
+    byCategory.set(rm.category, [...(byCategory.get(rm.category) ?? []), rm.term]);
   }
+  const countRiskyCategories = RISKY_BY_COUNT.filter(
+    (c) => new Set(byCategory.get(c) ?? []).size >= 2,
+  );
 
-  // ── 3. Trivial signals ─────────────────────────────────────────────────────
-  const trivialMatches = matchTrivialTerms(fullText);
+  const trivialMatches = matchTrivialSignals(fullText);
   const hasTrivial = trivialMatches.length > 0;
+  for (const tm of trivialMatches.slice(0, 2)) signals.push(`trivial:${tm}`);
 
-  for (const tm of trivialMatches.slice(0, 2)) {
-    signals.push(`trivial:${tm}`);
-  }
+  const scopeMatches = matchTerms(fullText, SCOPE_TERMS);
+  for (const sm of scopeMatches) signals.push(`scope:${sm}`);
 
-  // ── 4. Scope: repos & acceptance criteria ────────────────────────────────
   const repoCount = repos.length;
-
-  // Detect unknown repos (repos not in knownRepos)
   const unknownRepos = knownRepos.length > 0 ? repos.filter((r) => !knownRepos.includes(r)) : [];
+  if (repoCount >= 2) signals.push(`multi-repo:${repoCount}`);
+  if (unknownRepos.length > 0) signals.push(`unknown-repos:${unknownRepos.length}`);
 
-  if (repoCount >= 2) {
-    signals.push(`multi-repo:${repoCount}`);
-  }
-  if (unknownRepos.length > 0) {
-    signals.push(`unknown-repos:${unknownRepos.length}`);
-  }
-
-  // ≥4 acceptance criteria → scope signal (§3.1)
   const criteriaCount = acceptanceCriteria.length;
   const hasManyAC = criteriaCount >= 4;
-  if (hasManyAC) {
-    signals.push(`acceptance-criteria:${criteriaCount}`);
-  }
+  if (hasManyAC) signals.push(`acceptance-criteria:${criteriaCount}`);
 
-  // ── 5. Determine base route ────────────────────────────────────────────────
-  let route: Route = 'small'; // default
+  const hasScope =
+    scopeMatches.length > 0 || repoCount >= 2 || hasManyAC || unknownRepos.length > 0;
+
+  // ── Route ──────────────────────────────────────────────────────────────────
+  let route: Route;
   let confidence: Confidence = 'medium';
 
-  // Rule: strong risk → risky
-  if (hasStrongRisk) {
+  if (strongRisk.length > 0 || countRiskyCategories.length > 0) {
+    // Strong risk, or ≥2 distinct auth/payment terms (B1) → risky
     route = 'risky';
     confidence = 'high';
-    const categories = [...new Set(riskMatches.filter((m) => m.strong).map((m) => m.category))];
-    reasons.push(
-      `Contiene términos de riesgo alto (${categories.join(', ')}) que requieren revisión especial.`,
-    );
-  }
-  // Rule: enoughToStart:false → ≥ substantial
-  else if (!enoughToStart) {
+  } else if (hasAnyRisk || hasScope) {
+    // Any weak risk (B1) or scope signal (B2) → at least substantial
     route = 'substantial';
-    confidence = 'medium';
-    reasons.push(
-      'El ticket no tiene suficiente información para comenzar — se requiere aclaración.',
-    );
-  }
-  // Rule: ≥2 repos → ≥ substantial
-  else if (repoCount >= 2) {
-    route = 'substantial';
-    confidence = 'medium';
-    reasons.push(`Involucra ${repoCount} repositorios — requiere coordinación sustancial.`);
-  }
-  // Rule: ≥4 acceptance criteria → ≥ substantial (§3.1 señal de alcance)
-  else if (hasManyAC) {
-    route = 'substantial';
-    confidence = 'medium';
-    reasons.push(`${criteriaCount} criterios de aceptación — alcance sustancial confirmado.`);
-  }
-  // Rule: trivial (requires ≥1 trivial signal AND zero risk/scope/criteria)
-  else if (hasTrivial && !hasAnyRisk && repoCount <= 1 && !hasManyAC && enoughToStart) {
+  } else if (hasTrivial) {
+    // M1: trivial signal with no risk/scope — incompleteness does not raise the route
     route = 'trivial';
     confidence = 'high';
-    reasons.push(
-      `Señales de cambio trivial detectadas (${trivialMatches.slice(0, 2).join(', ')}).`,
-    );
-  }
-  // Default: small
-  else {
+  } else if (!enoughToStart) {
+    route = 'substantial';
+  } else {
     route = 'small';
-    confidence = 'medium';
   }
 
-  // Rule: trivial signal + scope/risk → route mayor con confidence:low
-  if (hasTrivial && (hasAnyRisk || repoCount >= 2 || hasManyAC)) {
-    confidence = 'low';
-    reasons.push(
-      'Contradicción: señales triviales y de riesgo/alcance simultáneas — confianza baja.',
-    );
+  // ── Reasons (≤ 5, español). Risk is always listed when detected (B1). ──────
+  if (hasAnyRisk) {
+    const detail = [...byCategory.entries()]
+      .map(([cat, terms]) => `${cat}: ${[...new Set(terms)].join(', ')}`)
+      .join('; ');
+    const level =
+      strongRisk.length > 0
+        ? 'Riesgo alto'
+        : countRiskyCategories.length > 0
+          ? `Riesgo alto (varios términos de ${countRiskyCategories.join(', ')})`
+          : 'Riesgo moderado';
+    reasons.push(`${level} — señales detectadas: ${detail}.`);
   }
-
-  // Rule: unknown repos escalate
-  if (unknownRepos.length > 0 && routeLevel(route) < routeLevel('substantial')) {
-    route = maxRoute(route, 'substantial');
+  if (scopeMatches.length > 0) {
+    reasons.push(`Señales de alcance: ${scopeMatches.join(', ')}.`);
+  }
+  if (repoCount >= 2) {
+    reasons.push(`Involucra ${repoCount} repositorios — requiere coordinación.`);
+  }
+  if (unknownRepos.length > 0) {
     reasons.push(`Repo(s) no previstos en el workspace: ${unknownRepos.join(', ')}.`);
   }
-
-  // Rule: weak risk + not trivial → ensure at least small
-  if (hasAnyRisk && !hasStrongRisk && routeLevel(route) < routeLevel('small')) {
-    route = 'small';
-    if (riskMatches.length > 0) {
-      reasons.push('Señales de riesgo moderado detectadas.');
-    }
+  if (hasManyAC) {
+    reasons.push(`${criteriaCount} criterios de aceptación — alcance sustancial.`);
   }
-
-  // Build remaining reasons
-  if (!enoughToStart && route !== 'substantial' && routeLevel(route) < routeLevel('substantial')) {
-    // already handled above or escalated
+  if (route === 'trivial') {
+    reasons.push(`Señales de cambio trivial (${trivialMatches.slice(0, 2).join(', ')}).`);
+  }
+  if (!enoughToStart) {
+    reasons.push(
+      route === 'trivial'
+        ? 'Faltan detalles en el ticket — se reporta como pregunta, no sube la ruta.'
+        : 'El ticket no tiene suficiente información para comenzar — se requiere aclaración.',
+    );
+  }
+  if (hasTrivial && (hasAnyRisk || hasScope)) {
+    confidence = 'low';
+    reasons.push('Contradicción: señales triviales junto a riesgo/alcance — confianza baja.');
   }
   if (reasons.length === 0) {
-    if (route === 'small') {
-      reasons.push('Cambio de alcance acotado sin señales de riesgo ni complejidad especial.');
-    } else if (route === 'substantial') {
-      reasons.push('El alcance o las señales del ticket apuntan a un cambio sustancial.');
-    }
+    reasons.push('Cambio de alcance acotado, sin señales de riesgo ni de alcance.');
   }
 
-  // Add risk details if not already added
-  if (hasAnyRisk && !hasStrongRisk && !reasons.some((r) => r.includes('riesgo'))) {
-    const categories = [...new Set(riskMatches.map((m) => m.category))];
-    reasons.push(`Términos de riesgo moderado detectados: ${categories.join(', ')}.`);
-  }
+  const overridable = !(route === 'risky' && strongRisk.length > 0);
 
-  // Add repo info if not added
-  if (repoCount >= 2 && !reasons.some((r) => r.includes('repositorio'))) {
-    reasons.push(`Cambio en ${repoCount} repositorios simultáneos.`);
-  }
-
-  // Limit reasons to 5
-  const finalReasons = reasons.slice(0, 5);
-  if (finalReasons.length === 0) {
-    finalReasons.push(`Ruta asignada: ${routeName(route)} basado en heurísticas de señales.`);
-  }
-
-  // overridable: risky with strong signal is not easily overridable; others are
-  const overridable = !(hasStrongRisk && route === 'risky');
-
-  return {
-    route,
-    reasons: finalReasons,
-    signals,
-    confidence,
-    overridable,
-  };
+  return { route, reasons: reasons.slice(0, 5), signals, confidence, overridable };
 }

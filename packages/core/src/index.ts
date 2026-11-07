@@ -274,6 +274,7 @@ export {
   DB_WIPE_TOKENS,
   matchRiskTerms,
   RISK_TERMS,
+  SCOPE_TERMS,
   TRIVIAL_TERMS,
   termRegex,
 } from './routing/risk-terms.js';

@@ -175,8 +175,8 @@ Resultado en el chat de tu editor. Las ramas quedan abiertas para que las revise
 |---|---|---|---|---|
 | **trivial** | 3 líneas inline | no | lint + tests existentes | typo, copy, color, bump patch, renombre |
 | **small** | plan breve por implementer (≤ 10 líneas) | no | tests + 1 pasada de reviewer | cambio acotado, 1 repo, sin señales de riesgo |
-| **substantial** | planner | máx. 2 rondas | re-verificación máx. 2 rondas | multi-repo, alcance difuso o riesgo moderado |
-| **risky** | planner + `needs-approval` | máx. 2 rondas | reviewer enfocado en riesgo + guardia DB (CHAMBA-013) | auth, migración DB, schema, pagos, crypto, PII, prod, secretos |
+| **substantial** | planner | máx. 2 rondas | re-verificación máx. 2 rondas | multi-repo, alcance difuso, palabras de alcance (refactor, migrar, rediseño, reescribir, nuevo módulo) o cualquier señal de riesgo débil (admin, acceso, rol, índice…) |
+| **risky** | planner + `needs-approval` | máx. 2 rondas | reviewer enfocado en riesgo + guardia DB (CHAMBA-013) | riesgo fuerte (migración DB, duración de token/sesión, pagos: checkout, precio, descuento, reembolso, factura…, crypto, prod, secretos) o ≥ 2 términos de auth/pagos |
 
 **Ejemplos del clasificador (tomados de los tests):**
 

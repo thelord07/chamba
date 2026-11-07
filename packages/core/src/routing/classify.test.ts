@@ -66,8 +66,13 @@ describe('classifyTask — tabla de casos §5.1', () => {
     expect(['small', 'substantial']).toContain(result.route);
   });
 
-  it('T11 actualizar dependencia npm → small', () => {
-    expectRoute('Actualizar la dependencia lodash de 4.17.20 a 4.17.21', 'small');
+  it('T11 actualizar dependencia npm (solo patch) → trivial (M2)', () => {
+    expectRoute('Actualizar la dependencia lodash de 4.17.20 a 4.17.21', 'trivial');
+  });
+
+  it('T11b actualizar dependencia con cambio minor/major → small', () => {
+    expectRoute('Actualizar la dependencia lodash de 4.17.21 a 4.18.0', 'small');
+    expectRoute('Upgrade react from 17.0.2 to 18.3.1 in the web app', 'small');
   });
 
   it('T12 mostrar mensaje de error en UI → small', () => {
@@ -329,5 +334,98 @@ describe('classifyTask — tabla de casos §5.1', () => {
     const result = classifyTask({ task: 'mejorar el tokenizer para el parser de código' });
     // "tokenizer" contains "token" but word boundary should prevent match
     expect(result.route).not.toBe('risky');
+  });
+});
+
+// ─── Review CHAMBA-020 (B1–B4, M1, M2): tabla de 16 tickets realistas ─────────
+describe('classifyTask — tabla de la review CHAMBA-020', () => {
+  const cases: Array<[string, Array<'trivial' | 'small' | 'substantial' | 'risky'>]> = [
+    ['Corregir typo en el título de la página de login', ['trivial']],
+    ['Arreglar typo en el README', ['trivial']],
+    ['Agregar campo opcional "descripcion" al DTO de curso con su test', ['small']],
+    ['Cambiar la duración del token de sesión de 15 a 30 minutos', ['risky']],
+    ['Migración que elimina la columna legacy_id de courses', ['risky']],
+    ['Rolar los logs del worker cada día', ['small']],
+    ['Actualizar el tokenizer del buscador', ['small', 'substantial']],
+    ['Endpoint de evaluaciones en LMS API con permisos por rol y export CSV', ['risky']],
+    ['Subir versión de lodash a 4.17.22', ['trivial']],
+    ['Cambiar el color del botón primario', ['trivial']],
+    ['Refactor del módulo de reportes para usar colas', ['substantial', 'risky']],
+    ['Ajustar el texto del correo de bienvenida', ['trivial']],
+    ['Agregar índice a la tabla enrollments', ['substantial', 'risky']],
+    ['Fix: GET /courses devuelve 500 sin módulos', ['small']],
+    ['Cambiar el cálculo del precio con descuento en el checkout', ['risky']],
+    ['Permitir que los admins vean los cursos archivados', ['substantial', 'risky']],
+  ];
+
+  it.each(cases)('%s', (task, expected) => {
+    expect(expected).toContain(classifyTask({ task }).route);
+  });
+
+  it('B1: la razón lista las señales de riesgo detectadas (nunca "sin señales de riesgo")', () => {
+    const r = classifyTask({
+      task: 'Endpoint de evaluaciones en LMS API con permisos por rol y export CSV',
+    });
+    const joined = r.reasons.join(' ');
+    expect(joined).toContain('permiso');
+    expect(joined).toContain('rol');
+    expect(joined).not.toMatch(/sin señales de riesgo/i);
+  });
+
+  it('B1: un riesgo débil nunca queda en trivial/small', () => {
+    expect(classifyTask({ task: 'Agregar índice a la tabla enrollments' }).route).toBe(
+      'substantial',
+    );
+    expect(classifyTask({ task: 'Corregir typo en el texto del email de bienvenida' }).route).toBe(
+      'substantial',
+    );
+  });
+
+  it('B2: señales de alcance en es/en ⇒ ≥ substantial', () => {
+    for (const task of [
+      'Migrar el servicio de notificaciones a colas',
+      'Rediseño de la pantalla de cursos',
+      'Reescribir el parser de planes',
+      'Rewrite the plan parser in a cleaner way',
+      'Redesign the courses screen layout',
+      'Crear un nuevo módulo de encuestas',
+      'Add a new module for surveys to the API',
+    ]) {
+      expect(['substantial', 'risky']).toContain(classifyTask({ task }).route);
+    }
+  });
+
+  it('B3: términos de pago son fuertes ⇒ risky', () => {
+    for (const task of [
+      'Ajustar el cobro mensual de la plataforma',
+      'Generar la factura del cliente al cerrar el mes',
+      'Procesar el reembolso cuando se cancela el curso',
+      'Handle refund requests from the admin panel',
+      'Renovar la suscripción automáticamente cada año',
+      'Send the invoice by email after each purchase',
+      'Cambiar la tarifa del plan empresarial',
+    ]) {
+      expect(classifyTask({ task }).route).toBe('risky');
+    }
+  });
+
+  it('B4: autorización débil (admin, acceso, authorize) ⇒ ≥ substantial', () => {
+    for (const task of [
+      'Permitir que los admins vean los cursos archivados',
+      'Dar acceso de lectura a los reportes del área',
+      'Authorize managers to export the course report',
+    ]) {
+      expect(['substantial', 'risky']).toContain(classifyTask({ task }).route);
+    }
+  });
+
+  it('M1: señal trivial sin riesgo/alcance no sube por incompletitud y lo reporta como pregunta', () => {
+    const r = classifyTask({ task: 'Arreglar typo en el README' });
+    expect(r.route).toBe('trivial');
+    expect(r.reasons.join(' ')).toMatch(/pregunta/);
+  });
+
+  it('M1: sin señal trivial, la incompletitud sigue subiendo la ruta', () => {
+    expect(classifyTask({ task: 'No funciona el login' }).route).toBe('substantial');
   });
 });
