@@ -55,3 +55,45 @@ describe('opencode-extras copy-assets — navigate before reading (CHAMBA-017)',
     expect(readCopy('planner')).toContain('chamba_vault_navigate');
   });
 });
+
+// ── CHAMBA-020: routing in command files ───────────────────────────────────────
+
+function commandCopyPath(name: string): string {
+  return fileURLToPath(new URL(`../assets/commands/${name}.md`, import.meta.url));
+}
+
+function commandSourcePath(name: string): string {
+  return fileURLToPath(new URL(`../../claude-extras/assets/commands/${name}.md`, import.meta.url));
+}
+
+function readCommandCopy(name: string): string {
+  return readFileSync(commandCopyPath(name), 'utf8');
+}
+
+const COMMANDS = ['ticket', 'orq'] as const;
+const FOUR_ROUTES = ['trivial', 'small', 'substantial', 'risky'] as const;
+
+describe('opencode-extras copy-assets — command files (CHAMBA-020)', () => {
+  for (const cmd of COMMANDS) {
+    describe(`${cmd}.md`, () => {
+      it('is byte-identical to the claude-extras source', () => {
+        const source = readFileSync(commandSourcePath(cmd), 'utf8');
+        expect(readCommandCopy(cmd)).toBe(source);
+      });
+
+      for (const route of FOUR_ROUTES) {
+        it(`contains route "${route}"`, () => {
+          expect(readCommandCopy(cmd)).toContain(route);
+        });
+      }
+
+      it('contains "máx. 2 rondas"', () => {
+        expect(readCommandCopy(cmd)).toContain('máx. 2 rondas');
+      });
+
+      it('does not contain "6 rounds"', () => {
+        expect(readCommandCopy(cmd)).not.toContain('6 rounds');
+      });
+    });
+  }
+});

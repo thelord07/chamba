@@ -140,6 +140,8 @@ the log directory and worktrees.
 | `chamba_get_agent_config` | `{ role }` | `{ model, effort, reasoning_priority, provider, hint }` for a role — no LLM |
 | `chamba_create_worktrees` | `{ ticket, repos? }` | Multi-repo worktrees for a ticket (config-driven); keeps branches |
 | `chamba_cleanup_worktrees` | `{ ticket, repos? }` | Removes a ticket's worktrees, **keeps every branch** |
+| `chamba_classify_task` | `{ task, repos?, planText?, acceptanceCriteria?, knownRepos? }` | Classifies a task into one of 4 routes (trivial, small, substantial, risky) using deterministic heuristics — no LLM. Signals: risk terms (auth, DB, payments, crypto, PII, prod, secrets), ticket completeness, repos involved, triviality. Returns `{ route, reasons (≤5, in Spanish), signals, confidence, overridable }`. Powers `/ticket` and `/orq` |
+| `chamba_task_metrics` | `{ action: 'start'\|'event'\|'end', workItem, … }` | Records task-progress metrics without storing ticket text or secrets. `start` begins tracking; `event` logs a milestone (`planReview`, `verify`, `escalation`, `override`); `end` closes and appends one line to `<wsRoot>/.chamba/metrics/tasks.jsonl` (gitignored). Lock is in-process; chamba never sees tokens |
 
 ## How it works
 
@@ -164,6 +166,45 @@ Result in your editor's chat. Branches stay open for you to review & merge.
 
 **chamba contributes:** workspace context, plan validation, worktree isolation,
 vault memory. **The model contributes:** reasoning, decisions, code.
+
+## Proportional routes
+
+`/ticket` and `/orq` pick the right flow heuristically — no LLM — via
+`chamba_classify_task`. The route is announced in one line and you can override it
+with `--route`.
+
+| Route | Plan | Plan review | Verification | When |
+|---|---|---|---|---|
+| **trivial** | 3-line inline summary | no | lint + existing tests | typo, copy, color, patch bump, rename |
+| **small** | brief plan by implementer (≤ 10 lines) | no | tests + 1 reviewer pass | scoped change, 1 repo, no risk signals |
+| **substantial** | planner | máx. 2 rondas | re-verify máx. 2 rondas | multi-repo, vague scope, or moderate risk |
+| **risky** | planner + `needs-approval` | máx. 2 rondas | reviewer focused on risk + DB guard (CHAMBA-013) | auth, DB migration, schema, payments, crypto, PII, prod, secrets |
+
+**Examples from the classifier test suite:**
+
+| Task | Route |
+|---|---|
+| `Corregir typo en el botón de enviar` | trivial |
+| `Add a new GET /users/:id/profile endpoint` | small |
+| `Sync user model across api, worker, admin repos` | substantial |
+| `Cambiar el flujo de autenticación JWT para soportar refresh tokens` | risky |
+| `Run database migration to add new columns to users table` | risky |
+| `Integrar Stripe para cobros recurrentes` | risky |
+| `Update .env variables for the production database connection` | risky |
+
+**Task metrics** (`chamba_task_metrics`) record outcomes per ticket in
+`<wsRoot>/.chamba/metrics/tasks.jsonl` — gitignored automatically if the workspace
+is inside a git repo. Fields: `workItem`, `startedAt`, `endedAt`, `routeSuggested`,
+`routeFinal`, `overridden`, `escalations`, `planReviewRounds`, `verifyRounds`,
+`notesRead`, `testsPassed`, `qaResult`, `delivered`, `source`. **No ticket text,
+no file paths, no secrets.** chamba never sees tokens (MCP protocol). In-flight
+state lives in `<wsRoot>/.chamba/metrics/inflight/<workItem>.json` (atomic write,
+7-day sweep); lock is in-process only (cross-process access is a known limitation).
+
+```bash
+npx @chamba/mcp metrics           # table by route, split by source (ticket / orq) + total
+npx @chamba/mcp metrics --since 30d  # filter by the last 30 days (also: 24h, 2w)
+```
 
 ## Editor extras (optional)
 
@@ -306,6 +347,7 @@ no single-machine RAM ceiling, less waiting. **Guide:
 - ✅ **1.11.0 — parche on real networks + Windows:** sync uploads only the blobs the server is missing over one keep-alive connection (100 new files: 102 TCP connections → 1), retries transient errors with backoff and says what failed instead of `fetch failed`; the parche client runs on Windows (drive and UNC paths, user-only ACL on credentials); CI on ubuntu, windows and macOS
 - ✅ **1.12.0 — Knowledge network in the vault:** hierarchical `tema/…` topics from a human-owned vocabulary; one note can live in several topics without duplicates. `chamba_vault_topics`, `chamba_vault_classify`, `chamba_vault_reindex` build topic hubs, indexes and optional Obsidian Bases deterministically (same bytes on any machine), and parche syncs them without conflict copies
 - ✅ **1.13.0 — Navigate the knowledge network:** `chamba_vault_navigate` walks topics → subtopics → notes (with backlinks and `work_item` siblings) and `chamba_load_context` returns a vault map instead of a flat list, so agents navigate before they read
+- ✅ **1.14.0 — Proportional routes (ODD step 1):** `chamba_classify_task` picks the right flow heuristically — no LLM — (trivial → small → substantial → risky); `/ticket` and `/orq` follow the route; `chamba_task_metrics` records outcomes per ticket in a local `.jsonl` (gitignored); `npx @chamba/mcp metrics` renders a table by route and source
 - 🔭 V2: semantic vault search, MCP sampling, more knowledge bases
 
 See [`PLAN.md`](./PLAN.md) for the full phase plan.

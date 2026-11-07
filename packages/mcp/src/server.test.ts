@@ -55,6 +55,7 @@ describe('chamba MCP server', () => {
     const { tools } = await client.listTools();
 
     expect(tools.map((t) => t.name).sort()).toEqual([
+      'chamba_classify_task',
       'chamba_cleanup_worktree',
       'chamba_cleanup_worktrees',
       'chamba_conflict_preview',
@@ -77,6 +78,7 @@ describe('chamba MCP server', () => {
       'chamba_review_plan',
       'chamba_save_plan',
       'chamba_summarize_to_vault',
+      'chamba_task_metrics',
       'chamba_triage_ticket',
       'chamba_vault_classify',
       'chamba_vault_join',

@@ -57,6 +57,23 @@ export interface Services {
    */
   vaultMutex: Map<string, Promise<void>>;
   /**
+   * Per-metrics mutex map (CHAMBA-020). Key is "metrics|<abs-path>".
+   * Guards concurrent writes to the metrics JSONL file within one process.
+   * Cross-process locking is not implemented (documented limitation).
+   */
+  metricsMutex?: Map<string, Promise<void>>;
+  /**
+   * Session ID for this MCP process (CHAMBA-020, R2).
+   * Random string set once at process start. Used to validate notesRead baseline
+   * across start/end calls: if sessionId differs, the process restarted.
+   */
+  metricsSessionId?: string;
+  /**
+   * Counter of vault-navigate readBody calls in this session (CHAMBA-020, ST-7).
+   * Incremented by chamba_vault_navigate when readBody:true and a body is returned.
+   */
+  navReadBodyCount?: number;
+  /**
    * Budget in milliseconds for an auto-sync triggered by a tool call.
    * Defaults to `AUTOSYNC_BUDGET_MS` (10 s) in production.
    * Injectable for tests to exercise the timeout path without real waiting.
@@ -95,6 +112,9 @@ export function createNodeServices(logger?: Logger): Services {
     parcheServerUrl: process.env.CHAMBA_PARCHE_URL,
     parchePullTtlMin: Number(process.env.CHAMBA_PARCHE_PULL_TTL_MIN ?? '5') || 5,
     vaultMutex: new Map(),
+    metricsMutex: new Map(),
+    metricsSessionId: Math.random().toString(36).slice(2),
+    navReadBodyCount: 0,
     workspaceRoot: process.env.CHAMBA_WORKSPACE_ROOT,
     platform: process.platform,
     username: (() => {

@@ -1,6 +1,7 @@
 import { createInterface } from 'node:readline';
 import { renderDoctorReport, runDoctor } from '@chamba/core';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { runMetricsCli } from './cli/metrics.js';
 import { runVaultCli } from './cli/vault.js';
 import { formatFatal } from './fatal.js';
 import { createLogger } from './logging.js';
@@ -45,6 +46,18 @@ async function main(): Promise<void> {
       exit: (code) => process.exit(code),
       prompt,
       isTTY: process.stdin.isTTY ?? false,
+    });
+    return;
+  }
+
+  // `metrics` renders the task metrics table from tasks.jsonl and exits.
+  if (flag === 'metrics') {
+    const services = createNodeServices();
+    await runMetricsCli(process.argv.slice(3), {
+      services,
+      stdout: (msg) => process.stdout.write(`${msg}\n`),
+      stderr: (msg) => process.stderr.write(`${msg}\n`),
+      exit: (code) => process.exit(code),
     });
     return;
   }

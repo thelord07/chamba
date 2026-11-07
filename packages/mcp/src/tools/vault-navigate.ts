@@ -558,6 +558,11 @@ export function registerVaultNavigate(server: McpServer, logger: Logger, service
         };
       }
 
+      // Increment session readBody counter when body was actually read (CHAMBA-020 ST-7).
+      if (readBody && view.body !== undefined) {
+        services.navReadBodyCount = (services.navReadBodyCount ?? 0) + 1;
+      }
+
       const { text, structured } = renderNote(view, reindexNotice);
       return { content: [{ type: 'text' as const, text }], structuredContent: structured };
     },
