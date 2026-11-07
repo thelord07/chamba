@@ -42,8 +42,13 @@ URL / mockups folder / standalone `.html`·`.zip` prototype and set the UI-archi
 preference (Atomic Design, Feature-Sliced, …). No LLM.
 
 **Triage + planning + review:** `chamba_triage_ticket` (heuristic ticket-completeness
-check, no LLM — powers `/triage`) · `chamba_generate_plan` · `chamba_review_plan`
-(heuristic, no LLM) · `chamba_save_plan`
+check, no LLM — powers `/triage`) · `chamba_classify_task` (route picker:
+trivial / small / substantial / risky — no LLM) · `chamba_generate_plan` ·
+`chamba_review_plan` (heuristic, no LLM) · `chamba_save_plan`
+
+**Metrics:** `chamba_task_metrics` (`start` / `event` / `end` — records outcomes per
+ticket in `<wsRoot>/.chamba/metrics/tasks.jsonl`, gitignored; no ticket text or
+secrets; chamba never sees tokens) · `npx @chamba/mcp metrics [--since 30d]`
 
 **Worktrees (parallel work):** `chamba_create_worktree` · `chamba_create_worktrees` ·
 `chamba_list_worktrees` · `chamba_worktree_status` · `chamba_conflict_preview` ·

@@ -1,6 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { Logger } from 'pino';
 import { createNodeServices, type Services } from './services.js';
+import { registerClassifyTask } from './tools/classify-task.js';
 import { registerCleanupWorktree } from './tools/cleanup-worktree.js';
 import { registerCleanupWorktrees } from './tools/cleanup-worktrees.js';
 import { registerConflictPreview } from './tools/conflict-preview.js';
@@ -23,6 +24,7 @@ import { registerResourceBudget } from './tools/resource-budget.js';
 import { registerReviewPlan } from './tools/review-plan.js';
 import { registerSavePlan } from './tools/save-plan.js';
 import { registerSummarizeToVault } from './tools/summarize-to-vault.js';
+import { registerTaskMetrics } from './tools/task-metrics.js';
 import { registerTriageTicket } from './tools/triage-ticket.js';
 import { registerVaultClassify } from './tools/vault-classify.js';
 import { registerVaultJoin } from './tools/vault-join.js';
@@ -70,6 +72,8 @@ export function createServer(logger: Logger, services: Services = createNodeServ
   registerGeneratePlan(server, logger, services);
   registerReviewPlan(server, logger, services);
   registerTriageTicket(server, logger, services);
+  registerClassifyTask(server, logger, services);
+  registerTaskMetrics(server, logger, services);
   registerSavePlan(server, logger, services);
   registerCreateWorktree(server, logger, services);
   registerListWorktrees(server, logger, services);

@@ -1168,3 +1168,41 @@ describe('T_reindex_busy: chamba_vault_reindex lock contention', () => {
     await server.close();
   });
 });
+
+// ─── T11: navReadBodyCount increments on readBody (CHAMBA-020 ST-7) ───────────
+
+describe('T11: navReadBodyCount increments when readBody body is returned', () => {
+  it('increments services.navReadBodyCount each time readBody=true returns a body', async () => {
+    const svc = makeServices({
+      [`${VAULT_PATH}/temas/VOCABULARIO.md`]: VOCAB_MD,
+      ...Object.fromEntries([
+        makeNote('proyectos/nota-t11.md', {
+          temas: ['lms'],
+          body: 'Contenido de la nota T11.',
+        }),
+      ]),
+    });
+    svc.navReadBodyCount = 0;
+
+    const { client, server } = await connect(svc);
+
+    // Navigate to a note WITH readBody:true
+    await client.callTool({
+      name: 'chamba_vault_navigate',
+      arguments: { path: 'proyectos/nota-t11.md', readBody: true },
+    });
+
+    // Counter should have incremented
+    expect(svc.navReadBodyCount).toBeGreaterThan(0);
+
+    // Navigate WITHOUT readBody (should NOT increment)
+    const before = svc.navReadBodyCount;
+    await client.callTool({
+      name: 'chamba_vault_navigate',
+      arguments: { path: 'proyectos/nota-t11.md', readBody: false },
+    });
+    expect(svc.navReadBodyCount).toBe(before);
+
+    await server.close();
+  });
+});

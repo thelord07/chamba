@@ -68,6 +68,23 @@ export { renderDoctorReport, runDoctor } from './doctor/doctor.js';
 export { FilesystemMemoryStore, MEMORY_DIR } from './memory/filesystem-store.js';
 // Memory
 export type { Memory, MemoryStore, RememberInput } from './memory/store.js';
+// Metrics — task metrics (CHAMBA-020)
+export type {
+  InflightMetric,
+  MetricRoute,
+  MetricSource,
+  QaResult,
+  RouteSummary,
+  TaskMetric,
+} from './metrics/task-metrics.js';
+export {
+  filterMetricsSince,
+  parseSinceArg,
+  parseTaskMetricsJsonl,
+  renderMetricsTable,
+  serializeTaskMetric,
+  summarizeMetricsByRoute,
+} from './metrics/task-metrics.js';
 // Model catalog
 export type { ModelInfo, ModelProvider } from './models/catalog.js';
 export {
@@ -244,6 +261,25 @@ export type {
   ConcurrencyBudgetInput,
 } from './resources/budget.js';
 export { applyOverlapCap, computeConcurrencyBudget } from './resources/budget.js';
+// Routing — task classifier + risk terms (CHAMBA-020)
+export type {
+  BumpKind,
+  ClassifyTaskInput,
+  ClassifyTaskResult,
+  Confidence,
+  DependencyBump,
+  Route,
+} from './routing/classify.js';
+export { classifyTask, detectDependencyBump, FRAMEWORK_TERMS } from './routing/classify.js';
+export type { RiskCategory, RiskMatch, RiskTerm } from './routing/risk-terms.js';
+export {
+  DB_WIPE_TOKENS,
+  matchRiskTerms,
+  RISK_TERMS,
+  SCOPE_TERMS,
+  TRIVIAL_TERMS,
+  termRegex,
+} from './routing/risk-terms.js';
 // Skills / playbooks registry (index-first, no LLM)
 export type { Skill, SkillRef } from './skills/skill.js';
 export {
@@ -456,6 +492,7 @@ export { detectRuleSources, RULE_SOURCES, readRuleExcerpts } from './workspace/r
 export { WorkspaceScanner } from './workspace/scanner.js';
 // Vault safety (keep the vault out of git repos)
 export {
+  ensureGitignored,
   ensureVaultGitignored,
   findGitRoot,
   VAULT_ARTIFACTS,

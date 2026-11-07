@@ -78,6 +78,34 @@ function normalizeIgnore(pattern: string): string {
 }
 
 /**
+ * Generic helper: ensure `patterns` are listed in `repoRoot`/.gitignore (idempotent,
+ * additive). Returns the patterns it added (empty when nothing was needed).
+ * Uses `comment` as the section header when adding new patterns.
+ *
+ * CHAMBA-020: extracted as a reusable helper for metrics gitignore support (ST-4).
+ */
+export async function ensureGitignored(
+  fs: FilesystemPort,
+  repoRoot: string,
+  patterns: readonly string[],
+  comment = '# chamba: artefactos excluidos del git',
+): Promise<string[]> {
+  const current = await readGitignore(fs, repoRoot);
+  const present = new Set(
+    current
+      .split('\n')
+      .map(normalizeIgnore)
+      .filter((l) => l.length > 0),
+  );
+  const missing = patterns.filter((p) => !present.has(normalizeIgnore(p)));
+  if (missing.length === 0) return [];
+  const sep = current.length === 0 ? '' : current.endsWith('\n') ? '\n' : '\n\n';
+  const block = `${sep}${comment}\n${missing.join('\n')}\n`;
+  await fs.writeFile(joinPath(repoRoot, '.gitignore'), current + block);
+  return missing;
+}
+
+/**
  * Ensure the vault artifacts are gitignored in `repoRoot`'s `.gitignore` (idempotent).
  * Appends only the patterns not already present, under a chamba-managed header. Returns
  * the patterns it added (empty when nothing was needed). A backstop so a vault that lives
@@ -93,19 +121,12 @@ export async function ensureVaultGitignored(
   extra?: readonly string[],
 ): Promise<string[]> {
   const allArtifacts = extra ? [...VAULT_ARTIFACTS, ...extra] : VAULT_ARTIFACTS;
-  const current = await readGitignore(fs, repoRoot);
-  const present = new Set(
-    current
-      .split('\n')
-      .map(normalizeIgnore)
-      .filter((l) => l.length > 0),
+  return ensureGitignored(
+    fs,
+    repoRoot,
+    allArtifacts,
+    '# chamba: artefactos del vault (notas/memoria personal — se excluyen del git)',
   );
-  const missing = allArtifacts.filter((p) => !present.has(normalizeIgnore(p)));
-  if (missing.length === 0) return [];
-  const sep = current.length === 0 ? '' : current.endsWith('\n') ? '\n' : '\n\n';
-  const block = `${sep}# chamba: artefactos del vault (notas/memoria personal — se excluyen del git)\n${missing.join('\n')}\n`;
-  await fs.writeFile(joinPath(repoRoot, '.gitignore'), current + block);
-  return missing;
 }
 
 async function readGitignore(fs: FilesystemPort, repoRoot: string): Promise<string> {

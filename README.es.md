@@ -142,6 +142,8 @@ el directorio de logs y los worktrees.
 | `chamba_get_agent_config` | `{ role }` | `{ model, effort, reasoning_priority, provider, hint }` por rol — sin LLM |
 | `chamba_create_worktrees` | `{ ticket, repos? }` | Worktrees multi-repo para un ticket (por config); conserva ramas |
 | `chamba_cleanup_worktrees` | `{ ticket, repos? }` | Borra los worktrees del ticket, **conserva todas las ramas** |
+| `chamba_classify_task` | `{ task, repos?, planText?, acceptanceCriteria?, knownRepos? }` | Clasifica una tarea en una de 4 rutas (trivial, small, substantial, risky) con heurísticas deterministas — sin LLM. Señales: términos de riesgo (auth, DB, pagos, crypto, PII, prod, secrets), completitud del ticket, repos involucrados, trivialidad. Devuelve `{ route, reasons (≤5, en español), signals, confidence, overridable }`. Potencia `/ticket` y `/orq` |
+| `chamba_task_metrics` | `{ action: 'start'\|'event'\|'end', workItem, … }` | Registra métricas de progreso de tareas sin guardar texto del ticket ni secretos. `start` inicia el tracking; `event` registra un hito (`planReview`, `verify`, `escalation`, `override`); `end` cierra y agrega una línea a `<wsRoot>/.chamba/metrics/tasks.jsonl` (gitignored). Lock in-process; chamba nunca ve tokens |
 
 ## Cómo funciona
 
@@ -162,6 +164,44 @@ El modelo del editor razona y llama a las tools de chamba:
         │
         ▼
 Resultado en el chat de tu editor. Las ramas quedan abiertas para que las revises.
+```
+
+## Rutas proporcionales
+
+`/ticket` y `/orq` eligen el flujo adecuado de forma heurística — sin LLM — mediante
+`chamba_classify_task`. La ruta se anuncia en una línea y se puede cambiar con `--route`.
+
+| Ruta | Plan | Revisión del plan | Verificación | Cuándo |
+|---|---|---|---|---|
+| **trivial** | 3 líneas inline | no | lint + tests existentes | typo, copy, color, bump patch, renombre |
+| **small** | plan breve por implementer (≤ 10 líneas) | no | tests + 1 pasada de reviewer | cambio acotado, 1 repo, sin señales de riesgo |
+| **substantial** | planner | máx. 2 rondas | re-verificación máx. 2 rondas | multi-repo, alcance difuso, palabras de alcance (refactor, migrar, rediseño, reescribir, nuevo módulo), un bump major de dependencia o un upgrade no-patch de framework/runtime (react, nestjs, expo, typescript, node…), o cualquier señal de riesgo débil (admin, acceso, rol, índice…) |
+| **risky** | planner + `needs-approval` | máx. 2 rondas | reviewer enfocado en riesgo + guardia DB (CHAMBA-013) | riesgo fuerte (migración DB, duración de token/sesión, pagos: checkout, precio, descuento, reembolso, factura…, crypto, prod, secretos) o ≥ 2 términos de auth/pagos |
+
+**Ejemplos del clasificador (tomados de los tests):**
+
+| Tarea | Ruta |
+|---|---|
+| `Corregir typo en el botón de enviar` | trivial |
+| `Add a new GET /users/:id/profile endpoint` | small |
+| `Sync user model across api, worker, admin repos` | substantial |
+| `Cambiar el flujo de autenticación JWT para soportar refresh tokens` | risky |
+| `Run database migration to add new columns to users table` | risky |
+| `Integrar Stripe para cobros recurrentes` | risky |
+| `Update .env variables for the production database connection` | risky |
+
+**Métricas de tareas** (`chamba_task_metrics`) registran resultados por ticket en
+`<wsRoot>/.chamba/metrics/tasks.jsonl` — gitignored automáticamente si el workspace
+está dentro de un repo git. Campos: `workItem`, `startedAt`, `endedAt`, `routeSuggested`,
+`routeFinal`, `overridden`, `escalations`, `planReviewRounds`, `verifyRounds`,
+`notesRead`, `testsPassed`, `qaResult`, `delivered`, `source`. **Sin texto del ticket,
+sin rutas de archivos, sin secretos.** chamba nunca ve tokens (protocolo MCP). El estado
+en vuelo vive en `<wsRoot>/.chamba/metrics/inflight/<workItem>.json` (escritura atómica,
+limpieza cada 7 días); el lock es in-process (el acceso cross-process es una limitación conocida).
+
+```bash
+npx @chamba/mcp metrics           # tabla por ruta, separada por source (ticket / orq) + total
+npx @chamba/mcp metrics --since 30d  # filtra los últimos 30 días (también: 24h, 2w)
 ```
 
 ## Extras por editor (opcional)
@@ -283,6 +323,7 @@ corrés chamba en paralelo entre máquinas: sin techo de RAM de una sola, menos 
 - ✅ **1.11.0 — parche en redes reales + Windows:** el sync sube solo los blobs que le faltan al server por una sola conexión keep-alive (100 archivos nuevos: de 102 conexiones TCP a 1), reintenta errores transitorios con backoff y dice qué falló en vez de `fetch failed`; el cliente de parche funciona en Windows (rutas con unidad y UNC, ACL solo-usuario en las credenciales); CI en ubuntu, windows y macOS
 - ✅ **1.12.0 — Red de conocimiento en el vault:** temas jerárquicos `tema/…` desde un vocabulario que controla el humano; una nota puede estar en varios temas sin duplicarse. `chamba_vault_topics`, `chamba_vault_classify` y `chamba_vault_reindex` arman hubs por tema, índices y Obsidian Bases opcionales de forma determinista (mismos bytes en cualquier máquina), y parche los sincroniza sin copias en conflicto
 - ✅ **1.13.0 — Navegar la red de conocimiento:** `chamba_vault_navigate` recorre temas → subtemas → notas (con backlinks y hermanas del mismo `work_item`) y `chamba_load_context` devuelve un mapa del vault en vez de una lista plana, así los agentes navegan antes de leer
+- ✅ **1.14.0 — Rutas proporcionales (ODD paso 1):** `chamba_classify_task` elige el flujo adecuado heurísticamente — sin LLM — (trivial → small → substantial → risky); `/ticket` y `/orq` siguen la ruta; `chamba_task_metrics` registra resultados por ticket en un `.jsonl` local (gitignored); `npx @chamba/mcp metrics` muestra una tabla por ruta y source
 - 🔭 V2: búsqueda semántica del vault, MCP sampling, más bases de conocimiento
 
 Ver [`PLAN.md`](./PLAN.md) para el plan completo de fases.
