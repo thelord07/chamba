@@ -16,9 +16,14 @@
  * Ningún campo contiene texto libre del ticket ni secretos (§3.3).
  */
 
-import { join } from 'node:path';
 import type { InflightMetric, MetricRoute, MetricSource, QaResult, TaskMetric } from '@chamba/core';
-import { dirname, ensureGitignored, findGitRoot, serializeTaskMetric } from '@chamba/core';
+import {
+  dirname,
+  ensureGitignored,
+  findGitRoot,
+  joinPath,
+  serializeTaskMetric,
+} from '@chamba/core';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { Logger } from 'pino';
 import { z } from 'zod';
@@ -76,11 +81,6 @@ const endInputSchema = z.object({
 });
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function joinPath(...parts: string[]): string {
-  // Use node:path.join — this tool is in the MCP package (Node environment)
-  return join(...parts);
-}
 
 function inflightDir(wsRoot: string): string {
   return joinPath(wsRoot, '.chamba', 'metrics', 'inflight');

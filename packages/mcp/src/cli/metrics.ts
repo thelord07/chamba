@@ -9,9 +9,9 @@
  * All I/O is injectable via `MetricsCliDeps` for tests.
  */
 
-import { join } from 'node:path';
 import {
   filterMetricsSince,
+  joinPath,
   parseSinceArg,
   parseTaskMetricsJsonl,
   renderMetricsTable,
@@ -25,10 +25,6 @@ export interface MetricsCliDeps {
   stdout: (msg: string) => void;
   stderr: (msg: string) => void;
   exit: (code: number) => void;
-}
-
-function joinPath(...parts: string[]): string {
-  return join(...parts);
 }
 
 function metricsJsonlPath(wsRoot: string): string {
