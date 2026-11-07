@@ -263,12 +263,14 @@ export type {
 export { applyOverlapCap, computeConcurrencyBudget } from './resources/budget.js';
 // Routing — task classifier + risk terms (CHAMBA-020)
 export type {
+  BumpKind,
   ClassifyTaskInput,
   ClassifyTaskResult,
   Confidence,
+  DependencyBump,
   Route,
 } from './routing/classify.js';
-export { classifyTask } from './routing/classify.js';
+export { classifyTask, detectDependencyBump, FRAMEWORK_TERMS } from './routing/classify.js';
 export type { RiskCategory, RiskMatch, RiskTerm } from './routing/risk-terms.js';
 export {
   DB_WIPE_TOKENS,

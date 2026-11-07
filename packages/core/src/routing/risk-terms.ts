@@ -749,7 +749,6 @@ export const TRIVIAL_TERMS: readonly string[] = [
   'color',
   'comentario',
   'comment',
-  'bump',
   'version patch',
   'patch version',
   'renombre',

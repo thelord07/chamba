@@ -6,7 +6,7 @@
 
 import { describe, expect, it } from 'vitest';
 import type { Route } from './classify.js';
-import { classifyTask } from './classify.js';
+import { classifyTask, detectDependencyBump } from './classify.js';
 
 // Helper: assert route
 function expectRoute(task: string, expected: Route, opts?: Parameters<typeof classifyTask>[0]) {
@@ -72,7 +72,7 @@ describe('classifyTask — tabla de casos §5.1', () => {
 
   it('T11b actualizar dependencia con cambio minor/major → small', () => {
     expectRoute('Actualizar la dependencia lodash de 4.17.21 a 4.18.0', 'small');
-    expectRoute('Upgrade react from 17.0.2 to 18.3.1 in the web app', 'small');
+    expectRoute('Upgrade react from 17.0.2 to 18.3.1 in the web app', 'substantial');
   });
 
   it('T12 mostrar mensaje de error en UI → small', () => {
@@ -427,5 +427,39 @@ describe('classifyTask — tabla de la review CHAMBA-020', () => {
 
   it('M1: sin señal trivial, la incompletitud sigue subiendo la ruta', () => {
     expect(classifyTask({ task: 'No funciona el login' }).route).toBe('substantial');
+  });
+});
+
+// ─── Re-review CHAMBA-020: bumps de dependencias ──────────────────────────────
+describe('classifyTask — bumps de dependencias (re-review CHAMBA-020)', () => {
+  const cases: Array<[string, 'trivial' | 'small' | 'substantial']> = [
+    ['Subir lodash de 4.17.21 a 4.17.22', 'trivial'],
+    ['Subir versión de lodash a 5.0.0', 'substantial'],
+    ['Actualizar NestJS a la versión 11', 'substantial'],
+    ['Subir react-native de 0.74 a 0.76', 'substantial'],
+    // complementarios
+    ['Subir versión de lodash a 4.17.22', 'trivial'],
+    ['Actualizar la dependencia lodash de 4.17.21 a 4.18.0', 'small'],
+    ['Subir typescript de 5.6.2 a 5.7.0', 'substantial'],
+    ['Actualizar vite de 5.4.10 a 5.4.11', 'trivial'],
+    ['Bump zod to the latest patch 3.23.9', 'trivial'],
+    ['Upgrade expo to SDK 52.0.0', 'substantial'],
+    ['Subir dayjs de 0.11.10 a 0.12.0', 'substantial'],
+  ];
+
+  it.each(cases)('%s → %s', (task, expected) => {
+    expect(classifyTask({ task }).route).toBe(expected);
+  });
+
+  it('detectDependencyBump distingue patch, minor y major', () => {
+    expect(detectDependencyBump('subir lodash de 4.17.21 a 4.17.22')?.kind).toBe('patch');
+    expect(detectDependencyBump('subir lodash de 4.17.21 a 4.18.0')?.kind).toBe('minor');
+    expect(detectDependencyBump('subir lodash a 5.0.0')?.kind).toBe('major');
+    expect(detectDependencyBump('actualizar nestjs a la version 11')).toEqual({
+      kind: 'major',
+      framework: 'nestjs',
+    });
+    expect(detectDependencyBump('subir react-native de 0.74 a 0.76')?.kind).toBe('major');
+    expect(detectDependencyBump('cambiar el timeout de 15 a 30 minutos')).toBeUndefined();
   });
 });

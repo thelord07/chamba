@@ -89,23 +89,103 @@ function matchTerms(text: string, list: readonly string[]): string[] {
 }
 
 /**
- * M2 (review CHAMBA-020): version bump of a dependency to an explicit semver
- * ("subir versión de lodash a 4.17.22", "bump zod to 3.23.8") is a trivial signal.
+ * Dependency bumps (review CHAMBA-020, M2 + re-review):
+ *   - trivial ONLY when it is a patch (x.y.Z → x.y.Z') or the ticket says "patch";
+ *   - major (first number changes, or the second one in 0.x) ⇒ ≥ substantial;
+ *   - frameworks/runtimes ⇒ ≥ substantial on any bump that is not a patch.
  */
-const DEPENDENCY_BUMP_RE =
-  /(?<![\w])(subir|sube|actualizar|actualiza|bump|upgrade|update)(?![\w])[^\n]{0,60}?(?<![\w.])\d+\.\d+\.\d+(?![\w.])/;
+const BUMP_VERB_RE = /(?<![\w])(subir|sube|actualizar|actualiza|bump|upgrade|update)(?![\w])/;
 
-function matchTrivialSignals(text: string): string[] {
-  const matched = matchTerms(text, TRIVIAL_TERMS);
+/** Dotted versions anywhere (`4.17.21`, `0.74`, `v18.3.1`) or a bare major after "version"/"a la". */
+const VERSION_RE =
+  /(?:(?<![\w.])v?(\d+)\.(\d+)(?:\.(\d+))?(?![\w.]))|(?:(?:version|versiones|a\s+la)\s+v?(\d+)(?![\w.]))/g;
+
+export const FRAMEWORK_TERMS: readonly string[] = [
+  'nestjs',
+  'nest',
+  'react',
+  'react-native',
+  'expo',
+  'typescript',
+  'node',
+  'nodejs',
+  'next',
+  'nextjs',
+  'next.js',
+  'vite',
+  'knex',
+  'prisma',
+  'drizzle',
+];
+
+interface Version {
+  major: number;
+  minor?: number;
+  patch?: number;
+}
+
+export type BumpKind = 'patch' | 'minor' | 'major';
+
+function isMajorJump(from: Version, to: Version): boolean {
+  if (from.major !== to.major) return true;
+  return from.major === 0 && from.minor !== to.minor;
+}
+
+/** Kind of a single target version when the original one is unknown. */
+function kindOfTarget(v: Version): BumpKind {
+  if (v.minor === undefined) return 'major'; // "NestJS 11"
+  if (v.major === 0) return v.patch !== undefined && v.patch > 0 ? 'patch' : 'major'; // 0.y(.0)
+  if (v.patch !== undefined && v.patch > 0) return 'patch'; // x.y.Z
+  return v.minor === 0 ? 'major' : 'minor'; // x.0.0 / x.y.0
+}
+
+export interface DependencyBump {
+  kind: BumpKind;
+  framework: string | undefined;
+}
+
+/** Detects a dependency/runtime version bump in normalized text, or undefined. */
+export function detectDependencyBump(text: string): DependencyBump | undefined {
   const normalized = normalizeText(text);
-  if (DEPENDENCY_BUMP_RE.test(normalized)) {
-    // With "from a.b.c to x.y.z", only a patch change counts as trivial.
-    const versions = [...normalized.matchAll(/(?<![\w.])(\d+)\.(\d+)\.\d+(?![\w.])/g)];
-    const [from, to] = versions;
-    const patchOnly = !from || !to || (from[1] === to[1] && from[2] === to[2]);
-    if (patchOnly) matched.push('dependency-bump');
+  if (!BUMP_VERB_RE.test(normalized)) return undefined;
+  const versions: Version[] = [...normalized.matchAll(VERSION_RE)].map((m) =>
+    m[4] !== undefined
+      ? { major: Number(m[4]) }
+      : {
+          major: Number(m[1]),
+          minor: Number(m[2]),
+          patch: m[3] === undefined ? undefined : Number(m[3]),
+        },
+  );
+  if (versions.length === 0) return undefined;
+
+  const framework = matchTerms(normalized, FRAMEWORK_TERMS)[0];
+  let kind: BumpKind;
+  const [from, to] = versions;
+  if (from && to) {
+    kind = isMajorJump(from, to) ? 'major' : from.minor !== to.minor ? 'minor' : 'patch';
+  } else if (from) {
+    kind = kindOfTarget(from);
+  } else {
+    return undefined;
   }
+  // The ticket explicitly saying "patch" wins, unless the numbers show a major jump.
+  if (/(?<![\w])patch(?![\w])/.test(normalized) && kind !== 'major') kind = 'patch';
+  return { kind, framework };
+}
+
+function matchTrivialSignals(text: string, bump: DependencyBump | undefined): string[] {
+  const matched = matchTerms(text, TRIVIAL_TERMS);
+  if (bump?.kind === 'patch') matched.push('dependency-bump:patch');
   return matched;
+}
+
+/** Scope signals from a bump: major, or any non-patch bump of a framework/runtime. */
+function bumpScopeSignals(bump: DependencyBump | undefined): string[] {
+  if (!bump || bump.kind === 'patch') return [];
+  if (bump.kind === 'major')
+    return [`dependency-major${bump.framework ? `:${bump.framework}` : ''}`];
+  return bump.framework ? [`framework-upgrade:${bump.framework}`] : [];
 }
 
 /** Categories where ≥2 distinct weak terms mean the change *is* about that area. */
@@ -141,11 +221,12 @@ export function classifyTask(input: ClassifyTaskInput): ClassifyTaskResult {
     (c) => new Set(byCategory.get(c) ?? []).size >= 2,
   );
 
-  const trivialMatches = matchTrivialSignals(fullText);
+  const bump = detectDependencyBump(fullText);
+  const trivialMatches = matchTrivialSignals(fullText, bump);
   const hasTrivial = trivialMatches.length > 0;
   for (const tm of trivialMatches.slice(0, 2)) signals.push(`trivial:${tm}`);
 
-  const scopeMatches = matchTerms(fullText, SCOPE_TERMS);
+  const scopeMatches = [...matchTerms(fullText, SCOPE_TERMS), ...bumpScopeSignals(bump)];
   for (const sm of scopeMatches) signals.push(`scope:${sm}`);
 
   const repoCount = repos.length;

@@ -177,7 +177,7 @@ with `--route`.
 |---|---|---|---|---|
 | **trivial** | 3-line inline summary | no | lint + existing tests | typo, copy, color, patch bump, rename |
 | **small** | brief plan by implementer (≤ 10 lines) | no | tests + 1 reviewer pass | scoped change, 1 repo, no risk signals |
-| **substantial** | planner | máx. 2 rondas | re-verify máx. 2 rondas | multi-repo, vague scope, scope words (refactor, migrate, redesign, rewrite, new module) or any weak risk signal (admin, access, role, index…) |
+| **substantial** | planner | máx. 2 rondas | re-verify máx. 2 rondas | multi-repo, vague scope, scope words (refactor, migrate, redesign, rewrite, new module), a major dependency bump or a non-patch framework/runtime upgrade (react, nestjs, expo, typescript, node…), or any weak risk signal (admin, access, role, index…) |
 | **risky** | planner + `needs-approval` | máx. 2 rondas | reviewer focused on risk + DB guard (CHAMBA-013) | strong risk (DB migration, token/session lifetime, payments: checkout, price, discount, refund, invoice…, crypto, prod, secrets) or ≥ 2 auth/payment terms |
 
 **Examples from the classifier test suite:**
