@@ -15,7 +15,11 @@
 import { hostname } from 'node:os';
 import {
   AdoptionPendingError,
+  addSecretAllowEntry,
+  allowSecretHint,
+  blockedSecretsSummary,
   CredentialsStore,
+  countProposed,
   defaultDeviceLabel,
   InvalidJoinInputError,
   joinFirstHint,
@@ -23,6 +27,7 @@ import {
   joinPath,
   linkDirPlaceholderHint,
   linkHint,
+  loadGraphNotes,
   MEMORY_DIR,
   ObsidianDetector,
   ParcheAlreadyMemberError,
@@ -31,10 +36,13 @@ import {
   ParcheRateLimitedError,
   parseJoinInput,
   planPush,
+  promoteNotesApply,
+  promoteNotesPlan,
   readState,
   resolveServerUrl,
   resolveVaultDir,
   scanLocal,
+  staleProposed,
   syncOnce,
   toSyncState,
   VaultDirMissingError,
@@ -115,6 +123,11 @@ async function runAdoptionGate(
     stdout(`Muestra (primeros ${gate.sample.length}):`);
     for (const p of gate.sample) {
       stdout(`  - ${p}`);
+    }
+  }
+  if (gate.blocked.length > 0) {
+    for (const line of blockedSecretsSummary(gate.blocked)) {
+      stdout(line);
     }
   }
 
@@ -641,6 +654,14 @@ async function runSync(argv: string[], deps: VaultCliDeps): Promise<void> {
         stderr(`  errors: ${summary.errors.join('; ')}`);
         anyError = true;
       }
+      // CHAMBA-021 S8: report (never block) files excluded for a possible secret.
+      // The sync is successful and partial, like skippedInvalidNames — anyError
+      // is NOT set.
+      if ((summary.blockedBySecret ?? []).length > 0) {
+        for (const line of blockedSecretsSummary(summary.blockedBySecret ?? [])) {
+          stderr(`  ${line}`);
+        }
+      }
       // CHAMBA-016: derived conflict summary line
       if ((summary.derivedConflictsResolved ?? []).length > 0) {
         const n = (summary.derivedConflictsResolved ?? []).length;
@@ -737,6 +758,7 @@ async function runStatus(deps: VaultCliDeps): Promise<void> {
       }
 
       const skippedCount = Object.keys(state?.skippedPaths ?? {}).length;
+      const blockedSecretEntries = Object.entries(state?.blockedSecret ?? {});
       stdout('---');
       stdout(`slug:      ${slug}`);
       stdout(`server:    ${server}`);
@@ -745,6 +767,16 @@ async function runStatus(deps: VaultCliDeps): Promise<void> {
       stdout(`pending:   ${pending}${dirExists ? ' change(s)' : ''}`);
       if (skippedCount > 0) {
         stdout(`skipped:   ${skippedCount} archivo(s) con nombre inválido en Windows`);
+      }
+      if (blockedSecretEntries.length > 0) {
+        stdout(
+          `secrets:   ${blockedSecretEntries.length} archivo(s) bloqueado(s) por posible secreto`,
+        );
+        for (const [path, entry] of blockedSecretEntries) {
+          for (const f of entry.findings) {
+            stdout(`  - ${path}:${f.line} (${f.kind}) — ${allowSecretHint(f.fingerprint, path)}`);
+          }
+        }
       }
       stdout(`path:      ${vaultDir}`);
       // CHAMBA-016: knowledge-network summary (dry run — never writes)
@@ -756,6 +788,15 @@ async function runStatus(deps: VaultCliDeps): Promise<void> {
             `red:       ${report.notas} notas, ${report.sinClasificar} sin clasificar, ${report.propuestos} propuestas` +
               (ready.length > 0 ? ` (listas para aprobar: ${ready.join(', ')})` : ''),
           );
+        } catch {
+          // informative only
+        }
+        // CHAMBA-021 S14: proposed notes pending human review
+        try {
+          const notes = await loadGraphNotes(services.fs, vaultDir);
+          const proposed = countProposed(notes);
+          const stale = staleProposed(notes, services.clock.now(), 30);
+          stdout(`propuestas: ${proposed} (${stale.length} con más de 30 días)`);
         } catch {
           // informative only
         }
@@ -1037,6 +1078,179 @@ async function runReindex(argv: string[], deps: VaultCliDeps): Promise<void> {
   }
 }
 
+// ─── runPromote ───────────────────────────────────────────────────────────────
+
+/**
+ * vault promote <ruta...> [--yes]
+ *
+ * CHAMBA-021 S12: promote NOTES from `estado: propuesto` to `canonico`
+ * (NOT `chamba_vault_topics promote`, which promotes a topic). Shows the
+ * diff and asks for `--yes` before writing, same pattern as `vault reindex
+ * --adopt-manual`.
+ */
+async function runPromote(argv: string[], deps: VaultCliDeps): Promise<void> {
+  const { services, stdout, stderr, exit } = deps;
+
+  const hasYes = hasFlag(argv, '--yes');
+  const paths = argv.filter((a) => a !== '--yes' && !a.startsWith('--'));
+
+  if (paths.length === 0) {
+    stderr('Usage: vault promote <ruta...> [--yes]');
+    exit(1);
+    return;
+  }
+
+  const vaultResult = await resolveActiveParcheVaultFull(services);
+  let vaultDir: string | undefined;
+  if (vaultResult.kind === 'bound-unsyncable' && vaultResult.dirExists) {
+    vaultDir = vaultResult.vaultDir;
+  } else if (vaultResult.kind === 'ok') {
+    vaultDir = vaultResult.vault.vaultDir;
+  } else if (vaultResult.kind !== 'bound-unsyncable') {
+    const detection = await new ObsidianDetector(services.fs).detect({
+      explicitPath: services.obsidianVaultPath,
+      searchRoots: obsidianSearchRoots(services),
+    });
+    if (detection.found) vaultDir = detection.path;
+  }
+
+  if (!vaultDir) {
+    stderr('No se encontró ningún vault. Configura CHAMBA_OBSIDIAN_VAULT_PATH o usa un parche.');
+    exit(1);
+    return;
+  }
+
+  const plan = await promoteNotesPlan(services.fs, vaultDir, paths);
+
+  if (!hasYes) {
+    stdout(`[dryRun] promote — ${plan.diffs.length} nota(s) a promover:`);
+    for (const d of plan.diffs) stdout(`  - ${d.path}`);
+    for (const r of plan.rejected) stdout(`  ⚠ ${r.path}: ${r.reason}`);
+    stdout('Vuelve a correr con --yes para aplicar.');
+    return;
+  }
+
+  const result = await promoteNotesApply(services.fs, vaultDir, paths);
+  stdout(
+    `promote: ${result.written.length} nota(s) promovida(s), ${result.rejected.length} rechazada(s).`,
+  );
+  for (const w of result.written) stdout(`  ✓ ${w}`);
+  for (const r of result.rejected) stdout(`  ⚠ ${r.path}: ${r.reason}`);
+
+  const reindexReport = await new VaultReindexer(services.fs, vaultDir).reindex();
+  if (reindexReport.archivosEscritos.length > 0) {
+    stdout(`reindex: ${reindexReport.archivosEscritos.length} archivo(s) generado(s)`);
+  }
+}
+
+// ─── runAllowSecret ───────────────────────────────────────────────────────────
+
+/**
+ * vault allow-secret <fingerprint> --path <ruta> [--slug <slug>]
+ *
+ * D-Q2 (CHAMBA-021 §9): marks one secret finding as a false positive in the
+ * local, non-synced allowlist. Requires an interactive TTY — the user must
+ * retype the exact path to confirm (never the value — only path/line/kind are
+ * ever shown). This is the ONLY place that writes the allowlist: the
+ * `chamba_vault_allow_secret` tool never writes, so an agent cannot
+ * self-confirm a secret upload.
+ *
+ * `--slug` picks which linked parche to target, same idea as `vault sync
+ * <slug>` — needed once someone has 2+ linked parches (otherwise there is no
+ * way to tell which one's `blockedSecret` state to read/clear).
+ */
+async function runAllowSecret(argv: string[], deps: VaultCliDeps): Promise<void> {
+  const { services, stdout, stderr, exit, prompt, isTTY } = deps;
+
+  const fingerprint = argv[0];
+  const pathFlag = parseFlag(argv, '--path');
+  const slugFlag = parseFlag(argv, '--slug');
+
+  if (!fingerprint || !pathFlag) {
+    stderr('Usage: vault allow-secret <fingerprint> --path <ruta> [--slug <slug>]');
+    exit(1);
+    return;
+  }
+
+  if (!/^[0-9a-f]{12}$/i.test(fingerprint)) {
+    stderr('fingerprint inválido: debe ser 12 caracteres hexadecimales.');
+    exit(1);
+    return;
+  }
+
+  if (!isTTY) {
+    stderr('vault allow-secret requiere una terminal interactiva: ejecútalo tú en tu terminal.');
+    exit(1);
+    return;
+  }
+
+  let effectiveSlugArg = slugFlag;
+  if (!effectiveSlugArg) {
+    effectiveSlugArg = await resolveWorkspaceSyncSlug(services);
+  }
+  const creds = new CredentialsStore(services.fs, services.homedir);
+  const allSlugs = await creds.listSlugs();
+  const targets = effectiveSlugArg ? allSlugs.filter((s) => s.slug === effectiveSlugArg) : allSlugs;
+
+  if (targets.length !== 1) {
+    stderr(
+      targets.length === 0
+        ? slugFlag
+          ? `No credential found for vault "${slugFlag}".`
+          : `No parche credentials found. Use \`${joinFirstHint()}\` first.`
+        : 'Hay más de un vault vinculado; no se pudo determinar cuál usar automáticamente. ' +
+            `Usa \`vault allow-secret ${fingerprint} --path ${pathFlag} --slug <slug>\`.`,
+    );
+    exit(1);
+    return;
+  }
+
+  const { server, slug } = targets[0] as { server: string; slug: string };
+  const cred = await creds.get(server, slug);
+  if (!cred) {
+    stderr(`${slug}: no credential`);
+    exit(1);
+    return;
+  }
+
+  const vaultDir = resolveVaultDir(cred, services.homedir, slug);
+  if (!(await services.fs.exists(vaultDir))) {
+    stderr(`La carpeta ${vaultDir} del parche ${slug} ya no existe.`);
+    exit(1);
+    return;
+  }
+
+  const normalizedPath = pathFlag.normalize('NFC');
+  const state = await readState(services.fs, vaultDir);
+  const recorded = state?.blockedSecret?.[normalizedPath];
+
+  stdout(`Ruta: ${normalizedPath}`);
+  if (recorded && recorded.findings.length > 0) {
+    for (const f of recorded.findings) {
+      stdout(`Línea: ${f.line}  Tipo: ${f.kind}  Fingerprint registrado: ${f.fingerprint}`);
+    }
+    if (!recorded.findings.some((f) => f.fingerprint === fingerprint)) {
+      stdout('⚠ El fingerprint dado no coincide con ninguno de los registrados para esta ruta.');
+    }
+  } else {
+    stdout('(no hay un bloqueo registrado para esta ruta en el estado local)');
+  }
+
+  const answer = await prompt(`Escribe la ruta exacta para confirmar ("${normalizedPath}"): `);
+  if (answer.trim().normalize('NFC') !== normalizedPath) {
+    stdout('La ruta no coincide — no se marcó nada.');
+    return;
+  }
+
+  await addSecretAllowEntry(services.fs, services.clock, vaultDir, {
+    path: normalizedPath,
+    fingerprint,
+  });
+  stdout(
+    `Marcado como falso positivo: ${normalizedPath} (${fingerprint}). El próximo sync lo subirá.`,
+  );
+}
+
 // ─── Main dispatcher ──────────────────────────────────────────────────────────
 
 /**
@@ -1077,11 +1291,19 @@ export async function runVaultCli(argv: string[], deps: VaultCliDeps): Promise<v
       // CHAMBA-016: rebuild derived vault files
       await runReindex(rest, deps);
       break;
+    case 'allow-secret':
+      // CHAMBA-021 S8/D-Q2: mark one finding as a false positive (TTY-only)
+      await runAllowSecret(rest, deps);
+      break;
+    case 'promote':
+      // CHAMBA-021 S12: promote note(s) from estado:propuesto to canonico
+      await runPromote(rest, deps);
+      break;
     default: {
       const { stderr, exit } = deps;
       stderr(
         'Usage: vault <subcommand> [args]\n' +
-          'Subcommands: join, link, sync, status, leave, unlink, resync, reindex',
+          'Subcommands: join, link, sync, status, leave, unlink, resync, reindex, allow-secret, promote',
       );
       exit(1);
     }

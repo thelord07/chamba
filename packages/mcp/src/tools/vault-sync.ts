@@ -4,6 +4,7 @@
  */
 
 import {
+  blockedSecretsSummary,
   CredentialsStore,
   joinFirstHint,
   linkDirPlaceholderHint,
@@ -148,6 +149,13 @@ export function registerVaultSync(server: McpServer, logger: Logger, services: S
           if (summary.errors.length > 0) {
             results.push(`  errors: ${summary.errors.join('; ')}`);
             anyError = true;
+          }
+          // CHAMBA-021 S8: report (never block) files excluded for a possible
+          // secret — sync is successful and partial, like skippedInvalidNames.
+          if ((summary.blockedBySecret ?? []).length > 0) {
+            for (const line of blockedSecretsSummary(summary.blockedBySecret ?? [])) {
+              results.push(`  ${line}`);
+            }
           }
           // CHAMBA-016: derived conflict summary line
           if ((summary.derivedConflictsResolved ?? []).length > 0) {

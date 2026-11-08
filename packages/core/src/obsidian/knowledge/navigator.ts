@@ -12,7 +12,7 @@
  */
 
 import { type GraphNote, sortNotes, stableCmp } from './knowledge-graph.js';
-import type { NoteType } from './note-metadata.js';
+import { esCanonico, type NoteType } from './note-metadata.js';
 import { ancestors, children, type Vocabulary } from './vocabulary.js';
 
 // ─── Public types ─────────────────────────────────────────────────────────────
@@ -57,6 +57,9 @@ export interface NavNodeItem {
   temas: string[];
   workItem?: string;
   date?: string;
+  /** CHAMBA-021 S13: present only for a note pending human review. */
+  estado?: 'propuesto';
+  author?: string;
 }
 
 export interface CoTopic {
@@ -92,6 +95,9 @@ export interface NavNoteView {
   hermanas: NavNodeItem[];
   body?: string;
   truncated?: boolean;
+  /** CHAMBA-021 S13: present only for a note pending human review. */
+  estado?: 'propuesto';
+  author?: string;
 }
 
 // ─── buildVaultNav ────────────────────────────────────────────────────────────
@@ -374,6 +380,8 @@ export function navNote(
     ...(note.metadata.summary !== undefined && { summary: note.metadata.summary }),
     backlinks,
     hermanas,
+    ...(!esCanonico(note.metadata) && { estado: 'propuesto' as const }),
+    ...(note.metadata.author !== undefined && { author: note.metadata.author }),
   };
 
   // ── Body ────────────────────────────────────────────────────────────────────
@@ -404,6 +412,8 @@ function noteToNavItem(note: GraphNote): NavNodeItem {
     temas: note.metadata.temas,
     ...(note.metadata.work_item !== undefined && { workItem: note.metadata.work_item }),
     ...(note.metadata.date !== undefined && { date: note.metadata.date }),
+    ...(!esCanonico(note.metadata) && { estado: 'propuesto' as const }),
+    ...(note.metadata.author !== undefined && { author: note.metadata.author }),
   };
 }
 

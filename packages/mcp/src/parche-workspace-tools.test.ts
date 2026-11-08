@@ -14,7 +14,14 @@
  *   R8   — workspace_init leaves existing .chamba/parche.json byte-identical
  */
 
-import { CredentialsStore, FakeHash, FakeParche, MemoryFilesystem, writeState } from '@chamba/core';
+import {
+  CredentialsStore,
+  FakeHash,
+  FakeParche,
+  FakeRandom,
+  MemoryFilesystem,
+  writeState,
+} from '@chamba/core';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { pino } from 'pino';
@@ -125,6 +132,7 @@ async function makeWorkspaceSvc(opts: {
     homedir,
     http: parche,
     hash: new FakeHash(),
+    random: new FakeRandom(),
     parchePullTtlMin: 5,
     vaultMutex: new Map(),
     platform: 'linux',
@@ -238,6 +246,7 @@ describe('AC2 — workspace isolation (same machine, shared credentials.json)', 
       homedir,
       http: parcheA,
       hash: new FakeHash(),
+      random: new FakeRandom(),
       parchePullTtlMin: 5,
       vaultMutex: new Map(),
       platform: 'linux',
@@ -434,6 +443,7 @@ describe('O2 — bound-unsyncable: warning line with fix command', () => {
       homedir,
       http: parche,
       hash: new FakeHash(),
+      random: new FakeRandom(),
       parchePullTtlMin: 5,
       vaultMutex: new Map(),
       platform: 'linux',
@@ -496,6 +506,7 @@ describe('O2 — bound-unsyncable: warning line with fix command', () => {
       homedir,
       http: parche,
       hash: new FakeHash(),
+      random: new FakeRandom(),
       parchePullTtlMin: 5,
       vaultMutex: new Map(),
       platform: 'linux',
@@ -609,6 +620,7 @@ describe('O3 — CHAMBA_WORKSPACE_ROOT (services.workspaceRoot) override', () =>
       homedir,
       http: parcheB, // Use parcheB since it has team-beta credentials
       hash: new FakeHash(),
+      random: new FakeRandom(),
       parchePullTtlMin: 5,
       vaultMutex: new Map(),
       platform: 'linux',
@@ -710,6 +722,7 @@ describe('R8 — workspace_init leaves existing parche.json byte-identical', () 
       homedir: '/home/test',
       http: parche,
       hash: new FakeHash(),
+      random: new FakeRandom(),
       parchePullTtlMin: 5,
       vaultMutex: new Map(),
       platform: 'linux',
@@ -978,6 +991,7 @@ describe('O2 additional — pending-adoption and realpath-mismatch', () => {
       homedir,
       http: parche,
       hash: new FakeHash(),
+      random: new FakeRandom(),
       parchePullTtlMin: 5,
       vaultMutex: new Map(),
       platform: 'linux',
@@ -1052,6 +1066,7 @@ describe('O2 additional — pending-adoption and realpath-mismatch', () => {
       homedir,
       http: parche,
       hash: new FakeHash(),
+      random: new FakeRandom(),
       parchePullTtlMin: 5,
       vaultMutex: new Map(),
       platform: 'linux',
@@ -1113,6 +1128,7 @@ describe('O2 additional — pending-adoption and realpath-mismatch', () => {
       homedir,
       http: parche,
       hash: new FakeHash(),
+      random: new FakeRandom(),
       parchePullTtlMin: 5,
       vaultMutex: new Map(),
       platform: 'linux',
@@ -1246,6 +1262,7 @@ describe('O2 — invalid workspace binding: no fallthrough', () => {
       homedir,
       http: parche,
       hash: new FakeHash(),
+      random: new FakeRandom(),
       parchePullTtlMin: 5,
       vaultMutex: new Map(),
       platform: 'linux',
@@ -1351,6 +1368,7 @@ describe('N2 — recall reads from binding vault when bound-unsyncable + dirExis
       homedir,
       http: parche,
       hash: new FakeHash(),
+      random: new FakeRandom(),
       parchePullTtlMin: 5,
       vaultMutex: new Map(),
       platform: 'linux',
@@ -1409,6 +1427,7 @@ describe('N3 — summarize_to_vault with invalid binding → isError text matche
       homedir,
       http: parche,
       hash: new FakeHash(),
+      random: new FakeRandom(),
       parchePullTtlMin: 5,
       vaultMutex: new Map(),
       platform: 'linux',

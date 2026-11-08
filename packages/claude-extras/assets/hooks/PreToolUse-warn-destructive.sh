@@ -38,4 +38,11 @@ case "$lc" in
     ask "this deletes files, rewrites history, or removes volumes." ;;
 esac
 
+# CHAMBA-021 D-Q2: marking a possible secret as a false positive is the one
+# action that lets it reach the shared vault — confirm before it runs.
+case "$lc" in
+  *"vault allow-secret"*|*"allow-secret"*)
+    ask "this marks a possible secret as a false positive so it will be uploaded." ;;
+esac
+
 printf '{}\n'

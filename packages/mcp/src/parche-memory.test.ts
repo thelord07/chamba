@@ -13,7 +13,14 @@
  *   Gate 4c — vault status reports personal count
  */
 
-import { CredentialsStore, FakeHash, FakeParche, MemoryFilesystem, writeState } from '@chamba/core';
+import {
+  CredentialsStore,
+  FakeHash,
+  FakeParche,
+  FakeRandom,
+  MemoryFilesystem,
+  writeState,
+} from '@chamba/core';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { pino } from 'pino';
@@ -90,6 +97,7 @@ async function makeMachine(opts: {
     homedir,
     http: parche,
     hash: new FakeHash(),
+    random: new FakeRandom(),
     parchePullTtlMin: 5,
     vaultMutex: new Map(),
     platform: 'linux',
@@ -209,6 +217,7 @@ describe('AC14 regression — without parche vault uses cwd/.chamba/memory/', ()
       homedir: '/home/test',
       http: parche,
       hash: new FakeHash(),
+      random: new FakeRandom(),
       parchePullTtlMin: 5,
       vaultMutex: new Map(),
       platform: 'linux',
@@ -261,6 +270,7 @@ describe('AC14 regression — without parche vault uses cwd/.chamba/memory/', ()
       homedir: '/home/test',
       http: parche,
       hash: new FakeHash(),
+      random: new FakeRandom(),
       parchePullTtlMin: 5,
       vaultMutex: new Map(),
       platform: 'linux',

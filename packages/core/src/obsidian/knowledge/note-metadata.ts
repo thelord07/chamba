@@ -53,6 +53,20 @@ export interface NoteMetadata {
   temas_propuestos: string[];
   source?: string;
   generated?: boolean;
+
+  // ── CHAMBA-021: provenance + governance contract ────────────────────────────
+  /** Human name of the person behind the write (never an email). */
+  author?: string;
+  /** `chamba/<tool>@<version>` — which chamba tool/version wrote or last touched this note. */
+  agent?: string;
+  /** ISO timestamp of the (last agent) write. */
+  written_at?: string;
+  /** `propuesto` | `canonico`. Absent ⇒ canónico (D-Q3). Any other value reads as `undefined`. */
+  estado?: 'propuesto' | 'canonico';
+  /** Free-form flag, e.g. `revisar` (instruction-like content detected). */
+  flag?: string;
+  /** D-Q4: name of whoever ran `classify apply` on a human note (add-only). */
+  clasificado_por?: string;
 }
 
 // ─── Internal constants ───────────────────────────────────────────────────────
@@ -72,6 +86,13 @@ const KEY_ORDER: ReadonlyArray<keyof NoteMetadata> = [
   'temas_propuestos',
   'source',
   'generated',
+  // CHAMBA-021: appended at the end to minimize churn on existing notes.
+  'author',
+  'agent',
+  'written_at',
+  'estado',
+  'flag',
+  'clasificado_por',
 ];
 
 /** Keys rendered as block lists (`  - x` per line). */
@@ -90,6 +111,12 @@ const SCALAR_KEYS: ReadonlySet<string> = new Set([
   'project',
   'source',
   'generated',
+  'author',
+  'agent',
+  'written_at',
+  'estado',
+  'flag',
+  'clasificado_por',
 ]);
 
 // ─── NFC normalization ────────────────────────────────────────────────────────
@@ -468,6 +495,15 @@ export function readNoteMetadata(content: string, path: string): NoteMetadata {
             ? false
             : undefined;
 
+  const author = asString(fm.get('author'));
+  const agent = asString(fm.get('agent'));
+  const written_at = asString(fm.get('written_at'));
+  const rawEstado = asString(fm.get('estado'));
+  const estado: NoteMetadata['estado'] =
+    rawEstado === 'propuesto' || rawEstado === 'canonico' ? rawEstado : undefined;
+  const flag = asString(fm.get('flag'));
+  const clasificado_por = asString(fm.get('clasificado_por'));
+
   return {
     title,
     ...(date !== undefined && { date }),
@@ -483,7 +519,23 @@ export function readNoteMetadata(content: string, path: string): NoteMetadata {
     temas_propuestos,
     ...(source !== undefined && { source }),
     ...(generated !== undefined && { generated }),
+    ...(author !== undefined && { author: nfc(author) }),
+    ...(agent !== undefined && { agent }),
+    ...(written_at !== undefined && { written_at }),
+    ...(estado !== undefined && { estado }),
+    ...(flag !== undefined && { flag }),
+    ...(clasificado_por !== undefined && { clasificado_por: nfc(clasificado_por) }),
   };
+}
+
+/**
+ * CHAMBA-021 S10: single source of truth for "is this note canonical".
+ * D-Q3 (owner decision): `estado` absent ⇒ canónico, for ANY note (human or chamba).
+ * Every consumer (ranking, hubs, counts, doctor) must go through this helper —
+ * never compare `meta.estado` directly.
+ */
+export function esCanonico(meta: Pick<NoteMetadata, 'estado'>): boolean {
+  return meta.estado !== 'propuesto';
 }
 
 // ─── Quoting helpers ──────────────────────────────────────────────────────────

@@ -15,7 +15,13 @@
  *   AC6  — vault sync without slug in bound workspace syncs only that slug; autoSync.enabled:false → 0 requests
  */
 
-import { FakeHash, FakeParche, MemoryFilesystem, parcheBindingFileSchema } from '@chamba/core';
+import {
+  FakeHash,
+  FakeParche,
+  FakeRandom,
+  MemoryFilesystem,
+  parcheBindingFileSchema,
+} from '@chamba/core';
 import { describe, expect, it } from 'vitest';
 import { runVaultCli, type VaultCliDeps } from './cli/vault.js';
 import type { Services } from './services.js';
@@ -61,6 +67,7 @@ async function makeServices(parche: FakeParche, extra: Partial<Services> = {}): 
     homedir: HOMEDIR,
     http: parche,
     hash: new FakeHash(),
+    random: new FakeRandom(),
     parchePullTtlMin: 5,
     vaultMutex: new Map(),
     platform: 'linux',

@@ -75,6 +75,7 @@ async function main(): Promise<void> {
       obsidianSearchRoots: obsidianSearchRoots(services),
       nodeVersion: process.version,
       resources: services.system.resources(),
+      now: services.clock.now().toISOString(),
     });
     process.stdout.write(`${renderDoctorReport(report)}\n`);
     process.exitCode = report.healthy ? 0 : 1;

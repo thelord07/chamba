@@ -25,7 +25,7 @@
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { NodeFilesystem, NodeHash } from '@chamba/adapters';
+import { NodeFilesystem, NodeHash, NodeRandom } from '@chamba/adapters';
 import { FakeHash, FakeParche, findWorkspaceRoot } from '@chamba/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { runVaultCli, type VaultCliDeps } from './cli/vault.js';
@@ -125,6 +125,7 @@ describe('S19 — E2E parche Windows/cross-platform (CHAMBA-015)', () => {
       homedir: homedirForTest,
       http: parche,
       hash: new NodeHash(),
+      random: new NodeRandom(),
       parchePullTtlMin: 5,
       vaultMutex: new Map(),
       platform: process.platform,

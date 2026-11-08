@@ -1,5 +1,7 @@
 import { loadConfig } from '../config/loader.js';
+import { countProposed, staleProposed } from '../obsidian/knowledge/knowledge-graph.js';
 import { VaultReindexer } from '../obsidian/knowledge/reindexer.js';
+import { loadGraphNotes } from '../obsidian/knowledge/vault-notes.js';
 import type { FilesystemPort } from '../ports/filesystem.js';
 import type { ProcessPort } from '../ports/process.js';
 import type { SystemResources } from '../ports/system.js';
@@ -70,6 +72,11 @@ export interface DoctorInput {
   workspaceRoot?: string;
   /** Whether workspaceRoot came from env ('env') or was detected from cwd ('cwd'). */
   workspaceRootSource?: 'env' | 'cwd';
+  /**
+   * CHAMBA-021 S14: current time as ISO string, so the 30-day staleness
+   * threshold is testable without a real clock. Defaults to `new Date()`.
+   */
+  now?: string;
 }
 
 const MIN_NODE_MAJOR = 22;
@@ -94,6 +101,7 @@ export async function runDoctor(input: DoctorInput): Promise<DoctorReport> {
   checks.push(await checkWorkspace(input));
   checks.push(await checkConfig(input));
   checks.push(await checkVault(input));
+  checks.push(await checkVaultGovernance(input));
   checks.push(await checkParche(input));
   checks.push(await checkMcpRegistration(input));
   checks.push(await checkLogDir(input));
@@ -321,6 +329,47 @@ async function checkVault(input: DoctorInput): Promise<DoctorCheck> {
     detail: 'no vault connected',
     hint: 'Set CHAMBA_OBSIDIAN_VAULT_PATH, or run chamba_workspace_init to bootstrap one. Memory tools degrade cleanly without it.',
   };
+}
+
+/**
+ * CHAMBA-021 S14: proposed notes pending human review, and how many are
+ * stale (> 30 days by `written_at`, fallback `date`). Never deletes/archives
+ * anything (§2.4) — purely informational.
+ */
+async function checkVaultGovernance(input: DoctorInput): Promise<DoctorCheck> {
+  const base = { id: 'vault-governance', name: 'Vault governance' };
+  const detection = await new ObsidianDetector(input.fs).detect({
+    explicitPath: input.obsidianVaultPath,
+    searchRoots: input.obsidianSearchRoots ?? [],
+  });
+  if (!detection.found || !detection.path) {
+    return { ...base, status: 'ok', detail: 'no vault connected' };
+  }
+
+  try {
+    const notes = await loadGraphNotes(input.fs, detection.path);
+    const proposed = countProposed(notes);
+    const now = input.now ? new Date(input.now) : new Date();
+    const stale = staleProposed(notes, now, 30);
+
+    if (stale.length === 0) {
+      return {
+        ...base,
+        status: 'ok',
+        detail: `${proposed} nota(s) propuesta(s), ninguna con más de 30 días`,
+      };
+    }
+
+    const shown = stale.slice(0, 10).map((n) => n.path);
+    return {
+      ...base,
+      status: 'warn',
+      detail: `${proposed} nota(s) propuesta(s), ${stale.length} con más de 30 días: ${shown.join(', ')}${stale.length > shown.length ? ', …' : ''}`,
+      hint: 'Revisa esas notas y promuévelas con `chamba_vault_promote` o `npx @chamba/mcp vault promote <ruta> --yes` si siguen siendo válidas.',
+    };
+  } catch {
+    return { ...base, status: 'ok', detail: 'no se pudo evaluar (no fatal)' };
+  }
 }
 
 async function checkParche(input: DoctorInput): Promise<DoctorCheck> {

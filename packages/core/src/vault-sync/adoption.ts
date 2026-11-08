@@ -9,6 +9,10 @@
  */
 
 import type { FilesystemPort } from '../ports/filesystem.js';
+import type { HashPort } from '../ports/hash.js';
+import { isSecretAllowed, readSecretAllowlist } from '../secrets/allowlist.js';
+import type { Finding } from '../secrets/scanner.js';
+import { isScannable, scanText } from '../secrets/scanner.js';
 import { joinPath } from '../util/path.js';
 import { isSyncable } from './sync-filter.js';
 
@@ -19,19 +23,34 @@ export interface AdoptionSummary {
   ignoredCount: number;
   /** First ≤20 syncable paths (stable order). */
   sample: string[];
+  /**
+   * CHAMBA-021 S7: findings for syncable files with an un-allowlisted secret.
+   * Reporting only — the real exclusion happens at `syncOnce`'s secret gate
+   * (`secret-gate.ts`). Always `[]` when `deps.hash` is not provided (backward
+   * compatibility with callers that don't scan). A finding already marked a
+   * false positive in the local `secret-allowlist.json` is excluded here too.
+   */
+  blocked: Finding[];
+  /** `blocked.length`, kept as its own field for cheap structured output. */
+  blockedCount: number;
 }
 
 /**
  * Walk `vaultDir` and classify each file as syncable or ignored.
  * Returns counts and a sample of up to 20 syncable paths.
+ *
+ * hot-path (CHAMBA-021 §6): when `deps.hash` is provided, every syncable +
+ * scannable file is scanned in this SAME walk (no second pass over the vault).
  */
 export async function buildAdoptionSummary(
-  deps: { fs: FilesystemPort },
+  deps: { fs: FilesystemPort; hash?: HashPort },
   vaultDir: string,
 ): Promise<AdoptionSummary> {
-  const { fs } = deps;
+  const { fs, hash } = deps;
   const syncable: string[] = [];
+  const blocked: Finding[] = [];
   let totalFiles = 0;
+  const allowlist = hash ? await readSecretAllowlist(fs, vaultDir) : undefined;
 
   async function walk(dir: string, relDir: string): Promise<void> {
     let entries: Awaited<ReturnType<FilesystemPort['readDir']>>;
@@ -50,6 +69,18 @@ export async function buildAdoptionSummary(
         totalFiles++;
         if (isSyncable(normalizedRel)) {
           syncable.push(normalizedRel);
+          if (hash && isScannable(normalizedRel)) {
+            try {
+              const text = await fs.readFile(joinPath(vaultDir, normalizedRel));
+              const findings = await scanText({ hash }, text, normalizedRel);
+              const unallowed = allowlist
+                ? findings.filter((f) => !isSecretAllowed(allowlist, f.path, f.fingerprint))
+                : findings;
+              blocked.push(...unallowed);
+            } catch {
+              // Unreadable — nothing to scan; the sync gate will surface the error.
+            }
+          }
         }
       }
     }
@@ -64,5 +95,7 @@ export async function buildAdoptionSummary(
     syncableCount: syncable.length,
     ignoredCount: totalFiles - syncable.length,
     sample: syncable.slice(0, 20),
+    blocked,
+    blockedCount: blocked.length,
   };
 }

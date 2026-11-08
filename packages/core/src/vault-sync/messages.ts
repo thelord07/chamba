@@ -67,6 +67,7 @@ export function joinFirstHint(): string {
 
 // ─── Network error message (CHAMBA-014) ──────────────────────────────────────
 
+import type { Finding } from '../secrets/scanner.js';
 import type { ParcheNetworkError } from './parche-client.js';
 
 /**
@@ -96,5 +97,69 @@ export function parcheNetworkErrorMessage(
     `parche: no se pudo conectar a ${err.host} tras ${err.attempts} ${plural} ` +
     `(${err.code}: ${err.shortMessage}). ` +
     `Lo ya subido queda guardado; vuelve a correr \`${retryCmd}\`.`
+  );
+}
+
+// ─── Secret-scanner messages (CHAMBA-021) ────────────────────────────────────
+// Never include the detected value — only path, line, kind, fingerprint.
+
+/**
+ * Canonical placeholder the user should paste in place of a detected secret
+ * value. Shared with `isPlaceholder` in `secrets/entropy.ts` so it is never
+ * flagged as a secret itself.
+ */
+export { REDACTED_PLACEHOLDER } from '../secrets/entropy.js';
+
+/**
+ * Hint for marking a specific finding as a false positive via the CLI.
+ * @example allowSecretHint('a1b2c3d4e5f6', 'informes/x.md')
+ * // → 'npx @chamba/mcp vault allow-secret a1b2c3d4e5f6 --path "informes/x.md"'
+ */
+export function allowSecretHint(fingerprint: string, path: string): string {
+  return `${VAULT_CLI} allow-secret ${fingerprint} --path "${path}"`;
+}
+
+/**
+ * The canonical "blocked by possible secret" message shown in sync summaries,
+ * `vault status`, and adoption gates (CHAMBA-021 §2.2). Never includes the value.
+ */
+export function blockedSecretMessage(f: Finding): string {
+  return (
+    `⛔ bloqueado por posible secreto: ${f.path}:${f.line} (${f.kind}). ` +
+    `Quita el valor o márcalo como falso positivo con \`${allowSecretHint(f.fingerprint, f.path)}\`.`
+  );
+}
+
+/**
+ * A multi-line summary of blocked findings, capped at 10 detail lines plus a
+ * "y N más" tail. Returns `[]` when `blocked` is empty.
+ */
+export function blockedSecretsSummary(blocked: Finding[]): string[] {
+  if (blocked.length === 0) return [];
+  const lines = [
+    `⛔ ${blocked.length} archivo(s) con posible secreto — no se subirán hasta resolverlos:`,
+  ];
+  const shown = blocked.slice(0, 10);
+  for (const f of shown) lines.push(blockedSecretMessage(f));
+  if (blocked.length > shown.length) {
+    lines.push(`y ${blocked.length - shown.length} más`);
+  }
+  return lines;
+}
+
+/**
+ * D-Q1 (owner decision §9): rejection message shown when a write-time scan
+ * (summarize_to_vault, save_plan, remember) finds a secret in the content
+ * before anything is written. No allow-secret hint — there is no path yet.
+ */
+export function writeBlockedSecretMessage(f: {
+  field: string;
+  line: number;
+  kind: string;
+}): string {
+  const location = f.field === 'content' ? 'el contenido' : f.field;
+  return (
+    `⛔ no se escribió la nota: posible secreto en ${location} línea ${f.line} (${f.kind}). ` +
+    `Reemplaza el valor por <REDACTADO> y vuelve a intentarlo.`
   );
 }

@@ -8,6 +8,7 @@
  * The token is never returned.
  */
 
+import { blockedSecretsSummary } from '@chamba/core';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { Logger } from 'pino';
 import { z } from 'zod';
@@ -113,6 +114,9 @@ export function registerVaultLink(server: McpServer, logger: Logger, services: S
                   `Archivos ignorados: ${gate.ignoredCount}\n` +
                   (gate.sample.length > 0
                     ? `Muestra (primeros ${gate.sample.length}):\n${gate.sample.map((p) => `  - ${p}`).join('\n')}\n`
+                    : '') +
+                  (gate.blocked.length > 0
+                    ? `${blockedSecretsSummary(gate.blocked).join('\n')}\n`
                     : '') +
                   `\nPara confirmar la subida, vuelve a llamar con el mismo slug y dir, y confirmUpload: true.`,
               },

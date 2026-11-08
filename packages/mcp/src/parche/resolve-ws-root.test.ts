@@ -5,7 +5,7 @@
  * Tool and CLI must use the same resolution order.
  */
 
-import { FakeHash, FakeParche, MemoryFilesystem } from '@chamba/core';
+import { FakeHash, FakeParche, FakeRandom, MemoryFilesystem } from '@chamba/core';
 import { describe, expect, it } from 'vitest';
 import type { Services } from '../services.js';
 import { resolveWsRoot } from './resolve-ws-root.js';
@@ -25,6 +25,7 @@ function makeServices(overrides: Partial<Services> = {}): Services {
     },
     http: new FakeParche({ now: () => new Date(), today: () => '2026-01-01' }),
     hash: new FakeHash(),
+    random: new FakeRandom(),
     cwd: '/proj',
     homedir: '/home/test',
     parchePullTtlMin: 5,

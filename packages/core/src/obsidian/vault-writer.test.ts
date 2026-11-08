@@ -134,4 +134,56 @@ describe('CHAMBA-016: writer never touches a manual folder INDEX.md and keeps da
     expect(note).toMatch(/^date: 2026-06-09$/m);
     expect(note).toMatch(/^summary: Descripción heredada$/m);
   });
+
+  it('CHAMBA-021 S11: with provenance, writes author/agent/written_at and estado: propuesto', async () => {
+    const fs = new MemoryFilesystem({});
+    const writer = new VaultWriter(fs, fixedClock);
+    const res = await writer.write({
+      vaultPath: '/v',
+      title: 'Nota',
+      content: 'Cuerpo',
+      provenance: {
+        author: 'Joys',
+        agent: 'chamba/summarize_to_vault@1.0.0',
+        written_at: '2026-06-09T00:00:00.000Z',
+      },
+    });
+    const note = await fs.readFile(res.notePath);
+    expect(note).toMatch(/^author: Joys$/m);
+    expect(note).toMatch(/^agent: chamba\/summarize_to_vault@1\.0\.0$/m);
+    expect(note).toMatch(/^estado: propuesto$/m);
+  });
+
+  it('CHAMBA-021 S11: flagRevisar sets flag: revisar in the patch', async () => {
+    const fs = new MemoryFilesystem({});
+    const writer = new VaultWriter(fs, fixedClock);
+    const res = await writer.write({
+      vaultPath: '/v',
+      title: 'Nota',
+      content: 'Cuerpo',
+      provenance: {
+        agent: 'chamba/summarize_to_vault@1.0.0',
+        written_at: '2026-06-09T00:00:00.000Z',
+      },
+      flagRevisar: true,
+    });
+    const note = await fs.readFile(res.notePath);
+    expect(note).toMatch(/^flag: revisar$/m);
+  });
+
+  it('CHAMBA-021 S11: writing a new note never touches an unrelated human note byte-for-byte', async () => {
+    const human = '---\ntitle: Humana\nauthor: Alguien\n---\n\nEscrita a mano.\n';
+    const fs = new MemoryFilesystem({ '/v/proyectos/humana.md': human });
+    const writer = new VaultWriter(fs, fixedClock);
+    await writer.write({
+      vaultPath: '/v',
+      title: 'Nota agente',
+      content: 'Cuerpo',
+      provenance: {
+        agent: 'chamba/summarize_to_vault@1.0.0',
+        written_at: '2026-06-09T00:00:00.000Z',
+      },
+    });
+    expect(await fs.readFile('/v/proyectos/humana.md')).toBe(human);
+  });
 });

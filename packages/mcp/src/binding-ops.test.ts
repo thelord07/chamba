@@ -9,7 +9,7 @@
  *   - redactSecrets: replaces pch_ tokens
  */
 
-import { FakeHash, FakeParche, MemoryFilesystem } from '@chamba/core';
+import { FakeHash, FakeParche, FakeRandom, MemoryFilesystem } from '@chamba/core';
 import { describe, expect, it } from 'vitest';
 import {
   checkAdoptionGate,
@@ -51,6 +51,7 @@ function makeServices(extra: Partial<Services> = {}): Services {
     homedir: HOMEDIR,
     http: makeParche(),
     hash: new FakeHash(),
+    random: new FakeRandom(),
     parchePullTtlMin: 5,
     vaultMutex: new Map(),
     platform: 'linux',
@@ -71,13 +72,19 @@ async function makeWorkspaceServices(extra: Partial<Services> = {}): Promise<Ser
 
 describe('checkAdoptionGate', () => {
   it('returns proceed when syncableCount is 0 (empty vault)', () => {
-    const result = checkAdoptionGate({ syncableCount: 0, ignoredCount: 0, sample: [] });
+    const result = checkAdoptionGate({
+      syncableCount: 0,
+      ignoredCount: 0,
+      sample: [],
+      blocked: [],
+      blockedCount: 0,
+    });
     expect(result.kind).toBe('proceed');
   });
 
   it('returns proceed when confirmUpload is true', () => {
     const result = checkAdoptionGate(
-      { syncableCount: 5, ignoredCount: 2, sample: ['a.md', 'b.md'] },
+      { syncableCount: 5, ignoredCount: 2, sample: ['a.md', 'b.md'], blocked: [], blockedCount: 0 },
       true,
     );
     expect(result.kind).toBe('proceed');
@@ -88,6 +95,8 @@ describe('checkAdoptionGate', () => {
       syncableCount: 3,
       ignoredCount: 1,
       sample: ['a.md', 'b.md', 'c.md'],
+      blocked: [],
+      blockedCount: 0,
     });
     expect(result.kind).toBe('needs-confirmation');
     if (result.kind === 'needs-confirmation') {
@@ -98,7 +107,10 @@ describe('checkAdoptionGate', () => {
   });
 
   it('returns needs-confirmation when confirmUpload is false', () => {
-    const result = checkAdoptionGate({ syncableCount: 3, ignoredCount: 0, sample: [] }, false);
+    const result = checkAdoptionGate(
+      { syncableCount: 3, ignoredCount: 0, sample: [], blocked: [], blockedCount: 0 },
+      false,
+    );
     expect(result.kind).toBe('needs-confirmation');
   });
 });
@@ -107,7 +119,13 @@ describe('checkAdoptionGate', () => {
 
 describe('gateStructuredDetails', () => {
   it('returns syncableCount and sample for needs-confirmation', () => {
-    const gate = checkAdoptionGate({ syncableCount: 5, ignoredCount: 2, sample: ['a.md'] });
+    const gate = checkAdoptionGate({
+      syncableCount: 5,
+      ignoredCount: 2,
+      sample: ['a.md'],
+      blocked: [],
+      blockedCount: 0,
+    });
     const details = gateStructuredDetails(gate);
     expect(details.syncableCount).toBe(5);
     expect(details.ignoredCount).toBe(2);
@@ -115,7 +133,13 @@ describe('gateStructuredDetails', () => {
   });
 
   it('returns zeros for proceed gate', () => {
-    const gate = checkAdoptionGate({ syncableCount: 0, ignoredCount: 0, sample: [] });
+    const gate = checkAdoptionGate({
+      syncableCount: 0,
+      ignoredCount: 0,
+      sample: [],
+      blocked: [],
+      blockedCount: 0,
+    });
     const details = gateStructuredDetails(gate);
     expect(details.syncableCount).toBe(0);
     expect(details.ignoredCount).toBe(0);

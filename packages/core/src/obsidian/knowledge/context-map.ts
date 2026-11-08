@@ -18,6 +18,7 @@
 import { extractKeywords, occurrences } from '../../workspace/keywords.js';
 import type { GraphNote } from './knowledge-graph.js';
 import { stableCmp } from './knowledge-graph.js';
+import { esCanonico } from './note-metadata.js';
 import type { Vocabulary } from './vocabulary.js';
 
 // ─── Public types ─────────────────────────────────────────────────────────────
@@ -31,6 +32,8 @@ export interface MapaNoteItem {
   workItem?: string;
   date?: string;
   score: number;
+  /** CHAMBA-021 S13: present only for a note pending human review. */
+  estado?: 'propuesto';
 }
 
 export interface MapaNode {
@@ -246,6 +249,11 @@ function buildNodeEntries(
         const db = b.note.metadata.date ?? '';
         if (db > da) return 1;
         if (db < da) return -1;
+        // canonical before propuesto (CHAMBA-021 S13: at an equal score)
+        const aCanon = esCanonico(a.note.metadata);
+        const bCanon = esCanonico(b.note.metadata);
+        if (aCanon && !bCanon) return -1;
+        if (!aCanon && bCanon) return 1;
         // path asc
         return stableCmp(a.note.path, b.note.path);
       })
@@ -265,6 +273,7 @@ function buildNodeEntries(
       ...(note.metadata.work_item !== undefined && { workItem: note.metadata.work_item }),
       ...(note.metadata.date !== undefined && { date: note.metadata.date }),
       score,
+      ...(!esCanonico(note.metadata) && { estado: 'propuesto' as const }),
     }));
 
     nodos.push({
@@ -355,6 +364,7 @@ function buildWorkItemEntries(
       workItem: note.metadata.work_item, // keep original case for display
       ...(note.metadata.date !== undefined && { date: note.metadata.date }),
       score: 0,
+      ...(!esCanonico(note.metadata) && { estado: 'propuesto' as const }),
     }));
 
     // Add to dedupe set (work_item notes are exempt from node dedupe but counted here)
@@ -446,6 +456,7 @@ function renderMapaSection(mapa: MapaStruct): string {
         if (nota.keywords.length > 0) parts.push(`claves: ${nota.keywords.join(', ')}`);
         parts.push(nota.type);
         if (nota.date) parts.push(nota.date);
+        if (nota.estado === 'propuesto') parts.push('propuesto');
         const detail = parts.join(' · ');
         lines.push(`  - [${nota.titulo}](${nota.ruta})${detail ? ` — ${detail}` : ''}`);
       }
@@ -466,6 +477,7 @@ function renderMapaSection(mapa: MapaStruct): string {
       if (nota.keywords.length > 0) parts.push(`claves: ${nota.keywords.join(', ')}`);
       parts.push(nota.type);
       if (nota.date) parts.push(nota.date);
+      if (nota.estado === 'propuesto') parts.push('propuesto');
       const detail = parts.join(' · ');
       lines.push(`- [${nota.titulo}](${nota.ruta})${detail ? ` — ${detail}` : ''}`);
     }

@@ -13,7 +13,7 @@
  * + vault status / chamba_vault_status / doctor show knowledge line; doctor writes nothing.
  */
 
-import { FakeHash, FakeParche, MemoryFilesystem } from '@chamba/core';
+import { FakeHash, FakeParche, FakeRandom, MemoryFilesystem } from '@chamba/core';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { pino } from 'pino';
@@ -65,6 +65,7 @@ function makeServices(files: Record<string, string> = {}, vaultPath = '/vault'):
     homedir: '/home/test',
     http: new FakeParche(makeClock()),
     hash: new FakeHash(),
+    random: new FakeRandom(),
     parchePullTtlMin: 5,
     vaultMutex: new Map(),
     platform: 'linux',

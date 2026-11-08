@@ -64,3 +64,73 @@ describe('FilesystemMemoryStore', () => {
     expect(await store.recall('nothing-here')).toEqual([]);
   });
 });
+
+describe('FilesystemMemoryStore — CHAMBA-021 S11 provenance', () => {
+  it('a new memory gets author/agent/written_at and estado: propuesto', async () => {
+    const fs = new MemoryFilesystem({});
+    const store = new FilesystemMemoryStore(fs, clockAt('2026-06-09T10:00:00Z'), '/proj');
+    const provenance = {
+      author: 'Joys',
+      agent: 'chamba/remember@1.0.0',
+      written_at: '2026-06-09T10:00:00.000Z',
+    };
+    const memory = await store.remember({ key: 'k', content: 'hello', provenance });
+    expect(memory.author).toBe('Joys');
+    expect(memory.agent).toBe('chamba/remember@1.0.0');
+    expect(memory.estado).toBe('propuesto');
+
+    const file = await fs.readFile(memory.path);
+    expect(file).toContain('author: Joys');
+    expect(file).toContain('estado: propuesto');
+  });
+
+  it('re-remembering an existing chamba memory updates written_at/agent/author and keeps estado propuesto', async () => {
+    const fs = new MemoryFilesystem({});
+    const provenance = {
+      author: 'Joys',
+      agent: 'chamba/remember@1.0.0',
+      written_at: '2026-06-09T10:00:00.000Z',
+    };
+    const store = new FilesystemMemoryStore(fs, clockAt('2026-06-09T10:00:00Z'), '/proj');
+    await store.remember({ key: 'k', content: 'first', provenance });
+
+    const store2 = new FilesystemMemoryStore(fs, clockAt('2026-06-10T11:00:00Z'), '/proj');
+    const updated = await store2.remember({
+      key: 'k',
+      content: 'second',
+      provenance: { ...provenance, written_at: '2026-06-10T11:00:00.000Z' },
+    });
+    expect(updated.written_at).toBe('2026-06-10T11:00:00.000Z');
+    expect(updated.estado).toBe('propuesto');
+  });
+
+  it('a human-authored memory file at the same key keeps its author add-only', async () => {
+    const fs = new MemoryFilesystem({
+      '/proj/.chamba/memory/k.md': [
+        '---',
+        'key: k',
+        'tags: []',
+        'createdAt: 2026-01-01T00:00:00.000Z',
+        'updatedAt: 2026-01-01T00:00:00.000Z',
+        'author: Human Author',
+        '---',
+        '',
+        'Written by hand.',
+        '',
+      ].join('\n'),
+    });
+    const store = new FilesystemMemoryStore(fs, clockAt('2026-06-09T10:00:00Z'), '/proj');
+    const memory = await store.remember({
+      key: 'k',
+      content: 'agent update',
+      provenance: {
+        author: 'Joys',
+        agent: 'chamba/remember@1.0.0',
+        written_at: '2026-06-09T10:00:00.000Z',
+      },
+    });
+    expect(memory.author).toBe('Human Author');
+    expect(memory.agent).toBe('chamba/remember@1.0.0');
+    expect(memory.content).toContain('Written by hand.');
+  });
+});

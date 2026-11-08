@@ -26,10 +26,12 @@ import { registerSavePlan } from './tools/save-plan.js';
 import { registerSummarizeToVault } from './tools/summarize-to-vault.js';
 import { registerTaskMetrics } from './tools/task-metrics.js';
 import { registerTriageTicket } from './tools/triage-ticket.js';
+import { registerVaultAllowSecret } from './tools/vault-allow-secret.js';
 import { registerVaultClassify } from './tools/vault-classify.js';
 import { registerVaultJoin } from './tools/vault-join.js';
 import { registerVaultLink } from './tools/vault-link.js';
 import { registerVaultNavigate } from './tools/vault-navigate.js';
+import { registerVaultPromote } from './tools/vault-promote.js';
 import { registerVaultReindex } from './tools/vault-reindex.js';
 import { registerVaultResync } from './tools/vault-resync.js';
 import { registerVaultStatus } from './tools/vault-status.js';
@@ -92,9 +94,11 @@ export function createServer(logger: Logger, services: Services = createNodeServ
   registerVaultUnlink(server, logger, services);
   registerVaultResync(server, logger, services);
   registerVaultSync(server, logger, services);
+  registerVaultAllowSecret(server, logger, services);
   registerParcheStatus(server, logger, services);
   registerVaultTopics(server, logger, services);
   registerVaultClassify(server, logger, services);
+  registerVaultPromote(server, logger, services);
   registerVaultReindex(server, logger, services);
   registerVaultNavigate(server, logger, services);
 

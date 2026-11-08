@@ -20,7 +20,21 @@ import type { DirEntry, FilesystemPort } from '../../ports/filesystem.js';
 import { isDerivedPathPattern } from './derived-path.js';
 import type { NoteType } from './note-metadata.js';
 import { readNoteMetadata, upsertNoteMetadata } from './note-metadata.js';
+import { buildProvenance } from './provenance.js';
 import { parseVocabulary, resolveTopic } from './vocabulary.js';
+
+/**
+ * D-Q4 (CHAMBA-021 §9, owner decision): provenance inputs for `classifyPlan`/
+ * `classifyApply`. `author` is resolved by the caller (mcp's `resolveAuthor`);
+ * omit it to skip `author`/`clasificado_por` entirely.
+ */
+export interface ClassifyProvenanceOpts {
+  author?: string;
+  /** chamba/mcp package version. */
+  version: string;
+  /** Current time as ISO string (caller reads `services.clock`). */
+  nowIso: string;
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -151,6 +165,7 @@ export async function classifyPlan(
   fs: FilesystemPort,
   vaultDir: string,
   entries: ClassifyEntry[],
+  provenanceOpts?: ClassifyProvenanceOpts,
 ): Promise<ClassifyPlanResult> {
   if (entries.length > MAX_ENTRIES) {
     throw new Error(
@@ -179,7 +194,7 @@ export async function classifyPlan(
     }
 
     const meta = readNoteMetadata(content, entry.path);
-    const patch = buildPatch(entry, meta, vocabulary);
+    const patch = buildPatch(entry, meta, vocabulary, provenanceOpts);
     const updated = upsertNoteMetadata(content, patch);
 
     // Extract frontmatter portions for the diff
@@ -202,6 +217,7 @@ export async function classifyApply(
   fs: FilesystemPort,
   vaultDir: string,
   entries: ClassifyEntry[],
+  provenanceOpts?: ClassifyProvenanceOpts,
 ): Promise<ClassifyApplyResult> {
   if (entries.length > MAX_ENTRIES) {
     throw new Error(
@@ -230,7 +246,7 @@ export async function classifyApply(
     }
 
     const meta = readNoteMetadata(content, entry.path);
-    const patch = buildPatch(entry, meta, vocabulary);
+    const patch = buildPatch(entry, meta, vocabulary, provenanceOpts);
     const updated = upsertNoteMetadata(content, patch);
 
     await fs.writeFile(absPath, updated);
@@ -267,6 +283,7 @@ function buildPatch(
   entry: ClassifyEntry,
   meta: ReturnType<typeof readNoteMetadata>,
   vocabulary: ReturnType<typeof parseVocabulary>['vocabulary'] | null,
+  provenanceOpts?: ClassifyProvenanceOpts,
 ): Parameters<typeof upsertNoteMetadata>[1] {
   // Resolve temas
   const resolvedTemas: string[] = [];
@@ -304,6 +321,33 @@ function buildPatch(
   if (entry.keywords !== undefined) patch.keywords = entry.keywords;
   if (entry.type !== undefined) patch.type = entry.type;
   if (entry.workItem !== undefined) patch.work_item = entry.workItem;
+
+  // ── D-Q4 (CHAMBA-021 §9, owner decision) ──────────────────────────────────
+  if (provenanceOpts) {
+    const provenance = buildProvenance({
+      author: provenanceOpts.author,
+      tool: 'classify',
+      version: provenanceOpts.version,
+      now: new Date(provenanceOpts.nowIso),
+    });
+
+    if (meta.source === 'chamba') {
+      // Chamba note: fill missing author/agent/written_at, always re-flag as propuesto.
+      if (meta.author === undefined && provenance.author !== undefined) {
+        patch.author = provenance.author;
+      }
+      if (meta.agent === undefined) patch.agent = provenance.agent;
+      if (meta.written_at === undefined) patch.written_at = provenance.written_at;
+      patch.estado = 'propuesto';
+    } else {
+      // Human note: NEVER touch author/written_at/estado. Only add-only
+      // `clasificado_por` + `agent: chamba/classify@<ver>`.
+      if (meta.clasificado_por === undefined && provenance.author !== undefined) {
+        patch.clasificado_por = provenance.author;
+      }
+      if (meta.agent === undefined) patch.agent = provenance.agent;
+    }
+  }
 
   return patch;
 }

@@ -43,6 +43,7 @@ export function registerDoctor(server: McpServer, logger: Logger, services: Serv
         resources: services.system.resources(),
         workspaceRoot: wsRoot ?? undefined,
         workspaceRootSource: wsRootSource,
+        now: services.clock.now().toISOString(),
       });
 
       logger.info(

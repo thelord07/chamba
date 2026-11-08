@@ -11,6 +11,7 @@
 import type {
   AdoptionSummary,
   CredentialEntry,
+  Finding,
   ParcheBinding,
   ParcheScope,
   SyncSummary,
@@ -32,6 +33,7 @@ import {
   prepareVaultDir,
   readParcheBinding,
   readState,
+  redactSecretValues,
   resetVaultState,
   resolveParcheBinding,
   resolveServerUrl,
@@ -49,11 +51,21 @@ import { withVaultLock } from './mutex.js';
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 /**
- * Redact any `pch_` tokens from a string.
- * PARCHE-010 R1: no `pch_` prefix should ever appear in tool outputs.
+ * Redact any `pch_` tokens (and, as of CHAMBA-021 S9, any other scanner-shaped
+ * secret value) from a string before it reaches an error message or log line.
+ *
+ * `redactSecretValues` runs the full secrets scanner over the text and swaps
+ * out every detected value; it's wrapped in try/catch with a fallback to the
+ * original `pch_`-only regex so a scanner bug can never make `describeError`/
+ * `fatal.ts` — the last-resort error path — throw instead of degrade.
  */
 export function redactSecrets(text: string): string {
-  return text.replace(/pch_[A-Za-z0-9_-]+/g, '<token redactado>');
+  const pchRedacted = text.replace(/pch_[A-Za-z0-9_-]+/g, '<token redactado>');
+  try {
+    return redactSecretValues(pchRedacted);
+  } catch {
+    return pchRedacted;
+  }
 }
 
 // ─── 1. Scope resolution ──────────────────────────────────────────────────────
@@ -438,7 +450,10 @@ export async function relinkPrepare(
     services.clock,
   );
 
-  const summary = await buildAdoptionSummary({ fs: services.fs }, canonicalDir);
+  const summary = await buildAdoptionSummary(
+    { fs: services.fs, hash: services.hash },
+    canonicalDir,
+  );
 
   return {
     kind: 'ready',
@@ -513,7 +528,7 @@ export async function resyncPrepare(
     );
   }
 
-  const summary = await buildAdoptionSummary({ fs: services.fs }, vaultDir);
+  const summary = await buildAdoptionSummary({ fs: services.fs, hash: services.hash }, vaultDir);
 
   return { kind: 'ready', server: found.server, cred, vaultDir, summary };
 }
@@ -806,7 +821,7 @@ export async function getAdoptionSummary(
   services: Services,
   vaultDir: string,
 ): Promise<AdoptionSummary> {
-  return buildAdoptionSummary({ fs: services.fs }, vaultDir);
+  return buildAdoptionSummary({ fs: services.fs, hash: services.hash }, vaultDir);
 }
 
 // ─── 11. Vault dir helpers ────────────────────────────────────────────────────
@@ -950,7 +965,14 @@ export async function findResumeCandidate(
 
 export type AdoptionGateResult =
   | { kind: 'proceed' }
-  | { kind: 'needs-confirmation'; fileCount: number; ignoredCount: number; sample: string[] };
+  | {
+      kind: 'needs-confirmation';
+      fileCount: number;
+      ignoredCount: number;
+      sample: string[];
+      /** CHAMBA-021 S7: files with an un-allowlisted secret — reporting only. */
+      blocked: Finding[];
+    };
 
 /**
  * Decide whether a confirmation prompt is needed before uploading vault files.
@@ -968,6 +990,7 @@ export function checkAdoptionGate(
     fileCount: summary.syncableCount,
     ignoredCount: summary.ignoredCount,
     sample: summary.sample,
+    blocked: summary.blocked ?? [],
   };
 }
 
@@ -980,11 +1003,17 @@ export function gateStructuredDetails(gate: AdoptionGateResult): {
   syncableCount: number;
   ignoredCount: number;
   sample: string[];
+  blockedCount: number;
 } {
   if (gate.kind !== 'needs-confirmation') {
-    return { syncableCount: 0, ignoredCount: 0, sample: [] };
+    return { syncableCount: 0, ignoredCount: 0, sample: [], blockedCount: 0 };
   }
-  return { syncableCount: gate.fileCount, ignoredCount: gate.ignoredCount, sample: gate.sample };
+  return {
+    syncableCount: gate.fileCount,
+    ignoredCount: gate.ignoredCount,
+    sample: gate.sample,
+    blockedCount: gate.blocked.length,
+  };
 }
 
 // ─── 13. Resume join ──────────────────────────────────────────────────────────
@@ -1041,6 +1070,8 @@ export interface SyncStructuredOutput {
   skippedInvalidNames?: string[];
   /** CHAMBA-015 D2.4: paths pushed from non-Windows that are Windows-incompatible. */
   windowsIncompatibleNames?: string[];
+  /** CHAMBA-021 S6: findings for files excluded this sync for a possible secret. */
+  blockedBySecret?: Finding[];
 }
 
 /**
@@ -1071,6 +1102,9 @@ export function formatSyncOutput(summary: SyncSummary): SyncStructuredOutput {
   }
   if (summary.windowsIncompatibleNames && summary.windowsIncompatibleNames.length > 0) {
     result.windowsIncompatibleNames = summary.windowsIncompatibleNames;
+  }
+  if (summary.blockedBySecret && summary.blockedBySecret.length > 0) {
+    result.blockedBySecret = summary.blockedBySecret;
   }
   return result;
 }

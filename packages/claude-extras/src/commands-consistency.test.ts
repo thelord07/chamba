@@ -37,6 +37,8 @@ const ALLOWED = new Set([
   'link',
   'resync',
   'unlink',
+  'promote',
+  'allow-secret',
   'prefs',
   'en',
   'es',

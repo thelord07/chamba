@@ -11,7 +11,14 @@
  *           CLI vault resync --yes: same guarantees
  */
 
-import { FakeHash, FakeParche, MemoryFilesystem, readState, writeState } from '@chamba/core';
+import {
+  FakeHash,
+  FakeParche,
+  FakeRandom,
+  MemoryFilesystem,
+  readState,
+  writeState,
+} from '@chamba/core';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { pino } from 'pino';
@@ -55,6 +62,7 @@ function makeServices(parche: FakeParche, extra: Partial<Services> = {}): Servic
     homedir: HOMEDIR,
     http: parche,
     hash: new FakeHash(),
+    random: new FakeRandom(),
     parchePullTtlMin: 5,
     vaultMutex: new Map(),
     platform: 'linux',

@@ -8,6 +8,7 @@
 
 import { hostname } from 'node:os';
 import {
+  blockedSecretsSummary,
   CredentialsStore,
   defaultDeviceLabel,
   InvalidJoinInputError,
@@ -281,6 +282,9 @@ export function registerVaultJoin(server: McpServer, logger: Logger, services: S
                   `Archivos ignorados: ${gate.ignoredCount}\n` +
                   (gate.sample.length > 0
                     ? `Muestra (primeros ${gate.sample.length}):\n${gate.sample.map((p) => `  - ${p}`).join('\n')}\n`
+                    : '') +
+                  (gate.blocked.length > 0
+                    ? `${blockedSecretsSummary(gate.blocked).join('\n')}\n`
                     : '') +
                   `\nPara confirmar la subida, vuelve a llamar con el mismo código, el mismo dir${dir ? ` ("${dir}")` : ''}, y confirmUpload: true.` +
                   credWarningText,

@@ -9,6 +9,7 @@ import type { FilesystemPort } from '../ports/filesystem.js';
 import type { HashPort } from '../ports/hash.js';
 import { joinPath } from '../util/path.js';
 import type { SyncState } from './plan.js';
+import type { BlockedSecretMap } from './secret-gate.js';
 
 // ─── Schema ───────────────────────────────────────────────────────────────────
 
@@ -53,6 +54,36 @@ export const syncStateFileSchema = z.object({
    * Absent when there are no skipped paths (backward-compatible with older states).
    */
   skippedPaths: z.record(z.string(), z.string()).optional(),
+  /**
+   * CHAMBA-021 S6: vault-relative paths currently excluded from push because
+   * the secret scanner found an un-allowlisted finding. Cleared automatically
+   * once the file no longer has findings (or is allowlisted) on a later sync.
+   * Absent when there are no blocked paths (backward-compatible).
+   *
+   * `findings` holds EVERY un-allowlisted finding for the path (a file can
+   * contain more than one distinct secret), not just the first — each one
+   * needs its own fingerprint so `vault allow-secret` can clear it.
+   */
+  blockedSecret: z
+    .record(
+      z.string(),
+      z.object({
+        findings: z
+          .array(
+            z.object({
+              fingerprint: z.string(),
+              kind: z.string(),
+              line: z.number().int(),
+            }),
+          )
+          .min(1),
+        detectedAt: z.string(),
+      }),
+    )
+    .optional()
+    // Tolerant: a future/older shape of this map must never invalidate the
+    // whole state (that would drop `cursor`/`files` and force a full re-sync).
+    .catch(undefined),
 });
 
 export type SyncStateFile = z.infer<typeof syncStateFileSchema>;
@@ -125,12 +156,17 @@ export function toSyncState(file: SyncStateFile): SyncState {
  *
  * @param newSkippedPaths - When provided, replaces the `skippedPaths` map (phase-2
  *   write). When absent, the base value is preserved (phases 1 and 3).
+ * @param newBlockedSecret - Same semantics as `newSkippedPaths`, for the
+ *   `blockedSecret` map (CHAMBA-021 S6). Pass the freshly computed map on every
+ *   write the gate ran for (phases 1 and 3); phase 2 should pass through the
+ *   same map computed after phase 1 so it isn't lost.
  */
 export function mergeIntoStateFile(
   base: SyncStateFile,
   state: SyncState,
   now: string,
   newSkippedPaths?: Record<string, string>,
+  newBlockedSecret?: BlockedSecretMap,
 ): SyncStateFile {
   const result: SyncStateFile = {
     server: base.server,
@@ -155,6 +191,10 @@ export function mergeIntoStateFile(
   const effectiveSkipped = newSkippedPaths ?? base.skippedPaths;
   if (effectiveSkipped && Object.keys(effectiveSkipped).length > 0) {
     result.skippedPaths = effectiveSkipped;
+  }
+  const effectiveBlockedSecret = newBlockedSecret ?? base.blockedSecret;
+  if (effectiveBlockedSecret && Object.keys(effectiveBlockedSecret).length > 0) {
+    result.blockedSecret = effectiveBlockedSecret;
   }
   return result;
 }

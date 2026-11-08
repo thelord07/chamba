@@ -4,7 +4,7 @@
  * Tests para chamba_classify_task tool.
  */
 
-import { FakeHash, FakeParche, MemoryFilesystem } from '@chamba/core';
+import { FakeHash, FakeParche, FakeRandom, MemoryFilesystem } from '@chamba/core';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { pino } from 'pino';
@@ -32,6 +32,7 @@ function makeServices(): Services {
       today: () => '2026-11-07',
     }),
     hash: new FakeHash(),
+    random: new FakeRandom(),
     cwd: '/proj',
     homedir: '/home/test',
     parchePullTtlMin: 5,

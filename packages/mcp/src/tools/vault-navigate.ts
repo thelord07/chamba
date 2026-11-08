@@ -23,6 +23,7 @@ import {
   resolveTopic,
   safeVaultRelPath,
   VaultReindexer,
+  wrapVaultData,
 } from '@chamba/core';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { Logger } from 'pino';
@@ -215,6 +216,7 @@ function renderNode(
 function renderNote(
   view: NonNullable<ReturnType<typeof navNote>>,
   notice?: string,
+  wrappedBody?: string,
 ): { text: string; structured: NavOutput } {
   const lines: string[] = [`# Nota: ${view.titulo}`, '', `Ruta: \`${view.ruta}\``];
   lines.push(`Tipo: ${view.type}`);
@@ -251,7 +253,7 @@ function renderNote(
 
   if (view.body !== undefined) {
     lines.push('## Cuerpo');
-    lines.push(view.body);
+    lines.push(wrappedBody ?? view.body);
     if (view.truncated) lines.push('', '> (cuerpo recortado por maxChars)');
     lines.push('');
   }
@@ -563,7 +565,18 @@ export function registerVaultNavigate(server: McpServer, logger: Logger, service
         services.navReadBodyCount = (services.navReadBodyCount ?? 0) + 1;
       }
 
-      const { text, structured } = renderNote(view, reindexNotice);
+      // CHAMBA-021 S15: wrap the note body as third-party vault data (prompt-injection
+      // defense) — only when a body was actually read; no wrapper without readBody.
+      const wrappedBody =
+        view.body !== undefined
+          ? wrapVaultData(
+              view.body,
+              { author: view.author, estado: view.estado, ruta: view.ruta },
+              services.random.hex(12),
+            )
+          : undefined;
+
+      const { text, structured } = renderNote(view, reindexNotice, wrappedBody);
       return { content: [{ type: 'text' as const, text }], structuredContent: structured };
     },
   );
