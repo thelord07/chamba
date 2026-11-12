@@ -223,6 +223,7 @@ Encontrado dogfooding en **finalis**. El check "Git repo" corría `git rev-parse
 - ✅ **1.12.0** — CHAMBA-016: red de conocimiento en el vault (temas jerárquicos, vocabulario humano, hubs/índices/Bases deterministas); tools `vault_topics`, `vault_classify`, `vault_reindex`.
 - ✅ **1.13.0** — CHAMBA-017: navegación de la red de conocimiento (`chamba_vault_navigate`, mapa del vault en `load_context`, regla "navega antes de leer" en los prompts).
 - ✅ **1.14.0** — CHAMBA-020: rutas proporcionales (`chamba_classify_task`, 4 rutas en `/ticket` y `/orq`, `chamba_task_metrics` + CLI `metrics`); CHAMBA-019: subcomandos de `/vault` en inglés.
+- ✅ **1.15.0** — CHAMBA-021: vault compartido seguro (escáner de secretos de 14 reglas, procedencia + `estado: propuesto | canonico`, `chamba_vault_promote`, `chamba_vault_allow_secret`, notas devueltas como datos contra prompt-injection).
 
 ## Orden sugerido (lo que sigue)
 1. ✅ **1.0.0** — Tier 3 completo. Pulido y estabilización: superficie de tools revisada, docs
