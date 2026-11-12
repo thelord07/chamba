@@ -1,5 +1,13 @@
 # @chamba/claude-extras
 
+## 1.15.1
+
+### Patch Changes
+
+- Updated dependencies [bee3853]
+  - @chamba/core@1.15.1
+  - @chamba/adapters@1.15.1
+
 ## 1.15.0
 
 ### Minor Changes
