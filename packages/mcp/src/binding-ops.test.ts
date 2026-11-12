@@ -301,6 +301,34 @@ describe('formatSyncOutput', () => {
     // No movedToTrashEntries key exposed directly
     expect(out).not.toHaveProperty('movedToTrashEntries');
   });
+
+  it('CHAMBA-023 S6: includes blockedBySecretServer when non-empty', () => {
+    const summary = {
+      pushed: 1,
+      pulled: 0,
+      conflicts: [],
+      movedToTrash: [],
+      movedToTrashEntries: [],
+      errors: [],
+      blockedBySecretServer: [{ path: 'c.md', kinds: ['assignment'] }],
+    };
+    const out = formatSyncOutput(summary);
+    expect(out.blockedBySecretServer).toEqual([{ path: 'c.md', kinds: ['assignment'] }]);
+  });
+
+  it('CHAMBA-023 S6: omits blockedBySecretServer when empty or absent', () => {
+    const summary = {
+      pushed: 1,
+      pulled: 0,
+      conflicts: [],
+      movedToTrash: [],
+      movedToTrashEntries: [],
+      errors: [],
+      blockedBySecretServer: [],
+    };
+    const out = formatSyncOutput(summary);
+    expect(out.blockedBySecretServer).toBeUndefined();
+  });
 });
 
 // ─── redactSecrets ────────────────────────────────────────────────────────────

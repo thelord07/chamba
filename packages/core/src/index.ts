@@ -322,7 +322,13 @@ export {
 } from './secrets/allowlist.js';
 export { redactSecretValues } from './secrets/redact.js';
 export type { Finding, SecretKind, WriteField, WriteFieldFinding } from './secrets/scanner.js';
-export { isScannable, scanText, scanWriteFields } from './secrets/scanner.js';
+export {
+  isScannable,
+  MAX_SCAN_BYTES,
+  scanText,
+  scanWriteFields,
+  shouldScanContent,
+} from './secrets/scanner.js';
 // Skills / playbooks registry (index-first, no LLM)
 export type { Skill, SkillRef } from './skills/skill.js';
 export {
@@ -396,6 +402,8 @@ export {
   linkHint,
   parcheNetworkErrorMessage,
   REDACTED_PLACEHOLDER,
+  serverBlockedSecretMessage,
+  serverBlockedSecretsSummary,
   syncManualHint,
   unlinkWorkspaceHint,
   VAULT_CLI,
@@ -429,6 +437,8 @@ export {
   ParcheNetworkError,
   ParcheNotFoundError,
   ParcheRateLimitedError,
+  ParcheSecretDetectedError,
+  SECRET_ALLOW_HEADER,
 } from './vault-sync/parche-client.js';
 export { findCaseCollisions, pathKey } from './vault-sync/path-key.js';
 export type {

@@ -201,6 +201,109 @@ describe('vault allow-secret CLI (D-Q2)', () => {
   });
 });
 
+// ─── CHAMBA-023 S6: server-side rejection warnings ───────────────────────────
+
+describe('vault allow-secret CLI — warns when the path was rejected by the SERVER, not the local gate', () => {
+  it('shows the server-rejection warning before the prompt, never offering a false fix', async () => {
+    const { services, fs } = await setupBoundVault('# clean\n');
+    await writeState(fs, VAULT, {
+      server: SERVER,
+      slug: SLUG,
+      cursor: 0,
+      files: {},
+      blockedSecretServer: {
+        'secret.md': {
+          kinds: ['stripe-secret-key'],
+          hash: 'h1',
+          allowDigest: '',
+          detectedAt: '2026-10-29T10:00:00Z',
+        },
+      },
+    });
+    const r = await makeCli(services, ['allow-secret', 'a1b2c3d4e5f6', '--path', 'secret.md'], {
+      isTTY: true,
+      prompt: async () => 'secret.md',
+    });
+    expect(r.code).toBe(0);
+    const out = r.out.join('\n');
+    expect(out).toContain('rechazada por el servidor');
+    expect(out).toContain('stripe-secret-key');
+    expect(out).toContain('la allowlist local no la desbloquea');
+  });
+
+  it('does not show the warning for a path with only a LOCAL block', async () => {
+    const { services } = await setupBoundVault(SECRET_BODY);
+    await makeCli(services, ['sync', SLUG]); // populates state.blockedSecret only
+    const r = await makeCli(services, ['allow-secret', 'a1b2c3d4e5f6', '--path', 'secret.md'], {
+      isTTY: true,
+      prompt: async () => 'secret.md',
+    });
+    expect(r.out.join('\n')).not.toContain('rechazada por el servidor');
+  });
+});
+
+describe('vault status CLI — lists paths rejected by the server', () => {
+  it('shows a "servidor:" line with kinds, separate from local "secrets:"', async () => {
+    const { services, fs } = await setupBoundVault('# clean\n');
+    await writeState(fs, VAULT, {
+      server: SERVER,
+      slug: SLUG,
+      cursor: 0,
+      files: {},
+      blockedSecretServer: {
+        'c.md': {
+          kinds: ['assignment', 'jwt'],
+          hash: 'h1',
+          allowDigest: '',
+          detectedAt: '2026-10-29T10:00:00Z',
+        },
+      },
+    });
+    const out: string[] = [];
+    await runVaultCli(['status'], {
+      services,
+      stdout: (m) => out.push(m),
+      stderr: () => {},
+      exit: () => {},
+      prompt: async () => '',
+      isTTY: false,
+    });
+    const text = out.join('\n');
+    expect(text).toContain('servidor:');
+    expect(text).toContain('rechazado(s) por el servidor'); // review item 20: literal phrase
+    expect(text).toContain('c.md (assignment, jwt)');
+  });
+});
+
+describe('vault sync CLI — reports server-blocked paths without failing the sync', () => {
+  it('prints the server-rejection summary line and still exits 0', async () => {
+    const { services, fs } = await setupBoundVault('# clean\n');
+    // Simulate a prior rejection recorded in state; the file's content is
+    // UNCHANGED, so D-Q1(b) means this sync skips it WITHOUT a new PUT and
+    // still reports it in the summary.
+    const bodyHash = await new FakeHash().sha256(new TextEncoder().encode('# clean\n'));
+    await writeState(fs, VAULT, {
+      server: SERVER,
+      slug: SLUG,
+      cursor: 0,
+      files: {},
+      blockedSecretServer: {
+        'secret.md': {
+          kinds: ['assignment'],
+          hash: bodyHash,
+          allowDigest: '', // no local finding in '# clean\n' → matches the current allowDigest too
+          detectedAt: '2026-10-29T10:00:00Z',
+        },
+      },
+    });
+    const r = await makeCli(services, ['sync', SLUG]);
+    expect(r.code).toBe(0);
+    const allOutput = [...r.out, ...r.err].join('\n');
+    expect(allOutput).toContain('rechazados por el servidor');
+    expect(allOutput).not.toMatch(/sk_live_|pch_|AKIA/);
+  });
+});
+
 describe('chamba_vault_allow_secret tool — never writes', () => {
   async function connect(svc: Services) {
     const [ct, st] = InMemoryTransport.createLinkedPair();

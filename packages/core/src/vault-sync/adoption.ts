@@ -12,7 +12,7 @@ import type { FilesystemPort } from '../ports/filesystem.js';
 import type { HashPort } from '../ports/hash.js';
 import { isSecretAllowed, readSecretAllowlist } from '../secrets/allowlist.js';
 import type { Finding } from '../secrets/scanner.js';
-import { isScannable, scanText } from '../secrets/scanner.js';
+import { isScannable, MAX_SCAN_BYTES, scanText, shouldScanContent } from '../secrets/scanner.js';
 import { joinPath } from '../util/path.js';
 import { isSyncable } from './sync-filter.js';
 
@@ -69,14 +69,34 @@ export async function buildAdoptionSummary(
         totalFiles++;
         if (isSyncable(normalizedRel)) {
           syncable.push(normalizedRel);
-          if (hash && isScannable(normalizedRel)) {
+          // CHAMBA-023 D-Q3 (owner decision §9): scan by content, not by
+          // extension — any syncable file can be scanned (and rejected by
+          // the server), same as `screenPushEntries` (secret-gate.ts).
+          if (hash) {
             try {
-              const text = await fs.readFile(joinPath(vaultDir, normalizedRel));
-              const findings = await scanText({ hash }, text, normalizedRel);
-              const unallowed = allowlist
-                ? findings.filter((f) => !isSecretAllowed(allowlist, f.path, f.fingerprint))
-                : findings;
-              blocked.push(...unallowed);
+              // Review item 10: for a NON-`isScannable` extension (no 1.15.0
+              // size-cap exemption — see `shouldScanContent`'s B1 fix), stat
+              // first and skip the read entirely when it's already over
+              // `MAX_SCAN_BYTES` — never pull a large binary (e.g. a big
+              // image or video) into memory just to immediately discard it.
+              // `isScannable` extensions keep 1.15.0 parity (no size cap, so
+              // no stat short-circuit either — they're always read and
+              // lossily decoded, same as before CHAMBA-023).
+              if (!isScannable(normalizedRel)) {
+                const info = await fs.stat(joinPath(vaultDir, normalizedRel));
+                if (info !== null && info.size > MAX_SCAN_BYTES) {
+                  continue; // too big to ever be scanned — skip the read
+                }
+              }
+              const bytes = await fs.readBytes(joinPath(vaultDir, normalizedRel));
+              const text = shouldScanContent(bytes, normalizedRel);
+              if (text !== null) {
+                const findings = await scanText({ hash }, text, normalizedRel);
+                const unallowed = allowlist
+                  ? findings.filter((f) => !isSecretAllowed(allowlist, f.path, f.fingerprint))
+                  : findings;
+                blocked.push(...unallowed);
+              }
             } catch {
               // Unreadable — nothing to scan; the sync gate will surface the error.
             }

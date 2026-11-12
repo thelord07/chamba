@@ -147,6 +147,43 @@ export function blockedSecretsSummary(blocked: Finding[]): string[] {
   return lines;
 }
 
+// ─── Server-side rejection messages (CHAMBA-023 S6, D-Q1) ────────────────────
+// A server rejection (`422 secret_detected`) only carries `kinds` — no
+// fingerprint — so there is NO `allow-secret` hint here (§1.7/OQ4): the user
+// can't allowlist something with no fingerprint. Never include the value.
+
+/**
+ * The canonical "server rejected it as a possible secret" message
+ * (CHAMBA-023 D-Q1(a), owner decision). Suggests updating chamba — the
+ * server may have newer rules than this client's own `scanText` — or
+ * removing the value. `kinds` empty → the parenthetical is omitted.
+ */
+export function serverBlockedSecretMessage(f: { path: string; kinds: string[] }): string {
+  const kindsSuffix = f.kinds.length > 0 ? ` (${f.kinds.join(', ')})` : '';
+  return (
+    `⛔ el servidor rechazó por posible secreto: ${f.path}${kindsSuffix}. ` +
+    `Revisa el archivo y quita el valor; si crees que es un falso positivo, ` +
+    `actualiza chamba (\`npx -y @chamba/mcp@latest\`) y avisa al dueño del parche.`
+  );
+}
+
+/**
+ * A multi-line summary of server-rejected paths, capped at 10 detail lines
+ * plus a "y N más" tail — same shape as `blockedSecretsSummary`.
+ */
+export function serverBlockedSecretsSummary(
+  blocked: Array<{ path: string; kinds: string[] }>,
+): string[] {
+  if (blocked.length === 0) return [];
+  const lines = [`⛔ ${blocked.length} archivo(s) rechazados por el servidor por posible secreto:`];
+  const shown = blocked.slice(0, 10);
+  for (const f of shown) lines.push(serverBlockedSecretMessage(f));
+  if (blocked.length > shown.length) {
+    lines.push(`y ${blocked.length - shown.length} más`);
+  }
+  return lines;
+}
+
 /**
  * D-Q1 (owner decision §9): rejection message shown when a write-time scan
  * (summarize_to_vault, save_plan, remember) finds a secret in the content

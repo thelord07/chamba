@@ -89,7 +89,19 @@ export async function maybeAutoSync(
             platform: services.platform,
           },
         );
-        logger.info({ tool: 'autosync', slug: vault.slug, phase }, 'auto-sync completed');
+        // CHAMBA-023 S6: autosync stays silent by design (no summary printed) —
+        // the ONLY addition is a bare count, never paths/kinds/values. The
+        // user sees the full detail via `vault status`, which reads
+        // `state.blockedSecretServer` directly.
+        logger.info(
+          {
+            tool: 'autosync',
+            slug: vault.slug,
+            phase,
+            blockedBySecretServer: (summary.blockedBySecretServer ?? []).length,
+          },
+          'auto-sync completed',
+        );
 
         // CHAMBA-016/017: run reindex after pull if needed.
         // Uses the same reindex lock key as vault-navigate to avoid concurrent reindexes.

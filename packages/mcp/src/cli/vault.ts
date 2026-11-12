@@ -42,6 +42,7 @@ import {
   resolveServerUrl,
   resolveVaultDir,
   scanLocal,
+  serverBlockedSecretsSummary,
   staleProposed,
   syncOnce,
   toSyncState,
@@ -662,6 +663,13 @@ async function runSync(argv: string[], deps: VaultCliDeps): Promise<void> {
           stderr(`  ${line}`);
         }
       }
+      // CHAMBA-023 S6: server-side rejections (422 secret_detected) — reported
+      // the same way as local blocks; does not set anyError.
+      if ((summary.blockedBySecretServer ?? []).length > 0) {
+        for (const line of serverBlockedSecretsSummary(summary.blockedBySecretServer ?? [])) {
+          stderr(`  ${line}`);
+        }
+      }
       // CHAMBA-016: derived conflict summary line
       if ((summary.derivedConflictsResolved ?? []).length > 0) {
         const n = (summary.derivedConflictsResolved ?? []).length;
@@ -759,6 +767,7 @@ async function runStatus(deps: VaultCliDeps): Promise<void> {
 
       const skippedCount = Object.keys(state?.skippedPaths ?? {}).length;
       const blockedSecretEntries = Object.entries(state?.blockedSecret ?? {});
+      const blockedSecretServerEntries = Object.entries(state?.blockedSecretServer ?? {});
       stdout('---');
       stdout(`slug:      ${slug}`);
       stdout(`server:    ${server}`);
@@ -776,6 +785,18 @@ async function runStatus(deps: VaultCliDeps): Promise<void> {
           for (const f of entry.findings) {
             stdout(`  - ${path}:${f.line} (${f.kind}) — ${allowSecretHint(f.fingerprint, path)}`);
           }
+        }
+      }
+      // CHAMBA-023 S6/review item 20: paths rejected by the SERVER — the
+      // text must literally say "rechazado por el servidor" (not just imply
+      // it via the "servidor:" label), matching the wording used everywhere
+      // else this state surfaces (messages.ts, allow-secret warning).
+      if (blockedSecretServerEntries.length > 0) {
+        stdout(
+          `servidor:  ${blockedSecretServerEntries.length} archivo(s) rechazado(s) por el servidor por posible secreto`,
+        );
+        for (const [path, entry] of blockedSecretServerEntries) {
+          stdout(`  - ${path} (${entry.kinds.join(', ')}) · desde ${entry.detectedAt}`);
         }
       }
       stdout(`path:      ${vaultDir}`);
@@ -1223,8 +1244,17 @@ async function runAllowSecret(argv: string[], deps: VaultCliDeps): Promise<void>
   const normalizedPath = pathFlag.normalize('NFC');
   const state = await readState(services.fs, vaultDir);
   const recorded = state?.blockedSecret?.[normalizedPath];
+  // CHAMBA-023 NB7: a server rejection has no fingerprint — allow-secret can't
+  // clear it. Warn BEFORE the prompt so the user doesn't think this fixes it.
+  const recordedServer = state?.blockedSecretServer?.[normalizedPath];
 
   stdout(`Ruta: ${normalizedPath}`);
+  if (recordedServer) {
+    stdout(
+      `⚠ Esta ruta fue rechazada por el servidor (${recordedServer.kinds.join(', ')}), no por el gate local: ` +
+        `la allowlist local no la desbloquea. Quita el valor del archivo o actualiza chamba.`,
+    );
+  }
   if (recorded && recorded.findings.length > 0) {
     for (const f of recorded.findings) {
       stdout(`Línea: ${f.line}  Tipo: ${f.kind}  Fingerprint registrado: ${f.fingerprint}`);

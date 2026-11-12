@@ -16,6 +16,25 @@
  *   corruptBlob(hash)    — make GET return wrong bytes
  *   rejectPushBlobs(hashes) — make push always 422 for these hashes
  *   latencyMs            — simulate latency via clock.sleep
+ *   rejectBlobAsSecret(hash, kinds)               — CHAMBA-023 S7: PUT /api/blob/:hash
+ *     always 422 {error:'secret_detected', kinds} for this hash, regardless of
+ *     X-Parche-Secret-Allow. Never stores the blob or creates a blob_ref (mirrors
+ *     PARCHE-012: 422 is returned before the transaction).
+ *   requireBlobAllowFingerprints(hash, {kinds, fingerprints}) — CHAMBA-023 S7:
+ *     models the real contract — PUT /api/blob/:hash 422s unless EVERY fingerprint
+ *     in `fingerprints` is present in the X-Parche-Secret-Allow header; a 422 here
+ *     also never stores the blob. An empty `fingerprints` list is special-cased to
+ *     mean "always reject" (plan §S7 NB8) rather than the vacuous-true reading of
+ *     `[].every(...)` — it models "the server found something, but the client has
+ *     nothing exempted for it at all".
+ *   failPutBlob(hash, status)                      — CHAMBA-023 S7: PUT /api/blob/:hash
+ *     returns this raw status (e.g. 403, 500) for regression tests, independent
+ *     of the secret_detected path.
+ *   blobAllowHeaders / lastBlobAllowHeader          — CHAMBA-023 S7: observability.
+ *     `blobAllowHeaders` records, per hash, the LAST X-Parche-Secret-Allow header
+ *     value received on a PUT for that hash (split into fingerprints); reads both
+ *     `X-Parche-Secret-Allow` and `x-parche-secret-allow` (HttpPort doesn't
+ *     normalize header names — same as `authenticate` does for `Authorization`).
  */
 
 import type { ClockPort } from '../ports/clock.js';
@@ -124,8 +143,60 @@ export class FakeParche implements HttpPort {
   /** When set, GET /api/web/invites/:code/check returns this fixed result instead of the default. */
   checkInviteOverride: null | { status: number; body: unknown } | 'throw' = null;
 
+  // ── CHAMBA-023 S7: PUT /api/blob/:hash secret-gate knobs ────────────────────
+  private readonly rejectBlobAsSecretMap = new Map<string, string[]>(); // hash → kinds
+  private readonly requiredBlobAllowFingerprints = new Map<
+    string,
+    { kinds: string[]; fingerprints: string[] }
+  >(); // hash → required
+  private readonly failPutBlobMap = new Map<string, number>(); // hash → raw status
+
+  /**
+   * CHAMBA-023 S7: every PUT /api/blob/:hash this fake has seen, keyed by hash,
+   * with the X-Parche-Secret-Allow header value SPLIT into fingerprints (empty
+   * array when the header was absent). Last call wins per hash — read it right
+   * after the PUT you're asserting on.
+   */
+  readonly blobAllowHeaders = new Map<string, string[]>();
+  /** The X-Parche-Secret-Allow header value (raw, unsplit) of the LAST PUT seen, across all hashes. */
+  lastBlobAllowHeader: string | null = null;
+
   corruptBlob(hash: string): void {
     this.corruptedBlobs.add(hash);
+  }
+
+  /**
+   * CHAMBA-023 S7: make PUT /api/blob/:hash always respond 422
+   * {error:'secret_detected', kinds} for this hash, no matter what
+   * X-Parche-Secret-Allow carries. Never stores the blob or creates a blob_ref.
+   */
+  rejectBlobAsSecret(hash: string, kinds: string[]): void {
+    this.rejectBlobAsSecretMap.set(hash, kinds);
+  }
+
+  /**
+   * CHAMBA-023 S7: make PUT /api/blob/:hash accept (201, blob stored) only when
+   * EVERY fingerprint in `fingerprints` is present in the X-Parche-Secret-Allow
+   * header; otherwise 422 {error:'secret_detected', kinds} (blob not stored).
+   * An empty `fingerprints` list means "always reject" (see class docstring).
+   */
+  requireBlobAllowFingerprints(
+    hash: string,
+    opts: { kinds: string[]; fingerprints: string[] },
+  ): void {
+    this.requiredBlobAllowFingerprints.set(hash, {
+      kinds: opts.kinds,
+      fingerprints: opts.fingerprints,
+    });
+  }
+
+  /**
+   * CHAMBA-023 S7: make PUT /api/blob/:hash return this raw status (e.g. 403,
+   * 500) for this hash — independent of the secret_detected path, for
+   * regression tests on non-secret PUT failures.
+   */
+  failPutBlob(hash: string, status: number): void {
+    this.failPutBlobMap.set(hash, status);
   }
 
   /**
@@ -661,6 +732,40 @@ export class FakeParche implements HttpPort {
   private handlePutBlob(req: HttpRequest, hash: string): HttpResponse {
     const device = this.authenticate(req);
     if (!device) return err(401, 'unauthorized');
+
+    // CHAMBA-023 S7 (NB11): HttpPort does not normalize header names, so read
+    // both the canonical and lowercase spellings — same as `authenticate` does
+    // for `Authorization`/`authorization`.
+    const rawHeader =
+      req.headers?.['X-Parche-Secret-Allow'] ?? req.headers?.['x-parche-secret-allow'] ?? '';
+    const sentFingerprints = rawHeader.length > 0 ? rawHeader.split(',') : [];
+    this.blobAllowHeaders.set(hash, sentFingerprints);
+    this.lastBlobAllowHeader = rawHeader.length > 0 ? rawHeader : null;
+
+    // failPutBlob knob: raw status, independent of the secret_detected path.
+    const failStatus = this.failPutBlobMap.get(hash);
+    if (failStatus !== undefined) {
+      return err(failStatus, 'simulated_failure');
+    }
+
+    // rejectBlobAsSecret knob: always 422, regardless of the header.
+    const alwaysRejectKinds = this.rejectBlobAsSecretMap.get(hash);
+    if (alwaysRejectKinds !== undefined) {
+      return json({ error: 'secret_detected', kinds: alwaysRejectKinds }, 422);
+    }
+
+    // requireBlobAllowFingerprints knob: 422 unless every required fingerprint
+    // is present in the header. An empty required list means "always reject"
+    // (NOT the vacuous-true reading of `[].every(...)`).
+    const required = this.requiredBlobAllowFingerprints.get(hash);
+    if (required !== undefined) {
+      const sentSet = new Set(sentFingerprints);
+      const satisfied =
+        required.fingerprints.length > 0 && required.fingerprints.every((fp) => sentSet.has(fp));
+      if (!satisfied) {
+        return json({ error: 'secret_detected', kinds: required.kinds }, 422);
+      }
+    }
 
     const data = req.body instanceof Uint8Array ? req.body : enc.encode(String(req.body ?? ''));
     const alreadyExists = this.blobs.has(hash);

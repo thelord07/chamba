@@ -26,9 +26,81 @@ export interface Finding {
 // format), so it's scanned like the other text notes — unlike `.png`/`.pdf`.
 const SCANNABLE_EXTENSIONS = new Set(['.md', '.canvas', '.base', '.svg']);
 
-/** True when `path`'s extension is one the secret scanner covers (CHAMBA-021 §2.1: images/PDF out of scope). */
+/**
+ * True when `path`'s extension is one of the 4 extensions originally covered
+ * by the scanner (CHAMBA-021 §2.1). CHAMBA-023 D-Q3 (owner decision) replaces
+ * this extension-based gate with the content-based `shouldScanContent` for
+ * `screenPushEntries` (secret-gate.ts) and `buildAdoptionSummary`
+ * (adoption.ts) — `.pdf`/`.png`/etc. can also be scanned when their bytes
+ * happen to decode as UTF-8 text. Kept exported for backward compatibility
+ * with any other caller that still wants the narrower, extension-only check.
+ */
 export function isScannable(path: string): boolean {
   return SCANNABLE_EXTENSIONS.has(extname(path).toLowerCase());
+}
+
+/**
+ * CHAMBA-023 D-Q3 (owner decision, §9): the server scans ANY blob that
+ * decodes as strict UTF-8 and is ≤ `MAX_SCAN_BYTES`, regardless of
+ * extension — not just `.md`/`.canvas`/`.base`/`.svg`. A `.pdf` or similar
+ * binary-by-extension file that happens to be valid UTF-8 text can still be
+ * rejected by the server with no local finding and no fingerprint to
+ * allowlist (CHAMBA-023 plan §1 Open question 5). `shouldScanContent` is the
+ * single source of truth for "should the client scan these bytes, and with
+ * what text", shared by the push gate and the adoption summary, so client
+ * and server agree on what gets scanned.
+ *
+ * Strict UTF-8 (`TextDecoder` with `fatal: true`) — NOT a Node API, pure
+ * Web-standard global available in both the browser and Node runtimes.
+ */
+export const MAX_SCAN_BYTES = 2 * 1024 * 1024;
+
+const strictUtf8Decoder = new TextDecoder('utf-8', { fatal: true });
+// Lossy (non-fatal) decoder — invalid byte sequences become U+FFFD instead
+// of failing. Used ONLY for the original 4 `isScannable` extensions, to
+// preserve exact 1.15.0 behavior (see review B1 below).
+const lossyUtf8Decoder = new TextDecoder('utf-8');
+
+/**
+ * Decide whether `bytes` should be scanned for secrets, and return the
+ * decoded text to scan — or `null` if it shouldn't be scanned at all. Never
+ * decodes twice: callers scan the returned string directly instead of
+ * re-decoding `bytes` themselves (review non-blocking item 11).
+ *
+ * CHAMBA-023 review B1 (fail-open fix): content-based scanning (D-Q3) must
+ * not REGRESS what 1.15.0 already covered for the 4 originally-scannable
+ * extensions (`.md`/`.canvas`/`.base`/`.svg`, `isScannable`). 1.15.0 used a
+ * lossy decode (`TextDecoder` without `fatal`) and no size cap for those —
+ * so a `.md` in ISO-8859-1 (invalid UTF-8) or over 2 MB with a secret in it
+ * WAS caught before CHAMBA-023. A strict-UTF-8-only, size-capped check for
+ * *every* syncable file would silently stop scanning those cases — a new,
+ * real fail-open. So the gate is split by path:
+ *
+ *  - `path` is one of the 4 `isScannable` extensions → preserve 1.15.0
+ *    behavior exactly: lossy decode, unconditionally, no size cap. Always
+ *    returns a string (every byte sequence decodes lossily to *something*).
+ *  - Any other syncable file (`.pdf`, `.png`, …, or `path` omitted) → the
+ *    D-Q3 content-based gate: strict UTF-8 AND ≤ `MAX_SCAN_BYTES`, so a
+ *    genuinely binary file (which would never pass strict decoding anyway)
+ *    is never scanned, and a huge-but-valid-UTF-8 file doesn't get scanned
+ *    either (bounded cost — these extensions were never scanned pre-D-Q3 at
+ *    all, so there's no existing behavior to preserve here).
+ *
+ * Server note (PARCHE): `PUT /api/blob/:hash` carries no path, so a server
+ * calling this without `path` gets the strict branch — a `.md` that is not
+ * valid UTF-8 or exceeds `MAX_SCAN_BYTES` is then covered only by the
+ * client-side gate. Pass `path` whenever it is known.
+ */
+export function shouldScanContent(bytes: Uint8Array, path?: string): string | null {
+  if (path !== undefined && isScannable(path)) {
+    return lossyUtf8Decoder.decode(bytes);
+  }
+  if (bytes.byteLength > MAX_SCAN_BYTES) return null;
+  try {
+    return strictUtf8Decoder.decode(bytes);
+  } catch {
+    return null;
+  }
 }
 
 async function fingerprintOf(hash: HashPort, kind: SecretKind, value: string): Promise<string> {
