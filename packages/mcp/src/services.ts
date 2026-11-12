@@ -5,6 +5,7 @@ import {
   NodeHttp,
   NodeNet,
   NodeProcess,
+  NodeRandom,
   NodeSystem,
   RetryingHttp,
   SystemClock,
@@ -16,9 +17,11 @@ import type {
   HttpPort,
   NetPort,
   ProcessPort,
+  RandomPort,
   SystemPort,
 } from '@chamba/core';
 import type { Logger } from 'pino';
+import { readPackageVersion } from './version.js';
 
 /**
  * The OS-level services every tool needs, wired to Node adapters by default.
@@ -37,6 +40,12 @@ export interface Services {
   http: HttpPort;
   /** SHA-256 hash port for sync operations. */
   hash: HashPort;
+  /**
+   * Random port for generating the per-call nonce used by `wrapVaultData`
+   * (CHAMBA-021 S15), so vault content can never guess the delimiter that
+   * closes its own data block.
+   */
+  random: RandomPort;
   /** Workspace root used when a tool doesn't receive an explicit one. */
   cwd: string;
   /** User home directory, used to probe common Obsidian vault locations. */
@@ -95,6 +104,14 @@ export interface Services {
    * never reads `os.userInfo()` directly. Defaults to `os.userInfo().username`.
    */
   username: string;
+  /**
+   * @chamba/mcp's own package version (CHAMBA-021 S11), resolved once at
+   * startup via `readPackageVersion()`. Used to build `agent: chamba/<tool>@<version>`
+   * provenance stamps without each tool re-reading package.json. Optional so
+   * existing test fixtures that build `Services` by hand don't all need an
+   * update; tools fall back to `'unknown'` when absent.
+   */
+  version?: string;
 }
 
 export function createNodeServices(logger?: Logger): Services {
@@ -106,6 +123,7 @@ export function createNodeServices(logger?: Logger): Services {
     net: new NodeNet(),
     http: new RetryingHttp(new NodeHttp(), { logger }),
     hash: new NodeHash(),
+    random: new NodeRandom(),
     cwd: process.cwd(),
     homedir: homedir(),
     obsidianVaultPath: process.env.CHAMBA_OBSIDIAN_VAULT_PATH,
@@ -117,6 +135,7 @@ export function createNodeServices(logger?: Logger): Services {
     navReadBodyCount: 0,
     workspaceRoot: process.env.CHAMBA_WORKSPACE_ROOT,
     platform: process.platform,
+    version: readPackageVersion(),
     username: (() => {
       try {
         return userInfo().username;

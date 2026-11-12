@@ -1,4 +1,4 @@
-import { FakeHash, FakeParche, MemoryFilesystem } from '@chamba/core';
+import { FakeHash, FakeParche, FakeRandom, MemoryFilesystem } from '@chamba/core';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { pino } from 'pino';
@@ -27,6 +27,7 @@ function buildServices(files: Record<string, string>, cwd: string): Services {
       today: () => '2026-06-09',
     }),
     hash: new FakeHash(),
+    random: new FakeRandom(),
     cwd,
     homedir: '/home/test',
     parchePullTtlMin: 5,
@@ -80,10 +81,12 @@ describe('chamba MCP server', () => {
       'chamba_summarize_to_vault',
       'chamba_task_metrics',
       'chamba_triage_ticket',
+      'chamba_vault_allow_secret',
       'chamba_vault_classify',
       'chamba_vault_join',
       'chamba_vault_link',
       'chamba_vault_navigate',
+      'chamba_vault_promote',
       'chamba_vault_reindex',
       'chamba_vault_resync',
       'chamba_vault_status',

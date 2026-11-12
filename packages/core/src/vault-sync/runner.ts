@@ -15,6 +15,8 @@ import type { ClockPort } from '../ports/clock.js';
 import type { FilesystemPort } from '../ports/filesystem.js';
 import type { HashPort } from '../ports/hash.js';
 import type { HttpPort } from '../ports/http.js';
+import { readSecretAllowlist } from '../secrets/allowlist.js';
+import type { Finding } from '../secrets/scanner.js';
 import { detectStyle, isInvalidPath } from '../util/local-path.js';
 import { joinPath } from '../util/path.js';
 import { addConflictFrontmatter, readConflictMeta } from './conflict.js';
@@ -30,6 +32,7 @@ import { findCaseCollisions } from './path-key.js';
 import type { PullAction, PushEntry, SyncState } from './plan.js';
 import { applyPullPlan, applyPushResults, planPull, planPush } from './plan.js';
 import type { ChangeEntry, JoinRequest } from './protocol.js';
+import { computeBlockedSecretMap, screenPushEntries } from './secret-gate.js';
 import type { SyncStateFile } from './state-store.js';
 import {
   clearPendingAdoption,
@@ -115,6 +118,12 @@ export interface SyncSummary {
    * Order is stable (path-alphabetical, same as action processing order).
    */
   derivedConflictsResolved?: string[];
+  /**
+   * CHAMBA-021 S6: findings for files excluded from this sync's push because
+   * the secret scanner found an un-allowlisted secret (phases 1 and 3 combined).
+   * Optional for backward-compatibility with code that constructs a partial summary.
+   */
+  blockedBySecret?: Finding[];
 }
 
 /** Local snapshot: path → sha256 hex */
@@ -778,7 +787,32 @@ export async function syncOnce(deps: SyncDeps, opts: SyncOpts): Promise<SyncSumm
   checkAbort(signal);
 
   const { snapshot: localSnapshot, blobSource } = await scanLocal({ fs, hash }, vaultDir);
-  const pushEntries = planPush(syncState, localSnapshot);
+  const allPushEntries = planPush(syncState, localSnapshot);
+
+  // CHAMBA-021 S6: screen for un-allowlisted secrets BEFORE pushing. A file
+  // with ≥1 finding is excluded entirely from this batch; the rest proceeds.
+  const allowlist = await readSecretAllowlist(fs, vaultDir);
+  const { allowed: pushEntries, blocked: blocked1 } = await screenPushEntries(
+    { fs, hash },
+    vaultDir,
+    allPushEntries,
+    allowlist,
+    signal,
+  );
+
+  const now1 = clock.now().toISOString();
+  const baseStateFile: SyncStateFile = stateFile ?? {
+    server,
+    slug,
+    cursor: syncState.cursor,
+    files: syncState.files,
+  };
+  let blockedSecretMap = computeBlockedSecretMap(
+    baseStateFile.blockedSecret,
+    allPushEntries,
+    blocked1,
+    now1,
+  );
 
   let pushedCount = 0;
   // CHAMBA-015 D2.4: warn when pushing a file whose name is invalid on Windows.
@@ -807,14 +841,11 @@ export async function syncOnce(deps: SyncDeps, opts: SyncOpts): Promise<SyncSumm
   }
 
   // Save state after phase 1 (preserves any existing skippedPaths from stateFile)
-  const now1 = clock.now().toISOString();
-  const baseStateFile: SyncStateFile = stateFile ?? {
-    server,
-    slug,
-    cursor: syncState.cursor,
-    files: syncState.files,
-  };
-  await writeState(fs, vaultDir, mergeIntoStateFile(baseStateFile, syncState, now1));
+  await writeState(
+    fs,
+    vaultDir,
+    mergeIntoStateFile(baseStateFile, syncState, now1, undefined, blockedSecretMap),
+  );
 
   // ── Phase 2: Pull ──────────────────────────────────────────────────────────
   checkAbort(signal);
@@ -970,15 +1001,19 @@ export async function syncOnce(deps: SyncDeps, opts: SyncOpts): Promise<SyncSumm
     }
   }
 
-  // Save state after phase 2 with the updated skippedPaths
+  // Save state after phase 2 with the updated skippedPaths. blockedSecretMap is
+  // threaded through unchanged (phase 2 doesn't rescan) so it isn't lost —
+  // `mergeIntoStateFile` would otherwise fall back to `baseStateFile.blockedSecret`,
+  // the PRE-phase-1 value.
   const now2 = clock.now().toISOString();
   await writeState(
     fs,
     vaultDir,
-    mergeIntoStateFile(baseStateFile, postPullState, now2, newSkippedPaths),
+    mergeIntoStateFile(baseStateFile, postPullState, now2, newSkippedPaths, blockedSecretMap),
   );
 
   // ── Phase 3: Push conflict copies ─────────────────────────────────────────
+  let blocked2: Finding[] = [];
   if (conflicts.length > 0) {
     checkAbort(signal);
 
@@ -992,30 +1027,53 @@ export async function syncOnce(deps: SyncDeps, opts: SyncOpts): Promise<SyncSumm
       blobSource2.set(h, absPath);
     }
 
-    const pushEntries2 = planPush(postPullState, localSnapshot2);
-    if (pushEntries2.length > 0) {
+    const allPushEntries2 = planPush(postPullState, localSnapshot2);
+    // CHAMBA-021 S6: gate conflict-copy pushes too — a conflict copy of a file
+    // with a secret is a brand-new local file; without this it would leak
+    // through this back door even though phase 1 blocked the original.
+    const allowlist2 = await readSecretAllowlist(fs, vaultDir);
+    const screened2 = await screenPushEntries(
+      { fs, hash },
+      vaultDir,
+      allPushEntries2,
+      allowlist2,
+      signal,
+    );
+    const pushEntries2 = screened2.allowed;
+    blocked2 = screened2.blocked;
+
+    if (pushEntries2.length > 0 || allPushEntries2.length > 0) {
       let phase3State = postPullState;
-      try {
-        phase3State = await pushAll(
-          client,
-          slug,
-          postPullState,
-          pushEntries2,
-          blobSource2,
-          fs,
-          batchSize,
-          signal,
-        );
-      } catch (err) {
-        if (err instanceof ParcheCaseCollisionError) {
-          errors.push(
-            `Case collision during conflict copy push: path "${err.path}" conflicts with "${err.existing}". ` +
-              `Rename the copy manually to resolve.`,
+      if (pushEntries2.length > 0) {
+        try {
+          phase3State = await pushAll(
+            client,
+            slug,
+            postPullState,
+            pushEntries2,
+            blobSource2,
+            fs,
+            batchSize,
+            signal,
           );
-        } else {
-          throw err;
+        } catch (err) {
+          if (err instanceof ParcheCaseCollisionError) {
+            errors.push(
+              `Case collision during conflict copy push: path "${err.path}" conflicts with "${err.existing}". ` +
+                `Rename the copy manually to resolve.`,
+            );
+          } else {
+            throw err;
+          }
         }
       }
+
+      blockedSecretMap = computeBlockedSecretMap(
+        blockedSecretMap,
+        allPushEntries2,
+        blocked2,
+        clock.now().toISOString(),
+      );
 
       // Save state after phase 3 — pass newSkippedPaths so phase-2 skipped entries
       // are not lost when conflicts cause a re-write of state here.
@@ -1023,7 +1081,7 @@ export async function syncOnce(deps: SyncDeps, opts: SyncOpts): Promise<SyncSumm
       await writeState(
         fs,
         vaultDir,
-        mergeIntoStateFile(baseStateFile, phase3State, now3, newSkippedPaths),
+        mergeIntoStateFile(baseStateFile, phase3State, now3, newSkippedPaths, blockedSecretMap),
       );
     }
   }
@@ -1039,6 +1097,7 @@ export async function syncOnce(deps: SyncDeps, opts: SyncOpts): Promise<SyncSumm
     windowsIncompatibleNames,
     needsReindex,
     derivedConflictsResolved,
+    blockedBySecret: [...blocked1, ...blocked2],
   };
 }
 

@@ -10,7 +10,13 @@
  *  - AC3: secuencia small sin planReview ⇒ planReviewRounds === 0
  */
 
-import { FakeHash, FakeParche, MemoryFilesystem, parseTaskMetricsJsonl } from '@chamba/core';
+import {
+  FakeHash,
+  FakeParche,
+  FakeRandom,
+  MemoryFilesystem,
+  parseTaskMetricsJsonl,
+} from '@chamba/core';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { pino } from 'pino';
@@ -41,6 +47,7 @@ function makeServices(files?: Record<string, string>): Services {
       today: () => '2026-11-07',
     }),
     hash: new FakeHash(),
+    random: new FakeRandom(),
     cwd: '/proj',
     homedir: '/home/test',
     parchePullTtlMin: 5,

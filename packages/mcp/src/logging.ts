@@ -20,12 +20,19 @@ export function createLogger(): Logger {
     {
       level: process.env.CHAMBA_LOG_LEVEL ?? 'info',
       // Redact sensitive credential fields so the token never reaches the log file.
+      // CHAMBA-021 S9: 'value'/'secret'/'*.value' are defense in depth for any
+      // secret-scanner Finding accidentally logged whole — pino's `redact` acts
+      // on KEYS, not message text, so the real defense is never logging a value
+      // in the first place (Finding has no `value` field) plus the S9 test.
       redact: [
         'token',
         'deviceToken',
         '*.token',
         'headers.authorization',
         'req.headers.authorization',
+        'value',
+        'secret',
+        '*.value',
       ],
     },
     destination({ dest: logPath, sync: false }),

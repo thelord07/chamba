@@ -121,7 +121,7 @@ export function registerLoadContext(server: McpServer, logger: Logger, services:
         }
       }
 
-      const built = await new ContextBuilder(services.fs).build({
+      const built = await new ContextBuilder(services.fs, services.random).build({
         workspace,
         task,
         vaultPath,

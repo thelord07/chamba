@@ -7,7 +7,14 @@
  *   AC11c — summarize_to_vault still writes when sync fails
  */
 
-import { CredentialsStore, FakeHash, FakeParche, MemoryFilesystem, writeState } from '@chamba/core';
+import {
+  CredentialsStore,
+  FakeHash,
+  FakeParche,
+  FakeRandom,
+  MemoryFilesystem,
+  writeState,
+} from '@chamba/core';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { pino } from 'pino';
@@ -89,6 +96,7 @@ async function makeServicesWithParcheVault(opts: {
     homedir,
     http: opts.parche,
     hash: new FakeHash(),
+    random: new FakeRandom(),
     parchePullTtlMin: 5,
     vaultMutex: new Map(),
     platform: 'linux',
@@ -386,6 +394,7 @@ describe('PARCHE-009 AC10 — autosync with custom vault dir', () => {
       homedir,
       http: parche,
       hash: new FakeHash(),
+      random: new FakeRandom(),
       parchePullTtlMin: 5,
       vaultMutex: new Map(),
       platform: 'linux',
@@ -460,6 +469,7 @@ describe('PARCHE-009 AC10 — autosync with custom vault dir', () => {
       homedir,
       http: parche,
       hash: new FakeHash(),
+      random: new FakeRandom(),
       parchePullTtlMin: 5,
       vaultMutex: new Map(),
       platform: 'linux',

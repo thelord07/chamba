@@ -14,7 +14,7 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { NodeFilesystem } from '@chamba/adapters';
-import { collectSkillRefs, FakeHash, FakeParche, MemoryFilesystem } from '@chamba/core';
+import { collectSkillRefs, FakeHash, FakeParche, FakeRandom, MemoryFilesystem } from '@chamba/core';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { pino } from 'pino';
@@ -62,6 +62,7 @@ function makeServices(files: Record<string, string>): Services {
       today: () => '2026-06-09',
     }),
     hash: new FakeHash(),
+    random: new FakeRandom(),
     parchePullTtlMin: 5,
     vaultMutex: new Map(),
     platform: 'linux',

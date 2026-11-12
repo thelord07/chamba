@@ -2,6 +2,7 @@ import {
   FakeHash,
   FakeParche,
   FakeProcess,
+  FakeRandom,
   MemoryFilesystem,
   type ProcessHandler,
 } from '@chamba/core';
@@ -46,6 +47,7 @@ function services(handler: ProcessHandler): { svc: Services; process: FakeProces
         today: () => '2026-06-09',
       }),
       hash: new FakeHash(),
+      random: new FakeRandom(),
       parchePullTtlMin: 5,
       vaultMutex: new Map(),
       platform: 'linux',

@@ -8,12 +8,23 @@ export interface Memory {
   updatedAt: string;
   /** Path to the markdown file on disk. */
   path: string;
+
+  // ── CHAMBA-021 S11: provenance + estado (add-only on a human-authored file) ──
+  author?: string;
+  agent?: string;
+  written_at?: string;
+  estado?: 'propuesto' | 'canonico';
+  flag?: string;
 }
 
 export interface RememberInput {
   key: string;
   content: string;
   tags?: string[];
+  /** CHAMBA-021 S11: provenance for this write. Omit to keep legacy behavior. */
+  provenance?: import('../obsidian/knowledge/provenance.js').Provenance;
+  /** S5/S11: set `flag: 'revisar'` when `detectInstructionLike` found a match. */
+  flagRevisar?: boolean;
 }
 
 /**

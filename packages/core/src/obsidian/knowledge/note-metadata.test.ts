@@ -6,7 +6,7 @@
  * body identical byte-for-byte, quoting round-trip.
  */
 import { describe, expect, it } from 'vitest';
-import { readNoteMetadata, upsertNoteMetadata } from './note-metadata.js';
+import { esCanonico, readNoteMetadata, upsertNoteMetadata } from './note-metadata.js';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -539,5 +539,74 @@ describe('M10: keyword truncation by code points', () => {
     // So the truncation was by code points, not .length
     expect([...result].length).toBe(40);
     expect(result).toBe(kwWith40CodePoints);
+  });
+});
+
+// ─── CHAMBA-021 S10: provenance + estado contract ─────────────────────────────
+
+describe('CHAMBA-021 S10: provenance/estado frontmatter contract', () => {
+  it('round-trips author, agent, written_at, estado, flag', () => {
+    const base = '---\ntitle: Nota\n---\nCuerpo.\n';
+    const patched = upsertNoteMetadata(base, {
+      author: 'Joys',
+      agent: 'chamba/remember@1.0.0',
+      written_at: '2026-01-01T00:00:00.000Z',
+      estado: 'propuesto',
+      flag: 'revisar',
+    });
+    const meta = readNoteMetadata(patched, 'nota.md');
+    expect(meta.author).toBe('Joys');
+    expect(meta.agent).toBe('chamba/remember@1.0.0');
+    expect(meta.written_at).toBe('2026-01-01T00:00:00.000Z');
+    expect(meta.estado).toBe('propuesto');
+    expect(meta.flag).toBe('revisar');
+    // body byte-for-byte intact
+    expect(patched.endsWith('Cuerpo.\n')).toBe(true);
+  });
+
+  it('new keys are appended at the end of KEY_ORDER (after generated)', () => {
+    const base = '---\ntitle: Nota\nsource: chamba\ngenerated: true\n---\nCuerpo.\n';
+    const patched = upsertNoteMetadata(base, { estado: 'propuesto' });
+    const fmLines = patched.split('\n').slice(1, patched.split('\n').indexOf('---', 1));
+    const lastKey = fmLines[fmLines.length - 1]?.split(':')[0];
+    expect(lastKey).toBe('estado');
+  });
+
+  it('preserves CRLF EOL when writing provenance keys', () => {
+    const base = '---\r\ntitle: Nota\r\n---\r\nCuerpo.\r\n';
+    const patched = upsertNoteMetadata(base, { estado: 'propuesto' });
+    expect(patched).toContain('estado: propuesto\r\n');
+  });
+
+  it('an estado value other than propuesto/canonico reads as undefined', () => {
+    const content = '---\ntitle: Nota\nestado: basura\n---\nCuerpo.\n';
+    const meta = readNoteMetadata(content, 'nota.md');
+    expect(meta.estado).toBeUndefined();
+  });
+
+  it('a human note without frontmatter gets a fresh block, body intact', () => {
+    const human = '# Mi nota\n\nEscrita a mano.\n';
+    const patched = upsertNoteMetadata(human, { estado: 'propuesto' });
+    expect(patched).toContain('estado: propuesto');
+    expect(patched).toContain('# Mi nota\n\nEscrita a mano.\n');
+  });
+
+  it('clasificado_por round-trips and sits after estado/flag', () => {
+    const base = '---\ntitle: Nota\n---\nCuerpo.\n';
+    const patched = upsertNoteMetadata(base, { clasificado_por: 'Joys' });
+    const meta = readNoteMetadata(patched, 'nota.md');
+    expect(meta.clasificado_por).toBe('Joys');
+  });
+
+  describe('esCanonico', () => {
+    it('undefined estado ⇒ canonico (D-Q3)', () => {
+      expect(esCanonico({ estado: undefined })).toBe(true);
+    });
+    it('estado: canonico ⇒ canonico', () => {
+      expect(esCanonico({ estado: 'canonico' })).toBe(true);
+    });
+    it('estado: propuesto ⇒ not canonico', () => {
+      expect(esCanonico({ estado: 'propuesto' })).toBe(false);
+    });
   });
 });

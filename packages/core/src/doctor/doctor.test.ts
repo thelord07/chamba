@@ -238,3 +238,62 @@ describe('runDoctor', () => {
     expect(parche.detail).toContain('/nomarker');
   });
 });
+
+describe('CHAMBA-021 S14: vault-governance check', () => {
+  it('a propuesto note 31 days old ⇒ warn with the path', async () => {
+    const fs = new MemoryFilesystem({
+      '/vault/.obsidian/app.json': '{}',
+      '/vault/notas/old.md':
+        '---\ntitle: Vieja\nestado: propuesto\nwritten_at: 2025-12-01T00:00:00.000Z\n---\nCuerpo.\n',
+      '/proj/.chamba/workspace.md': '# Workspace\n',
+    });
+    const report = await runDoctor(input({ fs, now: '2026-01-05T00:00:00.000Z' }));
+    const gov = byId(report.checks, 'vault-governance');
+    expect(gov.status).toBe('warn');
+    expect(gov.detail).toContain('notas/old.md');
+  });
+
+  it('a propuesto note 29 days old ⇒ ok', async () => {
+    const fs = new MemoryFilesystem({
+      '/vault/.obsidian/app.json': '{}',
+      '/vault/notas/fresh.md':
+        '---\ntitle: Fresca\nestado: propuesto\nwritten_at: 2026-01-01T00:00:00.000Z\n---\nCuerpo.\n',
+      '/proj/.chamba/workspace.md': '# Workspace\n',
+    });
+    const report = await runDoctor(input({ fs, now: '2026-01-30T00:00:00.000Z' }));
+    const gov = byId(report.checks, 'vault-governance');
+    expect(gov.status).toBe('ok');
+  });
+
+  it('a propuesto note with no written_at falls back to date', async () => {
+    const fs = new MemoryFilesystem({
+      '/vault/.obsidian/app.json': '{}',
+      '/vault/notas/old.md':
+        '---\ntitle: Vieja\nestado: propuesto\ndate: 2025-01-01\n---\nCuerpo.\n',
+      '/proj/.chamba/workspace.md': '# Workspace\n',
+    });
+    const report = await runDoctor(input({ fs, now: '2026-01-05T00:00:00.000Z' }));
+    const gov = byId(report.checks, 'vault-governance');
+    expect(gov.status).toBe('warn');
+  });
+
+  it('a canonical (or estado-absent) old note never appears', async () => {
+    const fs = new MemoryFilesystem({
+      '/vault/.obsidian/app.json': '{}',
+      '/vault/notas/old.md': '---\ntitle: Vieja\ndate: 2020-01-01\n---\nCuerpo.\n',
+      '/proj/.chamba/workspace.md': '# Workspace\n',
+    });
+    const report = await runDoctor(input({ fs, now: '2026-01-05T00:00:00.000Z' }));
+    const gov = byId(report.checks, 'vault-governance');
+    expect(gov.status).toBe('ok');
+    expect(gov.detail).not.toContain('notas/old.md');
+  });
+
+  it('no vault connected ⇒ ok, never fails', async () => {
+    const report = await runDoctor(
+      input({ obsidianVaultPath: undefined, obsidianSearchRoots: [] }),
+    );
+    const gov = byId(report.checks, 'vault-governance');
+    expect(gov.status).toBe('ok');
+  });
+});

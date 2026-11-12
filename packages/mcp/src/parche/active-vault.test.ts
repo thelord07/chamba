@@ -3,7 +3,7 @@
  * PARCHE-009 AC10: custom vault dir is recognized by autosync.
  */
 
-import { FakeHash, FakeParche, MemoryFilesystem } from '@chamba/core';
+import { FakeHash, FakeParche, FakeRandom, MemoryFilesystem } from '@chamba/core';
 import { describe, expect, it } from 'vitest';
 import type { Services } from '../services.js';
 import { resolveActiveParcheVaultFull } from './active-vault.js';
@@ -41,6 +41,7 @@ function makeServices(overrides: Partial<Services> = {}): Services {
     homedir: '/home/test',
     http: parche,
     hash: new FakeHash(),
+    random: new FakeRandom(),
     parchePullTtlMin: 5,
     vaultMutex: new Map(),
     platform: 'linux',

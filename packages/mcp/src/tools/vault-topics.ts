@@ -35,8 +35,9 @@ const DESCRIPTION =
   'explícita del usuario en un turno aparte), ' +
   'add/alias (modifican VOCABULARIO.md — dryRun:true por defecto, muestra el VOCABULARIO.md ' +
   'resultante; solo escribe con dryRun:false tras confirmación explícita del usuario), ' +
-  'promote (mueve propuestas al vocabulario — dryRun:true por defecto, requiere confirmación ' +
-  'del usuario antes de dryRun:false ya que es una acción masiva).';
+  'promote (mueve un TEMA propuesto al vocabulario — dryRun:true por defecto, requiere ' +
+  'confirmación del usuario antes de dryRun:false ya que es una acción masiva; NO confundir ' +
+  'con `chamba_vault_promote`, que promueve una NOTA de `propuesto` a `canonico`).';
 
 const NO_VAULT_ERROR =
   'No Obsidian vault configured. Set CHAMBA_OBSIDIAN_VAULT_PATH or use the obsidian-mcp server';

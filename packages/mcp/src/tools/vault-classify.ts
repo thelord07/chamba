@@ -5,6 +5,7 @@
  * Confirmation from the user is required before apply with dryRun:false.
  */
 import {
+  type ClassifyProvenanceOpts,
   classifyApply,
   classifyPlan,
   listUnclassified,
@@ -16,6 +17,7 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { Logger } from 'pino';
 import { z } from 'zod';
 import { resolveActiveParcheVaultFull } from '../parche/active-vault.js';
+import { resolveAuthor } from '../parche/provenance.js';
 import { obsidianSearchRoots, type Services } from '../services.js';
 
 const TOOL_NAME = 'chamba_vault_classify';
@@ -98,6 +100,15 @@ export function registerVaultClassify(server: McpServer, logger: Logger, service
 
       logger.info({ tool: TOOL_NAME, action, vaultPath }, 'vault-classify');
 
+      // D-Q4 (CHAMBA-021 §9): provenance for classify apply (chamba notes get
+      // author/agent/written_at filled-if-missing + estado: propuesto; human
+      // notes only get add-only clasificado_por/agent).
+      const classifyProvenanceOpts: ClassifyProvenanceOpts = {
+        author: await resolveAuthor(services, vaultResult),
+        version: services.version ?? 'unknown',
+        nowIso: services.clock.now().toISOString(),
+      };
+
       // ── list ────────────────────────────────────────────────────────────────
       if (action === 'list') {
         const result = await listUnclassified(services.fs, vaultPath, {
@@ -164,7 +175,12 @@ export function registerVaultClassify(server: McpServer, logger: Logger, service
         }));
 
         if (effectiveDryRun) {
-          const plan = await classifyPlan(services.fs, vaultPath, classifyEntries);
+          const plan = await classifyPlan(
+            services.fs,
+            vaultPath,
+            classifyEntries,
+            classifyProvenanceOpts,
+          );
 
           const lines = [
             `[dryRun] classify apply — ${plan.diffs.length} nota(s) a actualizar, ${plan.rejected.length} rechazada(s):`,
@@ -197,7 +213,12 @@ export function registerVaultClassify(server: McpServer, logger: Logger, service
         }
 
         // dryRun:false — apply and reindex
-        const result = await classifyApply(services.fs, vaultPath, classifyEntries);
+        const result = await classifyApply(
+          services.fs,
+          vaultPath,
+          classifyEntries,
+          classifyProvenanceOpts,
+        );
 
         // Reindex after classify
         const reindexer = new VaultReindexer(services.fs, vaultPath);

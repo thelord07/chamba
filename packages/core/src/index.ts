@@ -101,6 +101,7 @@ export type {
   ClassifyDiff,
   ClassifyEntry,
   ClassifyPlanResult,
+  ClassifyProvenanceOpts,
   ListUnclassifiedResult,
   UnclassifiedItem,
 } from './obsidian/knowledge/classify.js';
@@ -118,7 +119,16 @@ export type {
   MapaWorkItem,
 } from './obsidian/knowledge/context-map.js';
 export { buildContextMap } from './obsidian/knowledge/context-map.js';
+// Knowledge — vault data wrap (CHAMBA-021 S15, prompt-injection defense)
+export type { WrapVaultDataMeta } from './obsidian/knowledge/data-wrap.js';
+export { VAULT_DATA_WARNING, wrapVaultData } from './obsidian/knowledge/data-wrap.js';
 export { isChambaGenerated, isDerivedPathPattern } from './obsidian/knowledge/derived-path.js';
+// Knowledge — instruction-like text heuristic (CHAMBA-021 S5, warn-only)
+export type { InstructionLikeResult } from './obsidian/knowledge/instruction-heuristic.js';
+export {
+  detectInstructionLike,
+  mergeInstructionLike,
+} from './obsidian/knowledge/instruction-heuristic.js';
 // Knowledge graph — derived files builder (CHAMBA-016 wave 2)
 export type {
   GraphNote,
@@ -128,6 +138,8 @@ export type {
 export {
   buildKnowledgeGraph,
   computeSuggestions,
+  countProposed,
+  staleProposed,
 } from './obsidian/knowledge/knowledge-graph.js';
 // Knowledge — navigator (CHAMBA-017)
 export type {
@@ -147,13 +159,31 @@ export {
   navNote,
   navRoot,
 } from './obsidian/knowledge/navigator.js';
-// Knowledge graph — note metadata and vocabulary (CHAMBA-016)
 export type { NoteMetadata, NoteType } from './obsidian/knowledge/note-metadata.js';
 export {
+  esCanonico,
   quoteScalar,
   readNoteMetadata,
   upsertNoteMetadata,
 } from './obsidian/knowledge/note-metadata.js';
+// Knowledge — promote a note to canónico (CHAMBA-021 S12). NOT the same as
+// `promotePlan`/`applyPromote` above (those promote a *topic* to the vocabulary).
+export type {
+  PromoteDiffEntry,
+  PromoteNotesApplyResult,
+  PromoteNotesResult,
+  PromoteRejection,
+} from './obsidian/knowledge/promote.js';
+export { promoteNotesApply, promoteNotesPlan } from './obsidian/knowledge/promote.js';
+// Knowledge graph — note metadata and vocabulary (CHAMBA-016)
+// Knowledge — provenance (CHAMBA-021 S11)
+export type {
+  ApplyProvenancePatchOptions,
+  BuildProvenanceInput,
+  Provenance,
+  ProvenanceFields,
+} from './obsidian/knowledge/provenance.js';
+export { applyProvenancePatch, buildProvenance } from './obsidian/knowledge/provenance.js';
 export type { ReindexOptions, ReindexReport } from './obsidian/knowledge/reindexer.js';
 export { VaultReindexer } from './obsidian/knowledge/reindexer.js';
 // Knowledge — safe path validation (CHAMBA-017)
@@ -244,6 +274,7 @@ export type { HashPort } from './ports/hash.js';
 export type { HttpPort, HttpRequest, HttpResponse } from './ports/http.js';
 export type { NetPort } from './ports/net.js';
 export type { ProcessExecOptions, ProcessPort, ProcessResult } from './ports/process.js';
+export type { RandomPort } from './ports/random.js';
 export type { SystemPort, SystemResources } from './ports/system.js';
 // QA capabilities (project + machine probe for acceptance QA, no LLM)
 export type {
@@ -280,6 +311,18 @@ export {
   TRIVIAL_TERMS,
   termRegex,
 } from './routing/risk-terms.js';
+// Secrets scanner (CHAMBA-021 S1/S2/S3) — `matchRules`/`RuleMatch` are intentionally
+// NOT exported: only the value-free `scanText`/`Finding` surface is public.
+export type { SecretAllowEntry, SecretAllowlist } from './secrets/allowlist.js';
+export {
+  addSecretAllowEntry,
+  isSecretAllowed,
+  readSecretAllowlist,
+  secretAllowlistSchema,
+} from './secrets/allowlist.js';
+export { redactSecretValues } from './secrets/redact.js';
+export type { Finding, SecretKind, WriteField, WriteFieldFinding } from './secrets/scanner.js';
+export { isScannable, scanText, scanWriteFields } from './secrets/scanner.js';
 // Skills / playbooks registry (index-first, no LLM)
 export type { Skill, SkillRef } from './skills/skill.js';
 export {
@@ -294,6 +337,7 @@ export { FakeNet } from './testing/fake-net.js';
 export { FakeParche } from './testing/fake-parche.js';
 export type { ProcessHandler, RecordedCall } from './testing/fake-process.js';
 export { FakeProcess } from './testing/fake-process.js';
+export { FakeRandom } from './testing/fake-random.js';
 export type { FlakyHttpOptions } from './testing/flaky-http.js';
 export { FlakyHttp } from './testing/flaky-http.js';
 // Testing utilities
@@ -343,14 +387,19 @@ export { CredentialsStore, credentialsFileSchema } from './vault-sync/credential
 export { defaultDeviceLabel, MAX_DEVICE_LABEL_LENGTH } from './vault-sync/device-label.js';
 // Vault-sync messages and helpers (PARCHE-011)
 export {
+  allowSecretHint,
+  blockedSecretMessage,
+  blockedSecretsSummary,
   joinFirstHint,
   joinInRepoHint,
   linkDirPlaceholderHint,
   linkHint,
   parcheNetworkErrorMessage,
+  REDACTED_PLACEHOLDER,
   syncManualHint,
   unlinkWorkspaceHint,
   VAULT_CLI,
+  writeBlockedSecretMessage,
 } from './vault-sync/messages.js';
 // Vault-sync parche binding (PARCHE-011)
 export type {

@@ -6,6 +6,7 @@
 import {
   FakeHash,
   FakeParche,
+  FakeRandom,
   MemoryFilesystem,
   parcheFilePath,
   readParcheBinding,
@@ -33,6 +34,7 @@ function makeServices(fs: MemoryFilesystem): Services {
     homedir: HOMEDIR,
     http: new FakeParche(clock),
     hash: new FakeHash(),
+    random: new FakeRandom(),
     parchePullTtlMin: 5,
     vaultMutex: new Map(),
     platform: 'linux',

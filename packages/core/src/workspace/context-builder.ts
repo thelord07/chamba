@@ -1,8 +1,10 @@
 import { buildContextMap, type MapaStruct } from '../obsidian/knowledge/context-map.js';
+import { wrapVaultData } from '../obsidian/knowledge/data-wrap.js';
 import { isChambaGenerated } from '../obsidian/knowledge/derived-path.js';
 import { loadGraphNotes, loadVocabulary } from '../obsidian/knowledge/vault-notes.js';
 import { INDEX_FILE, parseIndexNote } from '../obsidian/vault-index.js';
 import type { FilesystemPort } from '../ports/filesystem.js';
+import type { RandomPort } from '../ports/random.js';
 import { dirname, joinPath } from '../util/path.js';
 import { extractKeywords, occurrences } from './keywords.js';
 import { readRuleExcerpts } from './rules.js';
@@ -47,7 +49,10 @@ const SKIP_DIRS = new Set(['.obsidian', '.trash', 'node_modules', '.git']);
  * task (simple keyword search — semantic search is V2).
  */
 export class ContextBuilder {
-  constructor(private readonly fs: FilesystemPort) {}
+  constructor(
+    private readonly fs: FilesystemPort,
+    private readonly random: RandomPort,
+  ) {}
 
   async build(input: ContextBuildInput): Promise<BuiltContext> {
     const workspaceSection = this.workspaceSection(input.workspace);
@@ -79,7 +84,8 @@ export class ContextBuilder {
         mapa = mapaStruct;
         relevantNotes = mapaStruct.nodos.flatMap((n) => n.notas.map((note) => note.ruta));
 
-        const sections: string[] = [workspaceSection, mapaSection];
+        const wrappedMapaSection = wrapVaultData(mapaSection, undefined, this.random.hex(12));
+        const sections: string[] = [workspaceSection, wrappedMapaSection];
 
         const hasRules = input.includeRules !== false && input.workspace.ruleSources.length > 0;
         if (hasRules) {
@@ -112,9 +118,31 @@ export class ContextBuilder {
     if (input.vaultPath) {
       const notes = await this.searchNotes(input.vaultPath, input.task);
       relevantNotes = notes.map((n) => n.path);
-      sections.push(this.notesSection(notes));
+      const notesSection = this.notesSection(notes);
+
+      // Clamp the INNER content before wrapping, not the wrapped block — the
+      // final `<<</vault-datos:<nonce>>>` delimiter must never be cut off by a
+      // later clamp, or the model loses the boundary that marks third-party
+      // data as data, not instructions (CHAMBA-021 S15 prompt-injection defense).
+      const nonce = this.random.hex(12);
+      const otherSections = sections.join('\n\n');
+      const separator = otherSections.length > 0 ? 2 : 0; // the '\n\n' joiner
+      // Wrapping content of length N adds exactly N chars vs. wrapping '' —
+      // content replaces one line as-is, no extra separators are added.
+      const emptyWrappedLen = wrapVaultData('', undefined, nonce).length;
+      const notesBudget = maxChars - otherSections.length - separator - emptyWrappedLen;
+
+      if (notesBudget >= 0) {
+        const clampedNotesSection = clamp(notesSection, notesBudget);
+        sections.push(wrapVaultData(clampedNotesSection, undefined, nonce));
+      }
+      // else: not even an EMPTY wrapped block (open tag + warning + close tag)
+      // fits the budget — omit the vault-data section entirely rather than
+      // ever truncate mid-delimiter.
     }
 
+    // Safety net only: with the budgeting above this should no longer need to
+    // cut into the wrapped vault-data block's closing delimiter.
     const context = clamp(sections.join('\n\n'), maxChars);
     return { context, relevantNotes };
   }

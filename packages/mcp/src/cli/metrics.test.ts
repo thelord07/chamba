@@ -5,7 +5,13 @@
  */
 
 import type { TaskMetric } from '@chamba/core';
-import { FakeHash, FakeParche, MemoryFilesystem, serializeTaskMetric } from '@chamba/core';
+import {
+  FakeHash,
+  FakeParche,
+  FakeRandom,
+  MemoryFilesystem,
+  serializeTaskMetric,
+} from '@chamba/core';
 import { describe, expect, it, vi } from 'vitest';
 import type { Services } from '../services.js';
 import { type MetricsCliDeps, runMetricsCli } from './metrics.js';
@@ -71,6 +77,7 @@ function makeDeps(files?: Record<string, string>): MetricsCliDeps & { captured: 
       today: () => '2026-11-07',
     }),
     hash: new FakeHash(),
+    random: new FakeRandom(),
     cwd: '/proj',
     homedir: '/home/test',
     parchePullTtlMin: 5,

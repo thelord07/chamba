@@ -1,4 +1,4 @@
-import { FilesystemMemoryStore } from '@chamba/core';
+import { FilesystemMemoryStore, wrapVaultData } from '@chamba/core';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { Logger } from 'pino';
 import { z } from 'zod';
@@ -13,6 +13,21 @@ const DESCRIPTION =
   'With an active parche vault: pulls if stale, then searches both the vault memory ' +
   '(labelled "grupo <slug>") and personal local memory (labelled "personal, solo esta máquina"). ' +
   'Without parche: searches only the local .chamba/memory/.';
+
+/**
+ * CHAMBA-021 S15: wrap a memory's content as third-party vault data (a fresh
+ * nonce per memory, per call) so an editor model never treats it as instructions.
+ */
+function wrapMemoryContent(
+  services: Services,
+  m: { content: string; author?: string; estado?: string; path: string },
+): string {
+  return wrapVaultData(
+    m.content,
+    { author: m.author, estado: m.estado, ruta: m.path },
+    services.random.hex(12),
+  );
+}
 
 export function registerRecall(server: McpServer, logger: Logger, services: Services): void {
   server.registerTool(
@@ -55,7 +70,10 @@ export function registerRecall(server: McpServer, logger: Logger, services: Serv
             allMatches.length === 0
               ? `No memories matched "${query}".`
               : allMatches
-                  .map((m) => `### ${m.key} (\`${m.path}\`) [${m.origin}]\n${m.content}`)
+                  .map(
+                    (m) =>
+                      `### ${m.key} (\`${m.path}\`) [${m.origin}]\n${wrapMemoryContent(services, m)}`,
+                  )
                   .join('\n\n');
           return {
             content: [{ type: 'text' as const, text: `${matchText}\n\n${warning}` }],
@@ -69,7 +87,9 @@ export function registerRecall(server: McpServer, logger: Logger, services: Serv
           `${warning}\n\n` +
           (matches.length === 0
             ? `No memories matched "${query}".`
-            : matches.map((m) => `### ${m.key} (\`${m.path}\`)\n${m.content}`).join('\n\n'));
+            : matches
+                .map((m) => `### ${m.key} (\`${m.path}\`)\n${wrapMemoryContent(services, m)}`)
+                .join('\n\n'));
         return {
           content: [{ type: 'text' as const, text }],
           structuredContent: { matches: [] } as Record<string, unknown>,
@@ -94,7 +114,9 @@ export function registerRecall(server: McpServer, logger: Logger, services: Serv
         const text =
           matches.length === 0
             ? `No memories matched "${query}".`
-            : matches.map((m) => `### ${m.key} (\`${m.path}\`)\n${m.content}`).join('\n\n');
+            : matches
+                .map((m) => `### ${m.key} (\`${m.path}\`)\n${wrapMemoryContent(services, m)}`)
+                .join('\n\n');
 
         return {
           content: [{ type: 'text' as const, text }],
@@ -144,7 +166,9 @@ export function registerRecall(server: McpServer, logger: Logger, services: Serv
         text = `No memories matched "${query}".`;
       } else {
         text = allMatches
-          .map((m) => `### ${m.key} (\`${m.path}\`) [${m.origin}]\n${m.content}`)
+          .map(
+            (m) => `### ${m.key} (\`${m.path}\`) [${m.origin}]\n${wrapMemoryContent(services, m)}`,
+          )
           .join('\n\n');
       }
 

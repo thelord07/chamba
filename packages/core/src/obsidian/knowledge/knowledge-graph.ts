@@ -22,7 +22,7 @@
  * Pure TypeScript — no `node:` imports, no external dependencies.
  */
 
-import type { NoteMetadata } from './note-metadata.js';
+import { esCanonico, type NoteMetadata } from './note-metadata.js';
 import type { Vocabulary } from './vocabulary.js';
 import { ancestors, children, editDistance } from './vocabulary.js';
 
@@ -179,11 +179,42 @@ export function sortNotes(notes: GraphNote[]): GraphNote[] {
     if (a.date > b.date) return -1;
     if (a.date < b.date) return 1;
 
-    // 4. path ascending
+    // 4. canonical before propuesto (CHAMBA-021 S13: at an equal score — date here)
+    const aCanon = esCanonico(a.note.metadata);
+    const bCanon = esCanonico(b.note.metadata);
+    if (aCanon && !bCanon) return -1;
+    if (!aCanon && bCanon) return 1;
+
+    // 5. path ascending
     return stableCmp(a.note.path, b.note.path);
   });
 
   return keyed.map((k) => k.note);
+}
+
+// ─── CHAMBA-021 S13/S14: governance helpers ────────────────────────────────────
+
+/** Count of notes with `estado: propuesto` (pending human review). */
+export function countProposed(notes: GraphNote[]): number {
+  return notes.filter((n) => !esCanonico(n.metadata)).length;
+}
+
+/**
+ * Notes with `estado: propuesto` whose `written_at` (fallback: `date`) is
+ * older than `days` (default 30), as of `now`. Notes with neither field never
+ * count as stale (nothing to measure against).
+ */
+export function staleProposed(notes: GraphNote[], now: Date, days = 30): GraphNote[] {
+  const thresholdMs = days * 24 * 60 * 60 * 1000;
+  const nowMs = now.getTime();
+  return notes.filter((n) => {
+    if (esCanonico(n.metadata)) return false;
+    const raw = n.metadata.written_at ?? n.metadata.date;
+    if (!raw) return false;
+    const ts = Date.parse(raw);
+    if (Number.isNaN(ts)) return false;
+    return nowMs - ts > thresholdMs;
+  });
 }
 
 // ─── Note line rendering ──────────────────────────────────────────────────────
@@ -208,6 +239,9 @@ function renderNoteLine(fromFile: string, note: GraphNote): string {
   if (note.metadata.type && note.metadata.type !== 'nota') parts.push(note.metadata.type);
 
   if (note.metadata.date) parts.push(note.metadata.date);
+
+  // CHAMBA-021 S13: mark notes pending human review.
+  if (!esCanonico(note.metadata)) parts.push('propuesto');
 
   if (parts.length > 0) {
     line += ` — ${parts.join(' · ')}`;
@@ -673,6 +707,15 @@ function renderUnclassifiedFile(notes: GraphNote[]): string {
   lines.push('');
   lines.push('Notas sin temas válidos en el vocabulario.');
   lines.push('');
+
+  // CHAMBA-021 S13: surface the count of notes pending human review.
+  const proposedCount = countProposed(notes);
+  if (proposedCount > 0) {
+    lines.push(
+      `${proposedCount} nota${proposedCount !== 1 ? 's' : ''} propuesta${proposedCount !== 1 ? 's' : ''} pendientes de revisar.`,
+    );
+    lines.push('');
+  }
 
   if (notes.length === 0) {
     lines.push('_(ninguna)_');

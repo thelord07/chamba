@@ -104,4 +104,56 @@ describe('mergeIntoStateFile', () => {
     const merged = mergeIntoStateFile(base, syncState, '2026-10-29T12:00:00.000Z');
     expect(merged.groupId).toBeUndefined();
   });
+
+  // ── CHAMBA-021 S6: blockedSecret ──────────────────────────────────────────
+
+  it('preserves blockedSecret from base when newBlockedSecret is not given', () => {
+    const blockedSecret = {
+      'secret.md': {
+        findings: [{ fingerprint: 'abc123def456', kind: 'aws-access-key', line: 3 }],
+        detectedAt: '2026-10-29T10:00:00.000Z',
+      },
+    };
+    const base = { ...BASE_STATE, blockedSecret };
+    const merged = mergeIntoStateFile(base, { cursor: 1, files: {} }, '2026-10-29T12:00:00.000Z');
+    expect(merged.blockedSecret).toEqual(blockedSecret);
+  });
+
+  it('replaces blockedSecret when newBlockedSecret is given', () => {
+    const base = {
+      ...BASE_STATE,
+      blockedSecret: {
+        'old.md': {
+          findings: [{ fingerprint: 'f1', kind: 'assignment', line: 1 }],
+          detectedAt: '2026-10-29T09:00:00.000Z',
+        },
+      },
+    };
+    const next = {
+      'new.md': {
+        findings: [{ fingerprint: 'f2', kind: 'parche-token', line: 2 }],
+        detectedAt: '2026-10-29T12:00:00.000Z',
+      },
+    };
+    const merged = mergeIntoStateFile(
+      base,
+      { cursor: 1, files: {} },
+      '2026-10-29T12:00:00.000Z',
+      undefined,
+      next,
+    );
+    expect(merged.blockedSecret).toEqual(next);
+  });
+
+  it('omits blockedSecret entirely when the map is empty', () => {
+    const base = { ...BASE_STATE };
+    const merged = mergeIntoStateFile(
+      base,
+      { cursor: 1, files: {} },
+      '2026-10-29T12:00:00.000Z',
+      undefined,
+      {},
+    );
+    expect(merged.blockedSecret).toBeUndefined();
+  });
 });

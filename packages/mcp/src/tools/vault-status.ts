@@ -1,4 +1,12 @@
-import { listVaultNotes, ObsidianDetector, readState, VaultReindexer } from '@chamba/core';
+import {
+  countProposed,
+  listVaultNotes,
+  loadGraphNotes,
+  ObsidianDetector,
+  readState,
+  staleProposed,
+  VaultReindexer,
+} from '@chamba/core';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { Logger } from 'pino';
 import { resolveBindingHeader } from '../parche/binding-ops.js';
@@ -34,10 +42,20 @@ export function registerVaultStatus(server: McpServer, logger: Logger, services:
 
       // CHAMBA-015 D2.5: read skippedPaths count for the active binding's vault
       let skippedByName = 0;
+      // CHAMBA-021 S8: report possible-secret blocks for the active binding's vault
+      let blockedSecretCount = 0;
+      const blockedSecretLines: string[] = [];
       if (binding?.vaultDir) {
         try {
           const vaultState = await readState(services.fs, binding.vaultDir);
           skippedByName = Object.keys(vaultState?.skippedPaths ?? {}).length;
+          const blockedEntries = Object.entries(vaultState?.blockedSecret ?? {});
+          blockedSecretCount = blockedEntries.length;
+          for (const [path, entry] of blockedEntries) {
+            for (const f of entry.findings) {
+              blockedSecretLines.push(`  - ${path}:${f.line} (${f.kind})`);
+            }
+          }
         } catch {
           // Non-fatal: directory may not exist yet
         }
@@ -84,6 +102,7 @@ export function registerVaultStatus(server: McpServer, logger: Logger, services:
           structuredContent: {
             found: false,
             skippedByName,
+            blockedBySecret: blockedSecretCount,
             workspaceRoot: wsRoot,
             workspaceRootSource: wsRootSource,
             binding: binding
@@ -109,9 +128,14 @@ export function registerVaultStatus(server: McpServer, logger: Logger, services:
       const more = names.length > MAX_LISTED ? `\n…and ${names.length - MAX_LISTED} more` : '';
       const skippedLine =
         skippedByName > 0 ? `\nSkipped (Windows-invalid names): ${skippedByName} archivo(s)` : '';
+      const blockedSecretLine =
+        blockedSecretCount > 0
+          ? `\nPosibles secretos bloqueados: ${blockedSecretCount} archivo(s)\n${blockedSecretLines.join('\n')}`
+          : '';
 
       // Knowledge network summary (read-only, dryRun:true)
       let knowledgeLine = '';
+      let governanceLine = '';
       try {
         const reindexer = new VaultReindexer(services.fs, detection.path);
         const report = await reindexer.reindex({ dryRun: true });
@@ -125,11 +149,20 @@ export function registerVaultStatus(server: McpServer, logger: Logger, services:
       } catch {
         // Non-fatal
       }
+      // CHAMBA-021 S14: proposed notes pending human review (> 30 days flagged)
+      try {
+        const notes = await loadGraphNotes(services.fs, detection.path);
+        const proposed = countProposed(notes);
+        const stale = staleProposed(notes, services.clock.now(), 30);
+        governanceLine = `\nPropuestas pendientes: ${proposed} (${stale.length} con más de 30 días)`;
+      } catch {
+        // Non-fatal
+      }
 
       const text =
         lines.join('\n') +
         `Vault: ${detection.path} (${source})\n` +
-        `Notes chamba can see: ${names.length}${skippedLine}${knowledgeLine}\n\n${shown.map((n) => `- ${n}`).join('\n')}${more}` +
+        `Notes chamba can see: ${names.length}${skippedLine}${blockedSecretLine}${knowledgeLine}${governanceLine}\n\n${shown.map((n) => `- ${n}`).join('\n')}${more}` +
         (names.length === 0
           ? '\n\n⚠️ No notes found. If your path ends in `.obsidian`, point it at the parent folder instead.'
           : '');
@@ -142,6 +175,7 @@ export function registerVaultStatus(server: McpServer, logger: Logger, services:
           source,
           noteCount: names.length,
           skippedByName,
+          blockedBySecret: blockedSecretCount,
           notes: shown,
           workspaceRoot: wsRoot,
           workspaceRootSource: wsRootSource,

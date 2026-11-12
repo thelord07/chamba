@@ -1,11 +1,19 @@
-import { ObsidianDetector, VaultWriter } from '@chamba/core';
+import {
+  buildProvenance,
+  detectInstructionLike,
+  mergeInstructionLike,
+  ObsidianDetector,
+  VaultWriter,
+} from '@chamba/core';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { Logger } from 'pino';
 import { z } from 'zod';
 import { readGitRemote } from '../git-remote.js';
 import { resolveActiveParcheVaultFull } from '../parche/active-vault.js';
 import { maybeAutoSync } from '../parche/autosync.js';
+import { resolveAuthor } from '../parche/provenance.js';
 import { obsidianSearchRoots, type Services } from '../services.js';
+import { secretWriteGate } from '../write-gate.js';
 
 const TOOL_NAME = 'chamba_summarize_to_vault';
 
@@ -134,6 +142,17 @@ export function registerSummarizeToVault(
       related,
       type,
     }) => {
+      // D-Q1 (CHAMBA-021 §9): reject a possible secret BEFORE anything is written.
+      const gate = await secretWriteGate(services.hash, [
+        { field: 'title', value: title },
+        { field: 'summary', value: summary },
+        { field: 'keywords', value: keywords },
+        { field: 'content', value: content },
+      ]);
+      if (gate.blocked) {
+        return { isError: true, content: [{ type: 'text' as const, text: gate.text as string }] };
+      }
+
       // O2: full discriminated resolution — never fall through from a binding
       const vaultResult = await resolveActiveParcheVaultFull(services);
 
@@ -174,6 +193,20 @@ export function registerSummarizeToVault(
         return { isError: true, content: [{ type: 'text' as const, text: NO_VAULT_ERROR }] };
       }
 
+      const author = await resolveAuthor(services, vaultResult);
+      const provenance = buildProvenance({
+        author,
+        tool: 'summarize_to_vault',
+        version: services.version ?? 'unknown',
+        now: services.clock.now(),
+      });
+      // CHAMBA-021 review: check title/summary too, not only content.
+      const instrLike = mergeInstructionLike(
+        detectInstructionLike(title),
+        detectInstructionLike(summary ?? ''),
+        detectInstructionLike(content),
+      );
+
       const writer = new VaultWriter(services.fs, services.clock);
       const result = await writer.write({
         vaultPath,
@@ -188,6 +221,8 @@ export function registerSummarizeToVault(
         related,
         type,
         projectRemoteUrl: await readGitRemote(services.process, services.cwd),
+        provenance,
+        flagRevisar: instrLike.matched.length > 0,
       });
       logger.info({ tool: TOOL_NAME, notePath: result.notePath }, 'note written to vault');
 
@@ -201,7 +236,10 @@ export function registerSummarizeToVault(
         syncWarning = syncResult.warning;
       }
 
-      const text = formatKnowledgeResponse(result.notePath, result, syncWarning);
+      let text = formatKnowledgeResponse(result.notePath, result, syncWarning);
+      if (instrLike.matched.length > 0) {
+        text += `\n\n⚠ El contenido parece traer instrucciones para agentes (${instrLike.matched.join(', ')}). La nota queda como propuesto con flag: revisar.`;
+      }
 
       return { content: [{ type: 'text' as const, text }] };
     },

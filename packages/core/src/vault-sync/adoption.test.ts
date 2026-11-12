@@ -4,6 +4,8 @@
  */
 
 import { describe, expect, it } from 'vitest';
+import { addSecretAllowEntry } from '../secrets/allowlist.js';
+import { FakeHash } from '../testing/fake-hash.js';
 import { MemoryFilesystem } from '../testing/memory-filesystem.js';
 import { buildAdoptionSummary } from './adoption.js';
 
@@ -77,5 +79,61 @@ describe('buildAdoptionSummary', () => {
     expect(summary.syncableCount).toBe(2);
     expect(summary.sample).toContain('folder/deep/note.md');
     expect(summary.sample).toContain('top.md');
+  });
+
+  // ── CHAMBA-021 S7 ──────────────────────────────────────────────────────────
+
+  it('without deps.hash, blocked is always [] (backward compatibility)', async () => {
+    const fs = new MemoryFilesystem({
+      [`${VAULT}/secret.md`]: `token: ${'pch_'}${'A'.repeat(24)}\n`,
+    });
+    const summary = await buildAdoptionSummary({ fs }, VAULT);
+    expect(summary.blocked).toEqual([]);
+    expect(summary.blockedCount).toBe(0);
+  });
+
+  it('with deps.hash, a file with a secret is reported in blocked (same walk)', async () => {
+    const fs = new MemoryFilesystem({
+      [`${VAULT}/clean.md`]: '# fine\n',
+      [`${VAULT}/secret.md`]: `token: ${'pch_'}${'A'.repeat(24)}\n`,
+    });
+    const summary = await buildAdoptionSummary({ fs, hash: new FakeHash() }, VAULT);
+    expect(summary.syncableCount).toBe(2); // the count is unaffected
+    expect(summary.blockedCount).toBe(1);
+    expect(summary.blocked[0]?.path).toBe('secret.md');
+  });
+
+  it('images and PDFs never appear in blocked, even with a secret-shaped body', async () => {
+    const fs = new MemoryFilesystem({
+      [`${VAULT}/looks-like-a-secret.png`]: `token: ${'pch_'}${'A'.repeat(24)}\n`,
+      [`${VAULT}/looks-like-a-secret.pdf`]: `token: ${'pch_'}${'A'.repeat(24)}\n`,
+    });
+    const summary = await buildAdoptionSummary({ fs, hash: new FakeHash() }, VAULT);
+    expect(summary.blocked).toEqual([]);
+  });
+
+  it('excludes a finding already marked as a false positive in the local allowlist', async () => {
+    const fs = new MemoryFilesystem({
+      [`${VAULT}/secret.md`]: `token: ${'pch_'}${'A'.repeat(24)}\n`,
+    });
+    const hash = new FakeHash();
+    const first = await buildAdoptionSummary({ fs, hash }, VAULT);
+    expect(first.blockedCount).toBe(1);
+
+    const clock = {
+      now: () => new Date('2026-10-29T12:00:00Z'),
+      today: () => '2026-10-29',
+      sleep: () => Promise.resolve(),
+    };
+    await addSecretAllowEntry(fs, clock, VAULT, {
+      path: 'secret.md',
+      fingerprint: first.blocked[0]?.fingerprint ?? '',
+    });
+
+    const after = await buildAdoptionSummary({ fs, hash }, VAULT);
+    expect(after.blockedCount).toBe(0);
+    expect(after.blocked).toEqual([]);
+    // Allowlisting never affects the syncable count/sample.
+    expect(after.syncableCount).toBe(1);
   });
 });

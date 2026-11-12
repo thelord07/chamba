@@ -13,6 +13,12 @@ import { MemoryFilesystem } from '../../testing/memory-filesystem.js';
 import { classifyApply, classifyPlan, listUnclassified } from './classify.js';
 import { readNoteMetadata } from './note-metadata.js';
 
+const PROVENANCE_OPTS = {
+  author: 'Joys',
+  version: '1.14.0',
+  nowIso: '2026-01-01T00:00:00.000Z',
+};
+
 const VOCAB_CONTENT = `---
 title: "Vocabulario de temas"
 source: human
@@ -289,5 +295,102 @@ describe('M3: validateEntryPath rejects temas/', () => {
 
     // Should not be in rejected (may or may not have a diff)
     expect(result.rejected.find((r) => r.path === 'notas/nota.md')).toBeUndefined();
+  });
+});
+
+describe('CHAMBA-021 D-Q4 — classifyApply provenance', () => {
+  it('a chamba note gets author/agent/written_at filled (if missing) and estado: propuesto', async () => {
+    const original = `---\ntitle: Nota\nsource: chamba\n---\nCuerpo.\n`;
+    const fs = new MemoryFilesystem({
+      '/vault/temas/VOCABULARIO.md': VOCAB_CONTENT,
+      '/vault/notas/nota.md': original,
+    });
+
+    await classifyApply(
+      fs,
+      '/vault',
+      [{ path: 'notas/nota.md', temas: ['lms/cursos'] }],
+      PROVENANCE_OPTS,
+    );
+
+    const meta = readNoteMetadata(await fs.readFile('/vault/notas/nota.md'), 'notas/nota.md');
+    expect(meta.author).toBe('Joys');
+    expect(meta.agent).toBe('chamba/classify@1.14.0');
+    expect(meta.written_at).toBe('2026-01-01T00:00:00.000Z');
+    expect(meta.estado).toBe('propuesto');
+  });
+
+  it('a chamba note with an existing author does not have it overwritten', async () => {
+    const original = `---\ntitle: Nota\nsource: chamba\nauthor: Otra Persona\n---\nCuerpo.\n`;
+    const fs = new MemoryFilesystem({
+      '/vault/temas/VOCABULARIO.md': VOCAB_CONTENT,
+      '/vault/notas/nota.md': original,
+    });
+
+    await classifyApply(
+      fs,
+      '/vault',
+      [{ path: 'notas/nota.md', temas: ['lms/cursos'] }],
+      PROVENANCE_OPTS,
+    );
+
+    const meta = readNoteMetadata(await fs.readFile('/vault/notas/nota.md'), 'notas/nota.md');
+    expect(meta.author).toBe('Otra Persona');
+    expect(meta.estado).toBe('propuesto');
+  });
+
+  it('a human note (no source: chamba) only gets clasificado_por + agent, add-only — no author/written_at/estado', async () => {
+    const original = `---\ntitle: Nota humana\nauthor: Autor Humano\ntags:\n  - chamba\n---\nEscrita a mano.\n`;
+    const fs = new MemoryFilesystem({
+      '/vault/temas/VOCABULARIO.md': VOCAB_CONTENT,
+      '/vault/notas/humana.md': original,
+    });
+
+    await classifyApply(
+      fs,
+      '/vault',
+      [{ path: 'notas/humana.md', temas: ['lms/cursos'] }],
+      PROVENANCE_OPTS,
+    );
+
+    const updated = await fs.readFile('/vault/notas/humana.md');
+    const meta = readNoteMetadata(updated, 'notas/humana.md');
+    expect(meta.clasificado_por).toBe('Joys');
+    expect(meta.agent).toBe('chamba/classify@1.14.0');
+    expect(meta.author).toBe('Autor Humano'); // untouched
+    expect(meta.written_at).toBeUndefined();
+    expect(meta.estado).toBeUndefined();
+    expect(updated).toContain('Escrita a mano.');
+  });
+
+  it('a human note that already has clasificado_por/agent is not overwritten (add-only)', async () => {
+    const original = `---\ntitle: Nota humana\nclasificado_por: Alguien Mas\nagent: chamba/classify@0.1.0\n---\nCuerpo.\n`;
+    const fs = new MemoryFilesystem({
+      '/vault/temas/VOCABULARIO.md': VOCAB_CONTENT,
+      '/vault/notas/humana.md': original,
+    });
+
+    await classifyApply(
+      fs,
+      '/vault',
+      [{ path: 'notas/humana.md', temas: ['lms/cursos'] }],
+      PROVENANCE_OPTS,
+    );
+
+    const meta = readNoteMetadata(await fs.readFile('/vault/notas/humana.md'), 'notas/humana.md');
+    expect(meta.clasificado_por).toBe('Alguien Mas');
+    expect(meta.agent).toBe('chamba/classify@0.1.0');
+  });
+
+  it('without provenanceOpts, no provenance keys are added at all (back-compat)', async () => {
+    const original = `---\ntitle: Nota\n---\nCuerpo.\n`;
+    const fs = new MemoryFilesystem({
+      '/vault/temas/VOCABULARIO.md': VOCAB_CONTENT,
+      '/vault/notas/nota.md': original,
+    });
+    await classifyApply(fs, '/vault', [{ path: 'notas/nota.md', temas: ['lms/cursos'] }]);
+    const meta = readNoteMetadata(await fs.readFile('/vault/notas/nota.md'), 'notas/nota.md');
+    expect(meta.agent).toBeUndefined();
+    expect(meta.clasificado_por).toBeUndefined();
   });
 });

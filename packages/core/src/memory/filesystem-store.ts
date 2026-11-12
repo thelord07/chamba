@@ -1,3 +1,4 @@
+import { applyProvenancePatch } from '../obsidian/knowledge/provenance.js';
 import type { ClockPort } from '../ports/clock.js';
 import type { FilesystemPort } from '../ports/filesystem.js';
 import { joinPath } from '../util/path.js';
@@ -49,6 +50,19 @@ export class FilesystemMemoryStore implements MemoryStore {
     const now = this.clock.now().toISOString();
     const existing = await this.read(path);
 
+    // CHAMBA-021 S11: a memory with no `agent` key was never written by chamba
+    // (or predates this feature) — D-Q3's "estado absent ⇒ canonico" extends
+    // here: treat it as human-owned and apply provenance add-only.
+    const isChamba = existing === null || existing.agent !== undefined;
+    const patch: Pick<Memory, 'author' | 'agent' | 'written_at' | 'estado' | 'flag'> =
+      input.provenance
+        ? applyProvenancePatch(existing ?? undefined, input.provenance, {
+            isChamba,
+            estado: 'propuesto',
+            ...(input.flagRevisar ? { flag: 'revisar' } : {}),
+          })
+        : {};
+
     let memory: Memory;
     if (existing) {
       memory = {
@@ -58,6 +72,11 @@ export class FilesystemMemoryStore implements MemoryStore {
         updatedAt: now,
         content: `${existing.content.trimEnd()}\n\n## Update ${now}\n\n${input.content.trim()}`,
         path,
+        author: patch.author ?? existing.author,
+        agent: patch.agent ?? existing.agent,
+        written_at: patch.written_at ?? existing.written_at,
+        estado: patch.estado ?? existing.estado,
+        flag: patch.flag ?? existing.flag,
       };
     } else {
       memory = {
@@ -67,6 +86,11 @@ export class FilesystemMemoryStore implements MemoryStore {
         updatedAt: now,
         content: input.content.trim(),
         path,
+        author: patch.author,
+        agent: patch.agent,
+        written_at: patch.written_at,
+        estado: patch.estado,
+        flag: patch.flag,
       };
     }
 
@@ -131,6 +155,11 @@ function render(memory: Memory): string {
     `tags: [${memory.tags.join(', ')}]`,
     `createdAt: ${memory.createdAt}`,
     `updatedAt: ${memory.updatedAt}`,
+    ...(memory.author !== undefined ? [`author: ${memory.author}`] : []),
+    ...(memory.agent !== undefined ? [`agent: ${memory.agent}`] : []),
+    ...(memory.written_at !== undefined ? [`written_at: ${memory.written_at}`] : []),
+    ...(memory.estado !== undefined ? [`estado: ${memory.estado}`] : []),
+    ...(memory.flag !== undefined ? [`flag: ${memory.flag}`] : []),
     '---',
   ].join('\n');
   return `${frontmatter}\n\n${memory.content.trim()}\n`;
@@ -152,6 +181,9 @@ function parse(text: string, path: string): Memory {
     .map((t) => t.trim())
     .filter((t) => t.length > 0);
 
+  const rawEstado = meta.estado;
+  const estado = rawEstado === 'propuesto' || rawEstado === 'canonico' ? rawEstado : undefined;
+
   return {
     key: meta.key ?? slugFromPath(path),
     tags,
@@ -159,6 +191,11 @@ function parse(text: string, path: string): Memory {
     updatedAt: meta.updatedAt ?? meta.createdAt ?? '',
     content: body.trim(),
     path,
+    author: meta.author || undefined,
+    agent: meta.agent || undefined,
+    written_at: meta.written_at || undefined,
+    estado,
+    flag: meta.flag || undefined,
   };
 }
 

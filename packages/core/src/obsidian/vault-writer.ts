@@ -4,6 +4,7 @@ import { joinPath } from '../util/path.js';
 import type { TopicSuggestion } from './knowledge/knowledge-graph.js';
 import type { NoteType } from './knowledge/note-metadata.js';
 import { readNoteMetadata, upsertNoteMetadata } from './knowledge/note-metadata.js';
+import type { Provenance } from './knowledge/provenance.js';
 import type { ReindexReport } from './knowledge/reindexer.js';
 import { VaultReindexer } from './knowledge/reindexer.js';
 import type { ClosestTopicResult } from './knowledge/topics.js';
@@ -50,6 +51,18 @@ export interface WriteNoteInput {
   type?: NoteType;
   /** Project slug (slugifyGitRemote). */
   project?: string;
+
+  // ── CHAMBA-021 S11: provenance ──────────────────────────────────────────────
+  /**
+   * Provenance of this write (author/agent/written_at). When present, the note
+   * gets `estado: propuesto` — every note VaultWriter writes is `source: chamba`,
+   * so there is no human-owned target to protect here (add-only lives in
+   * FilesystemMemoryStore and classifyApply, where a human-authored file can
+   * genuinely sit at the write target).
+   */
+  provenance?: Provenance;
+  /** S5/S11: set `flag: 'revisar'` when `detectInstructionLike` found a match. */
+  flagRevisar?: boolean;
 }
 
 export interface WriteNoteResult {
@@ -195,6 +208,14 @@ export class VaultWriter {
     if (input.project) patch.project = input.project;
     if (autoRelated.length > 0) patch.related = autoRelated;
     if (temasPropuestos.length > 0) patch.temas_propuestos = temasPropuestos;
+
+    if (input.provenance) {
+      if (input.provenance.author !== undefined) patch.author = input.provenance.author;
+      patch.agent = input.provenance.agent;
+      patch.written_at = input.provenance.written_at;
+      patch.estado = 'propuesto';
+      if (input.flagRevisar) patch.flag = 'revisar';
+    }
 
     // Build initial note content (body + heading)
     const heading = `# ${input.title}\n\n${bodyContent.trim()}\n`;
