@@ -9,7 +9,7 @@ import type { FilesystemPort } from '../ports/filesystem.js';
 import type { HashPort } from '../ports/hash.js';
 import { joinPath } from '../util/path.js';
 import type { SyncState } from './plan.js';
-import type { BlockedSecretMap } from './secret-gate.js';
+import type { BlockedSecretMap, ServerBlockedSecretMap } from './secret-gate.js';
 
 // ─── Schema ───────────────────────────────────────────────────────────────────
 
@@ -83,6 +83,53 @@ export const syncStateFileSchema = z.object({
     .optional()
     // Tolerant: a future/older shape of this map must never invalidate the
     // whole state (that would drop `cursor`/`files` and force a full re-sync).
+    .catch(undefined),
+  /**
+   * CHAMBA-023 S5 (D-Q1, owner decision §9): vault-relative paths currently
+   * excluded from push because the SERVER rejected their blob with
+   * `422 secret_detected` — distinct from `blockedSecret` above (which is
+   * the LOCAL gate's own un-allowlisted findings). No `fingerprint`: the
+   * server's 422 only returns `kinds` (CHAMBA-023 plan §1 Open question 4),
+   * so this can never be merged into `blockedSecret` without offering a
+   * broken `allow-secret` hint.
+   *
+   * `hash` is the content hash that was rejected. `allowDigest` (review B3)
+   * is a fingerprint-only digest of what `X-Parche-Secret-Allow` carried for
+   * that hash at rejection time. Hash-based lifecycle (D-Q1(b) + B3): while
+   * the path's CURRENT local hash AND current allowDigest still equal
+   * `hash`/`allowDigest`, the sync gate skips the PUT entirely (retrying the
+   * exact same bytes with the exact same exemptions would just get the exact
+   * same 422) and the entry stays in this map. The moment either changes —
+   * the file is edited (new hash), OR the user exempts a newly-detected
+   * finding for the SAME content via `allow-secret` (new allowDigest) — the
+   * entry is cleared and the file is retried normally on the very next sync.
+   * It is never permanently stuck as long as one of those two things
+   * eventually happens.
+   *
+   * `kinds` is intentionally NOT `.min(1)` (review B2): the server's 422
+   * body is defensively parsed (parche-client.ts) and may legitimately
+   * report `kinds: []` (a malformed or minimal response) — requiring at
+   * least one element here would make THAT ONE path's garbage shape
+   * invalidate the ENTIRE `blockedSecretServer` map on the next `readState`
+   * (the whole object fails `.catch(undefined)`), silently un-blocking every
+   * other still-rejected path too.
+   *
+   * Absent when there are no server-blocked paths (backward-compatible).
+   */
+  blockedSecretServer: z
+    .record(
+      z.string(),
+      z.object({
+        kinds: z.array(z.string()),
+        hash: z.string(),
+        // `.default('')`: an entry missing this field must never invalidate the
+        // whole map through the record-level `.catch(undefined)` (review r2).
+        allowDigest: z.string().default(''),
+        detectedAt: z.string(),
+      }),
+    )
+    .optional()
+    // Tolerant for the same reason as `blockedSecret` above.
     .catch(undefined),
 });
 
@@ -160,6 +207,8 @@ export function toSyncState(file: SyncStateFile): SyncState {
  *   `blockedSecret` map (CHAMBA-021 S6). Pass the freshly computed map on every
  *   write the gate ran for (phases 1 and 3); phase 2 should pass through the
  *   same map computed after phase 1 so it isn't lost.
+ * @param newBlockedSecretServer - Same semantics, for the `blockedSecretServer`
+ *   map (CHAMBA-023 S5) — server-side `422 secret_detected` rejections.
  */
 export function mergeIntoStateFile(
   base: SyncStateFile,
@@ -167,6 +216,7 @@ export function mergeIntoStateFile(
   now: string,
   newSkippedPaths?: Record<string, string>,
   newBlockedSecret?: BlockedSecretMap,
+  newBlockedSecretServer?: ServerBlockedSecretMap,
 ): SyncStateFile {
   const result: SyncStateFile = {
     server: base.server,
@@ -195,6 +245,10 @@ export function mergeIntoStateFile(
   const effectiveBlockedSecret = newBlockedSecret ?? base.blockedSecret;
   if (effectiveBlockedSecret && Object.keys(effectiveBlockedSecret).length > 0) {
     result.blockedSecret = effectiveBlockedSecret;
+  }
+  const effectiveBlockedSecretServer = newBlockedSecretServer ?? base.blockedSecretServer;
+  if (effectiveBlockedSecretServer && Object.keys(effectiveBlockedSecretServer).length > 0) {
+    result.blockedSecretServer = effectiveBlockedSecretServer;
   }
   return result;
 }

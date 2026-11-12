@@ -1072,6 +1072,8 @@ export interface SyncStructuredOutput {
   windowsIncompatibleNames?: string[];
   /** CHAMBA-021 S6: findings for files excluded this sync for a possible secret. */
   blockedBySecret?: Finding[];
+  /** CHAMBA-023 S6: paths the SERVER rejected this sync (`422 secret_detected`). */
+  blockedBySecretServer?: Array<{ path: string; kinds: string[] }>;
 }
 
 /**
@@ -1105,6 +1107,9 @@ export function formatSyncOutput(summary: SyncSummary): SyncStructuredOutput {
   }
   if (summary.blockedBySecret && summary.blockedBySecret.length > 0) {
     result.blockedBySecret = summary.blockedBySecret;
+  }
+  if (summary.blockedBySecretServer && summary.blockedBySecretServer.length > 0) {
+    result.blockedBySecretServer = summary.blockedBySecretServer;
   }
   return result;
 }

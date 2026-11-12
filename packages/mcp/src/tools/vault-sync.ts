@@ -11,6 +11,7 @@ import {
   linkHint,
   readState,
   resolveVaultDir,
+  serverBlockedSecretsSummary,
   syncOnce,
   VaultReindexer,
 } from '@chamba/core';
@@ -154,6 +155,13 @@ export function registerVaultSync(server: McpServer, logger: Logger, services: S
           // secret — sync is successful and partial, like skippedInvalidNames.
           if ((summary.blockedBySecret ?? []).length > 0) {
             for (const line of blockedSecretsSummary(summary.blockedBySecret ?? [])) {
+              results.push(`  ${line}`);
+            }
+          }
+          // CHAMBA-023 S6: server-side rejections (422 secret_detected) — also
+          // never block the sync, reported the same way as local blocks.
+          if ((summary.blockedBySecretServer ?? []).length > 0) {
+            for (const line of serverBlockedSecretsSummary(summary.blockedBySecretServer ?? [])) {
               results.push(`  ${line}`);
             }
           }

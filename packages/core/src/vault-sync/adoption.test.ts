@@ -103,13 +103,27 @@ describe('buildAdoptionSummary', () => {
     expect(summary.blocked[0]?.path).toBe('secret.md');
   });
 
-  it('images and PDFs never appear in blocked, even with a secret-shaped body', async () => {
+  it('CHAMBA-023 D-Q3: a real (binary) image never appears in blocked', async () => {
+    const fs = new MemoryFilesystem();
+    const png = new Uint8Array([
+      0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44,
+      0x52, 0xff, 0xfe, 0xfd, 0xfc,
+    ]);
+    await fs.writeBytes(`${VAULT}/diagram.png`, png);
+    const summary = await buildAdoptionSummary({ fs, hash: new FakeHash() }, VAULT);
+    expect(summary.blocked).toEqual([]);
+  });
+
+  it('CHAMBA-023 D-Q3: a .png/.pdf WITH a secret-shaped body that decodes as UTF-8 IS scanned (content, not extension)', async () => {
     const fs = new MemoryFilesystem({
       [`${VAULT}/looks-like-a-secret.png`]: `token: ${'pch_'}${'A'.repeat(24)}\n`,
       [`${VAULT}/looks-like-a-secret.pdf`]: `token: ${'pch_'}${'A'.repeat(24)}\n`,
     });
     const summary = await buildAdoptionSummary({ fs, hash: new FakeHash() }, VAULT);
-    expect(summary.blocked).toEqual([]);
+    expect(summary.blocked.map((f) => f.path).sort()).toEqual([
+      'looks-like-a-secret.pdf',
+      'looks-like-a-secret.png',
+    ]);
   });
 
   it('excludes a finding already marked as a false positive in the local allowlist', async () => {

@@ -311,6 +311,36 @@ positivos. `chamba_vault_allow_secret` (la tool MCP) nunca escribe la allowlist 
 solo devuelve el comando exacto de CLI, así una nota que intente inyectar instrucciones a un
 agente para que exima un secreto no puede lograrlo.
 
+**El servidor también escanea — y puede rechazar lo que suba.** `vault sync` envía, junto
+con cada archivo, los fingerprints que tu propia allowlist ya exoneró para ese contenido
+(nunca la allowlist completa, nunca un valor) para que el servidor (`parche`) no vuelva a
+bloquear lo que ya revisaste. Si el servidor igual rechaza un blob (`422`), ese archivo queda
+excluido de esa subida — el resto del sync sigue y termina sin error — y `vault status`
+lo lista como **"rechazado por el servidor"**. A diferencia de un bloqueo local, este NO
+ofrece `allow-secret`: el servidor no devuelve el fingerprint del hallazgo, así que no hay
+nada que eximir todavía. El mensaje sugiere actualizar chamba (`npx -y @chamba/mcp@latest`
+— el servidor puede tener reglas más nuevas que tu versión) o directamente quitar el valor
+del archivo; en cuanto el contenido cambia (o el archivo se borra), el siguiente sync lo
+reintenta automáticamente.
+
+**El falso positivo de `token = crypto.randomUUID()` está corregido.** La regla de
+asignaciones (`clave: valor` / `clave = valor`) ya no marca una llamada de función
+(`token = crypto.randomUUID()`), un acceso a miembro (`crypto.randomUUID`) o una ruta de
+archivo (`docs/api-keys.md`) como posible secreto cuando el valor va **sin comillas** — son
+formas de código, no secretos. Un valor **entre comillas** (`token = "crypto.randomUUID()"`)
+sigue marcando igual que siempre: entrecomillar un literal es, por definición, ponerle un
+valor fijo. Esta corrección nunca cambia el fingerprint de un hallazgo que siga
+detectándose, así que ninguna allowlist existente queda invalidada — los hallazgos que dejan
+de dispararse simplemente quedan inertes en tu `.chamba-sync/secret-allowlist.json` (no se
+borran).
+
+**El gate local sigue siendo la única red para lo que nunca se sincroniza.** Rutas como
+`.env*`, `.chamba-sync/` o `.obsidian/workspace*` nunca salen de tu máquina — el servidor
+jamás ve esos bytes y por lo tanto no puede escanearlos. El escáner local (`vault sync` y la
+adopción) es, para esos archivos, la única defensa que existe; una exención del escáner vale
+exactamente igual para lo que sí se sube y para lo que nunca se sube, así que una regla
+demasiado permisiva no se "compensa" después en el servidor.
+
 **Rechazo en tiempo de escritura.** El mismo escáner corre sobre el contenido de cada
 escritura de chamba (`chamba_remember`, `chamba_summarize_to_vault`, `chamba_save_plan`, y
 cualquier otra nota/cuerpo que escriba una tool) *antes* de tocar el disco — un posible
@@ -341,9 +371,12 @@ contraseña corta en prosa plana no matchea nada). Si una credencial ya se subi�
 la atraparas — **rotala**. parche nunca borra blobs una vez escritos (por diseño, para
 historial/corrección de sync), así que quitar el valor de la nota después no des-sube
 retroactivamente lo ya subido; un secreto embebido en el `summary` de una nota bloquea
-también el hub/índice derivado de esa nota, de la misma manera. El escaneo lee cada archivo una vez antes de subirlo; si editas una nota justo en el instante en que un sync la está subiendo, lo subido puede ser la versión nueva (el siguiente sync la vuelve a escanear). Las imágenes rasterizadas y los
-PDFs quedan fuera de alcance — solo se escanean los formatos de texto plano sincronizables
-`.md`/`.canvas`/`.base`/`.svg`.
+también el hub/índice derivado de esa nota, de la misma manera. El escaneo lee cada archivo una vez antes de subirlo; si editas una nota justo en el instante en que un sync la está subiendo, lo subido puede ser la versión nueva (el siguiente sync la vuelve a escanear). El escaneo
+es por **contenido**, no por extensión: cualquier archivo sincronizable (incluidos
+`.pdf`/`.png`/`.jpg`/etc.) se escanea si sus bytes decodifican como texto UTF-8 válido y
+pesan ≤2 MB — igual criterio que usa el servidor. Un binario real (una imagen rasterizada
+de verdad, un PDF con streams comprimidos) nunca decodifica como texto y por lo tanto nunca
+se escanea.
 
 ## Roadmap
 

@@ -149,4 +149,58 @@ describe('chamba_vault_status', () => {
     expect(out.skippedByName).toBe(0);
     await server.close();
   });
+
+  // CHAMBA-023 S6: blockedBySecretServer shown in both structuredContent variants + text
+  it('CHAMBA-023 S6: blockedBySecretServer reflects state.blockedSecretServer (found:true path)', async () => {
+    const stateJson = JSON.stringify({
+      server: 'https://parche.chamba.tools',
+      slug: 'my-vault',
+      cursor: 0,
+      files: {},
+      lastSyncAt: '2026-06-10T00:00:00.000Z',
+      blockedSecretServer: {
+        'c.md': {
+          kinds: ['assignment'],
+          hash: 'h1',
+          allowDigest: '',
+          detectedAt: '2026-06-01T00:00:00.000Z',
+        },
+      },
+    });
+    const parcheJson = JSON.stringify({
+      version: 1,
+      server: 'https://parche.chamba.tools',
+      slug: 'my-vault',
+      vaultDir: '/vault',
+    });
+    const svc = makeServices(
+      {
+        '/vault/.obsidian/app.json': '{}',
+        '/vault/note.md': '# Note\n',
+        '/vault/.chamba-sync/state.json': stateJson,
+        '/home/test/.chamba/parche.json': parcheJson,
+      },
+      '/vault',
+    );
+
+    const { client, server } = await connect(svc);
+    const result = await client.callTool({ name: 'chamba_vault_status', arguments: {} });
+    const out = structured(result);
+
+    expect(out.found).toBe(true);
+    expect(out.blockedBySecretServer).toBe(1);
+    const text = (result as { content: Array<{ text: string }> }).content[0]?.text ?? '';
+    expect(text).toContain('Rechazado por el servidor por posible secreto: 1 archivo(s)');
+    expect(text).toContain('c.md (assignment)');
+
+    await server.close();
+  });
+
+  it('CHAMBA-023 S6: blockedBySecretServer is 0 in the found:false structuredContent when no vault is found', async () => {
+    const { client, server } = await connect(makeServices({}));
+    const out = structured(await client.callTool({ name: 'chamba_vault_status', arguments: {} }));
+    expect(out.found).toBe(false);
+    expect(out.blockedBySecretServer).toBe(0);
+    await server.close();
+  });
 });

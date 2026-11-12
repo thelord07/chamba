@@ -1046,6 +1046,69 @@ describe('scanLocal', () => {
     expect(Object.keys(snapshot)).toHaveLength(1);
     expect(snapshot['real.md']).toBeDefined();
   });
+
+  // ── CHAMBA-023 D-Q3: precompute findings on the same bytes read for the hash ──
+
+  it('with knownHashes, a NEW file (not in knownHashes) is scanned and findingsByPath records it', async () => {
+    const hash = new FakeHash();
+    const fs = new MemoryFilesystem();
+    await fs.writeBytes(`${VAULT}/note.md`, new TextEncoder().encode('# hello\n'));
+
+    const { snapshot, findingsByPath } = await scanLocal({ fs, hash }, VAULT, {});
+    const h = snapshot['note.md'];
+    expect(h).toBeDefined();
+    const entry = findingsByPath.get('note.md');
+    expect(entry).toBeDefined();
+    expect(entry?.hash).toBe(h);
+    expect(entry?.scanned).toBe(true);
+    expect(entry?.findings).toEqual([]);
+  });
+
+  it('with knownHashes, an UNCHANGED file (same hash) is NOT in findingsByPath at all', async () => {
+    const hash = new FakeHash();
+    const fs = new MemoryFilesystem();
+    const bytes = new TextEncoder().encode('# unchanged\n');
+    await fs.writeBytes(`${VAULT}/note.md`, bytes);
+    const h = await hash.sha256(bytes);
+
+    const { findingsByPath } = await scanLocal({ fs, hash }, VAULT, { 'note.md': h });
+    expect(findingsByPath.has('note.md')).toBe(false);
+  });
+
+  it('with knownHashes, a CHANGED file with a secret is scanned and the finding is recorded', async () => {
+    const hash = new FakeHash();
+    const fs = new MemoryFilesystem();
+    const secretBody = `token: ${'pch_'}${'A'.repeat(24)}\n`;
+    await fs.writeBytes(`${VAULT}/note.md`, new TextEncoder().encode(secretBody));
+
+    const { findingsByPath } = await scanLocal({ fs, hash }, VAULT, { 'note.md': 'some-old-hash' });
+    const entry = findingsByPath.get('note.md');
+    expect(entry?.scanned).toBe(true);
+    expect(entry?.findings.length).toBeGreaterThan(0);
+  });
+
+  it('with knownHashes, a binary file is marked scanned:false, never decoded', async () => {
+    const hash = new FakeHash();
+    const fs = new MemoryFilesystem();
+    const png = new Uint8Array([
+      0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44,
+      0x52, 0xff, 0xfe, 0xfd, 0xfc,
+    ]);
+    await fs.writeBytes(`${VAULT}/img.png`, png);
+
+    const { findingsByPath } = await scanLocal({ fs, hash }, VAULT, {});
+    const entry = findingsByPath.get('img.png');
+    expect(entry?.scanned).toBe(false);
+    expect(entry?.findings).toEqual([]);
+  });
+
+  it('without knownHashes (omitted), findingsByPath is always empty — no behavior change for other callers', async () => {
+    const hash = new FakeHash();
+    const fs = new MemoryFilesystem();
+    await fs.writeBytes(`${VAULT}/note.md`, new TextEncoder().encode('# hello\n'));
+    const { findingsByPath } = await scanLocal({ fs, hash }, VAULT);
+    expect(findingsByPath.size).toBe(0);
+  });
 });
 
 // ─── Additional: no /push call when plan is empty ────────────────────────────
@@ -1817,7 +1880,7 @@ describe('CHAMBA-014 Test 2 — rondas de 422', () => {
     expect(parche.livePaths(group.id).size).toBe(3);
   });
 
-  it('missing set keeps shrinking but needs a 4th round → stops at the 3-round cap', async () => {
+  it('CHAMBA-023 S4 (B4/N1 — progress by containment): a shrinking-but-already-PUT missing set aborts on the FIRST redundant round, not the 3-round cap', async () => {
     const parche = new FakeParche(makeClock());
     const group = setupGroup(parche);
     const token = makeToken(parche, group);
@@ -1831,7 +1894,21 @@ describe('CHAMBA-014 Test 2 — rondas de 422', () => {
       hs.push(await hash.sha256(bytes));
       await fs.writeBytes(`${VAULT}/cap${i}.md`, bytes);
     }
-    // 422 sets: {1,2,3,4} → {1,2,3} → {1,2} → {1}: always shrinking, so only the cap stops it.
+    // 422 sets: {1,2,3,4} → {1,2,3} → {1,2}: always shrinking.
+    //
+    // Pre-CHAMBA-023, the guard compared SET SIZE round over round, so this
+    // kept "making progress" for 3 rounds before the hard cap stopped it
+    // (4 push calls total). CHAMBA-023 S4 (review ronda 2, B4/N1) replaces
+    // that with "progress by containment": round 1 PUTs h1-h4 (all genuinely
+    // missing — the first attempt always sees every locally-changed hash as
+    // missing, since nothing has been uploaded yet). Round 2 re-reports
+    // {h1,h2,h3} — review item 5 gives each a SECOND PUT attempt before
+    // treating it as fully handled, so round 2 still makes progress (not an
+    // abort). Round 3 re-reports {h1,h2} — both now have 2/2 attempts used
+    // (fully handled) → the guard throws right there instead of burning
+    // through to the 3-round hard cap. 3 `/push` calls happen (not 4, and
+    // not 2 — review item 5 buys exactly one extra round over the original
+    // B4/N1 design).
     const [h1, h2, h3, h4] = hs as [string, string, string, string];
     parche.rejectPushBlobsOnce([h1, h1, h1, h1, h2, h2, h2, h3, h3, h4]);
 
@@ -1839,7 +1916,7 @@ describe('CHAMBA-014 Test 2 — rondas de 422', () => {
       /no se pudo completar el push: faltan blobs/,
     );
     const pushCalls = parche.requestLog.filter((r) => r.url.includes('/push'));
-    expect(pushCalls).toHaveLength(4);
+    expect(pushCalls).toHaveLength(3);
     expect(await readState(fs, VAULT)).toBeNull();
   });
 

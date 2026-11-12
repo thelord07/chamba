@@ -45,6 +45,9 @@ export function registerVaultStatus(server: McpServer, logger: Logger, services:
       // CHAMBA-021 S8: report possible-secret blocks for the active binding's vault
       let blockedSecretCount = 0;
       const blockedSecretLines: string[] = [];
+      // CHAMBA-023 S6: paths the SERVER itself rejected (422 secret_detected)
+      let blockedSecretServerCount = 0;
+      const blockedSecretServerLines: string[] = [];
       if (binding?.vaultDir) {
         try {
           const vaultState = await readState(services.fs, binding.vaultDir);
@@ -55,6 +58,11 @@ export function registerVaultStatus(server: McpServer, logger: Logger, services:
             for (const f of entry.findings) {
               blockedSecretLines.push(`  - ${path}:${f.line} (${f.kind})`);
             }
+          }
+          const blockedServerEntries = Object.entries(vaultState?.blockedSecretServer ?? {});
+          blockedSecretServerCount = blockedServerEntries.length;
+          for (const [path, entry] of blockedServerEntries) {
+            blockedSecretServerLines.push(`  - ${path} (${entry.kinds.join(', ')})`);
           }
         } catch {
           // Non-fatal: directory may not exist yet
@@ -103,6 +111,7 @@ export function registerVaultStatus(server: McpServer, logger: Logger, services:
             found: false,
             skippedByName,
             blockedBySecret: blockedSecretCount,
+            blockedBySecretServer: blockedSecretServerCount,
             workspaceRoot: wsRoot,
             workspaceRootSource: wsRootSource,
             binding: binding
@@ -131,6 +140,11 @@ export function registerVaultStatus(server: McpServer, logger: Logger, services:
       const blockedSecretLine =
         blockedSecretCount > 0
           ? `\nPosibles secretos bloqueados: ${blockedSecretCount} archivo(s)\n${blockedSecretLines.join('\n')}`
+          : '';
+      // CHAMBA-023 S6
+      const blockedSecretServerLine =
+        blockedSecretServerCount > 0
+          ? `\nRechazado por el servidor por posible secreto: ${blockedSecretServerCount} archivo(s)\n${blockedSecretServerLines.join('\n')}`
           : '';
 
       // Knowledge network summary (read-only, dryRun:true)
@@ -162,7 +176,7 @@ export function registerVaultStatus(server: McpServer, logger: Logger, services:
       const text =
         lines.join('\n') +
         `Vault: ${detection.path} (${source})\n` +
-        `Notes chamba can see: ${names.length}${skippedLine}${blockedSecretLine}${knowledgeLine}${governanceLine}\n\n${shown.map((n) => `- ${n}`).join('\n')}${more}` +
+        `Notes chamba can see: ${names.length}${skippedLine}${blockedSecretLine}${blockedSecretServerLine}${knowledgeLine}${governanceLine}\n\n${shown.map((n) => `- ${n}`).join('\n')}${more}` +
         (names.length === 0
           ? '\n\n⚠️ No notes found. If your path ends in `.obsidian`, point it at the parent folder instead.'
           : '');
@@ -176,6 +190,7 @@ export function registerVaultStatus(server: McpServer, logger: Logger, services:
           noteCount: names.length,
           skippedByName,
           blockedBySecret: blockedSecretCount,
+          blockedBySecretServer: blockedSecretServerCount,
           notes: shown,
           workspaceRoot: wsRoot,
           workspaceRootSource: wsRootSource,

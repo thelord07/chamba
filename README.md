@@ -311,6 +311,34 @@ confirms its own false positives. `chamba_vault_allow_secret` (the MCP tool) nev
 the allowlist itself; it only hands back the exact CLI command, so a note that tries to
 prompt-inject an agent into exempting a secret can't succeed.
 
+**The server scans too — and can reject what you push.** `vault sync` sends, alongside each
+file, the fingerprints your own allowlist already exempted for that content (never the full
+allowlist, never a value) so the server (`parche`) doesn't re-block what you already
+reviewed. If the server still rejects a blob (`422`), that file is excluded from that push —
+the rest of the sync continues and ends without an error — and `vault status` lists it as
+**"rejected by the server"**. Unlike a local block, this does NOT offer `allow-secret`: the
+server doesn't return the finding's fingerprint, so there's nothing to exempt yet. The
+message suggests updating chamba (`npx -y @chamba/mcp@latest` — the server may have newer
+rules than your version) or simply removing the value from the file; once the content
+changes (or the file is deleted), the next sync retries it automatically.
+
+**The `token = crypto.randomUUID()` false positive is fixed.** The assignment rule
+(`key: value` / `key = value`) no longer flags a function call (`token =
+crypto.randomUUID()`), a member access (`crypto.randomUUID`) or a file path
+(`docs/api-keys.md`) as a possible secret when the value is **unquoted** — those are code
+shapes, not secrets. A **quoted** value (`token = "crypto.randomUUID()"`) still matches
+exactly as before: quoting a literal is, by definition, giving it a fixed value. This fix
+never changes the fingerprint of a finding that still gets detected, so no existing
+allowlist is invalidated — findings that stop firing simply go inert in your
+`.chamba-sync/secret-allowlist.json` (nothing is deleted).
+
+**The local gate is still the only net for anything that never syncs.** Paths like
+`.env*`, `.chamba-sync/` or `.obsidian/workspace*` never leave your machine — the server
+never sees those bytes, so it can't scan them either. For those files, the local scanner
+(`vault sync` and adoption) is the only defense that exists; an exemption in the scanner's
+rules applies equally to what does get uploaded and to what never does, so an overly
+permissive rule can't be "made up for" later on the server.
+
 **Write-time rejection.** The same scanner runs on the content of every chamba write
 (`chamba_remember`, `chamba_summarize_to_vault`, `chamba_save_plan`, and any other note/body
 a tool writes) *before* anything touches disk — a possible secret is rejected outright, with
@@ -338,7 +366,7 @@ match anything). If a credential was already uploaded before you caught it — *
 parche never deletes blobs once written (by design, for history/sync correctness), so
 removing the value from the note afterwards does not retroactively un-upload it; a secret
 embedded in a note's `summary` blocks the hub/index derived from that note too, the same way.
-The scan reads each file once before uploading it; if you edit a note in the exact instant a sync is uploading it, the uploaded bytes may be the newer ones (the next sync rescans them). Raster images and PDFs are out of scope — only the syncable plaintext formats `.md`/`.canvas`/`.base`/`.svg` are scanned.
+The scan reads each file once before uploading it; if you edit a note in the exact instant a sync is uploading it, the uploaded bytes may be the newer ones (the next sync rescans them). Scanning is by **content**, not extension: any syncable file (including `.pdf`/`.png`/`.jpg`/etc.) is scanned if its bytes decode as valid UTF-8 text and weigh ≤2 MB — the same criterion the server uses. A genuinely binary file (a real raster image, a PDF with compressed streams) never decodes as text and is therefore never scanned.
 
 ## Packages
 

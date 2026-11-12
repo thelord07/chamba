@@ -82,6 +82,29 @@ export class ParcheCaseCollisionError extends ParcheHttpError {
 }
 
 /**
+ * CHAMBA-023 S2: thrown when `PUT /api/blob/:hash` returns
+ * `422 {error: 'secret_detected', kinds}` — the server's own secret scan
+ * rejected this blob's content, independent of the client's allowlist (the
+ * client already sent every fingerprint it has allowlisted for this content
+ * via `X-Parche-Secret-Allow`; the server still found something it did not
+ * recognize as covered). `kinds` is the server's classification (e.g.
+ * `['assignment', 'stripe-secret-key']`) — never the value, never a
+ * fingerprint (the server protocol does not return one, see CHAMBA-023 plan
+ * §1 Open question 4). The message never includes the path or the value —
+ * callers attach path/line context themselves (see `messages.ts`).
+ */
+export class ParcheSecretDetectedError extends ParcheHttpError {
+  override name = 'ParcheSecretDetectedError';
+  constructor(
+    status: number,
+    body: unknown,
+    public readonly kinds: string[],
+  ) {
+    super(status, body, `Blob rejected: secret_detected (${kinds.join(', ')})`);
+  }
+}
+
+/**
  * Thrown by RetryingHttp (adapters) when a network operation fails after all
  * retry attempts. Never includes query strings, headers, token or body — only
  * the host (from URL), attempt count, error code and a short human-readable
@@ -143,6 +166,61 @@ function parseJson(body: Uint8Array): unknown {
   } catch {
     return null;
   }
+}
+
+// ─── X-Parche-Secret-Allow header (CHAMBA-023 S2) ─────────────────────────────
+
+/** HTTP header carrying the fingerprints already allowlisted for this blob's content. */
+export const SECRET_ALLOW_HEADER = 'X-Parche-Secret-Allow';
+
+/** A fingerprint is always 12 lowercase hex chars (`fingerprintOf` in scanner.ts). */
+const FINGERPRINT_RE = /^[0-9a-f]{12}$/;
+
+/** Max byte length of the `X-Parche-Secret-Allow` header VALUE (CHAMBA-023 plan §1.4, D-Q4). */
+const MAX_HEADER_BYTES = 4096;
+
+/**
+ * Build the `X-Parche-Secret-Allow` header value from a list of fingerprints.
+ *
+ * Defense in depth (CHAMBA-023 plan §1.5): `secret-allowlist.json` is a
+ * user-editable file whose `fingerprint` field is `z.string().min(1)` — not
+ * constrained to the 12-hex-char shape fingerprints actually have. If a
+ * caller ever passed allowlist-derived strings straight through, a value
+ * containing `\r\n` would be a header-injection vector. Only strings matching
+ * `/^[0-9a-f]{12}$/` are allowed through; everything else is silently
+ * dropped (fail-closed: a dropped fingerprint just means that finding is
+ * treated as NOT exempted by the server, which is always safe).
+ *
+ * Deterministic: deduplicated, then sorted ascending (makes tests and any
+ * byte-level comparison stable). Truncated so the joined value never exceeds
+ * `MAX_HEADER_BYTES` — fail-closed by construction (plan §1.4): a truncated
+ * list is a SUBSET of what's really allowlisted, so the server either
+ * accepts (fine) or 422s for the fingerprints that didn't fit, which is
+ * handled by `ParcheSecretDetectedError` like any other divergence, never an
+ * unintended upload.
+ *
+ * Returns `undefined` when there is nothing valid to send (caller omits the
+ * header entirely).
+ */
+function buildSecretAllowHeaderValue(fingerprints: readonly string[]): string | undefined {
+  const valid = [...new Set(fingerprints.filter((fp) => FINGERPRINT_RE.test(fp)))].sort();
+  if (valid.length === 0) return undefined;
+
+  let value = '';
+  for (const fp of valid) {
+    const candidate = value.length === 0 ? fp : `${value},${fp}`;
+    if (encoder.encode(candidate).byteLength > MAX_HEADER_BYTES) break;
+    value = candidate;
+  }
+  return value.length > 0 ? value : undefined;
+}
+
+/** Defensive parse of the `kinds` array from a `422 secret_detected` body. */
+function parseSecretDetectedKinds(json: unknown): string[] {
+  if (json === null || typeof json !== 'object') return [];
+  const kinds = (json as { kinds?: unknown }).kinds;
+  if (!Array.isArray(kinds)) return [];
+  return kinds.filter((k): k is string => typeof k === 'string');
 }
 
 // ─── ParcheClient ─────────────────────────────────────────────────────────────
@@ -242,17 +320,48 @@ export class ParcheClient {
     throw new ParcheHttpError(res.status, json, `Unexpected HEAD blob response: ${res.status}`);
   }
 
-  /** PUT /api/blob/:hash — upload a blob. Returns 200 (already existed) or 201 (created). */
-  async putBlob(hash: string, data: Uint8Array, signal?: AbortSignal): Promise<void> {
+  /**
+   * PUT /api/blob/:hash — upload a blob. Returns 200 (already existed) or 201 (created).
+   *
+   * CHAMBA-023 S2: `opts.allowFingerprints` lists the fingerprints the LOCAL
+   * gate already allowlisted for THIS content (computed by `screenPushEntries`,
+   * see secret-gate.ts) — never the full allowlist, never another path's
+   * fingerprints. Sent via `X-Parche-Secret-Allow` so the server's own secret
+   * scan can skip findings the user already reviewed. The header is omitted
+   * entirely when there is nothing valid to send.
+   *
+   * A `422 {error: 'secret_detected', kinds}` response (the server found an
+   * un-exempted secret) throws `ParcheSecretDetectedError`, distinct from
+   * every other 4xx/5xx (still `ParcheHttpError`, unchanged).
+   */
+  async putBlob(
+    hash: string,
+    data: Uint8Array,
+    signal?: AbortSignal,
+    opts?: { allowFingerprints?: readonly string[] },
+  ): Promise<void> {
+    const headerValue = buildSecretAllowHeaderValue(opts?.allowFingerprints ?? []);
     const res = await this.req({
       method: 'PUT',
       url: this.url(`/api/blob/${hash}`),
-      headers: { ...this.authHeader(), 'Content-Type': 'application/octet-stream' },
+      headers: {
+        ...this.authHeader(),
+        'Content-Type': 'application/octet-stream',
+        ...(headerValue !== undefined ? { [SECRET_ALLOW_HEADER]: headerValue } : {}),
+      },
       body: data,
       signal,
     });
     if (res.status === 200 || res.status === 201) return;
     const json = parseJson(res.body);
+    if (
+      res.status === 422 &&
+      json !== null &&
+      typeof json === 'object' &&
+      (json as { error?: unknown }).error === 'secret_detected'
+    ) {
+      throw new ParcheSecretDetectedError(422, json, parseSecretDetectedKinds(json));
+    }
     throw new ParcheHttpError(res.status, json, `Unexpected PUT blob response: ${res.status}`);
   }
 

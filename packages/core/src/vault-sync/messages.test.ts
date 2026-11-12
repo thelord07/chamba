@@ -16,6 +16,8 @@ import {
   linkDirPlaceholderHint,
   linkHint,
   REDACTED_PLACEHOLDER,
+  serverBlockedSecretMessage,
+  serverBlockedSecretsSummary,
   syncManualHint,
   unlinkWorkspaceHint,
   VAULT_CLI,
@@ -140,6 +142,62 @@ describe('blockedSecretsSummary', () => {
     expect(lines[0]).toContain('13 archivo(s)');
     expect(lines).toHaveLength(1 + 10 + 1);
     expect(lines.at(-1)).toBe('y 3 más');
+  });
+});
+
+// ─── Server-side rejection messages (CHAMBA-023 S6, D-Q1) ───────────────────
+
+describe('serverBlockedSecretMessage', () => {
+  it('matches the exact D-Q1(a) format: no allow-secret hint, suggests updating chamba', () => {
+    const msg = serverBlockedSecretMessage({ path: 'informes/x.md', kinds: ['assignment', 'jwt'] });
+    expect(msg).toBe(
+      '⛔ el servidor rechazó por posible secreto: informes/x.md (assignment, jwt). ' +
+        'Revisa el archivo y quita el valor; si crees que es un falso positivo, ' +
+        'actualiza chamba (`npx -y @chamba/mcp@latest`) y avisa al dueño del parche.',
+    );
+    expect(msg).not.toContain('allow-secret');
+  });
+
+  it('omits the parenthetical when kinds is empty', () => {
+    const msg = serverBlockedSecretMessage({ path: 'informes/x.md', kinds: [] });
+    expect(msg).toBe(
+      '⛔ el servidor rechazó por posible secreto: informes/x.md. ' +
+        'Revisa el archivo y quita el valor; si crees que es un falso positivo, ' +
+        'actualiza chamba (`npx -y @chamba/mcp@latest`) y avisa al dueño del parche.',
+    );
+  });
+
+  it('a single kind renders without a comma', () => {
+    const msg = serverBlockedSecretMessage({ path: 'a.md', kinds: ['stripe-secret-key'] });
+    expect(msg).toContain('(stripe-secret-key)');
+  });
+
+  it('never contains a secret value', () => {
+    const msg = serverBlockedSecretMessage({ path: 'a.md', kinds: ['assignment'] });
+    expect(msg).not.toMatch(/sk_live_|pch_|AKIA/);
+  });
+});
+
+describe('serverBlockedSecretsSummary', () => {
+  it('returns [] for no blocked paths', () => {
+    expect(serverBlockedSecretsSummary([])).toEqual([]);
+  });
+
+  it('caps detail lines at 10 and adds a "y N más" tail', () => {
+    const many = Array.from({ length: 13 }, (_, i) => ({ path: `n${i}.md`, kinds: ['jwt'] }));
+    const lines = serverBlockedSecretsSummary(many);
+    expect(lines[0]).toContain('13 archivo(s)');
+    expect(lines).toHaveLength(1 + 10 + 1);
+    expect(lines.at(-1)).toBe('y 3 más');
+  });
+
+  it('never contains a secret value across a list of findings', () => {
+    const list = [
+      { path: 'a.md', kinds: ['stripe-secret-key'] },
+      { path: 'b.md', kinds: ['assignment'] },
+    ];
+    const lines = serverBlockedSecretsSummary(list).join('\n');
+    expect(lines).not.toMatch(/sk_live_|pch_|AKIA/);
   });
 });
 

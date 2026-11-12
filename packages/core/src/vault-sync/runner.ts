@@ -17,6 +17,7 @@ import type { HashPort } from '../ports/hash.js';
 import type { HttpPort } from '../ports/http.js';
 import { readSecretAllowlist } from '../secrets/allowlist.js';
 import type { Finding } from '../secrets/scanner.js';
+import { scanText, shouldScanContent } from '../secrets/scanner.js';
 import { detectStyle, isInvalidPath } from '../util/local-path.js';
 import { joinPath } from '../util/path.js';
 import { addConflictFrontmatter, readConflictMeta } from './conflict.js';
@@ -27,12 +28,19 @@ import {
   ParcheClient,
   ParcheHttpError,
   ParcheMissingBlobsError,
+  ParcheSecretDetectedError,
 } from './parche-client.js';
 import { findCaseCollisions } from './path-key.js';
 import type { PullAction, PushEntry, SyncState } from './plan.js';
 import { applyPullPlan, applyPushResults, planPull, planPush } from './plan.js';
 import type { ChangeEntry, JoinRequest } from './protocol.js';
-import { computeBlockedSecretMap, screenPushEntries } from './secret-gate.js';
+import type { PrecomputedFileFindings, ServerBlockedBlob } from './secret-gate.js';
+import {
+  allowDigestOf,
+  computeBlockedSecretMap,
+  computeServerBlockedMap,
+  screenPushEntries,
+} from './secret-gate.js';
 import type { SyncStateFile } from './state-store.js';
 import {
   clearPendingAdoption,
@@ -124,6 +132,16 @@ export interface SyncSummary {
    * Optional for backward-compatibility with code that constructs a partial summary.
    */
   blockedBySecret?: Finding[];
+  /**
+   * CHAMBA-023 S4: paths excluded from this sync's push because the SERVER
+   * rejected their blob with `422 secret_detected` (phases 1 and 3
+   * combined, deduplicated by path) — distinct from `blockedBySecret`
+   * above, which is the LOCAL gate's own un-allowlisted findings. No
+   * `hash` here (unlike the state map) — callers of the summary only need
+   * path + kinds to report it. The sync still finishes OK: this never adds
+   * to `errors`.
+   */
+  blockedBySecretServer?: Array<{ path: string; kinds: string[] }>;
 }
 
 /** Local snapshot: path → sha256 hex */
@@ -189,14 +207,31 @@ export class AdoptionPendingError extends Error {
 /**
  * Scan the vault directory, hash every syncable file, and return a snapshot.
  * Throws `CaseCollisionError` if any paths collide case-insensitively.
+ *
+ * CHAMBA-023 D-Q3 (owner decision §9): when `knownHashes` is given (the
+ * previous `syncedHash` per path, from `SyncState.files`), this ALSO scans
+ * for secrets right here, on the SAME bytes it just read to compute the
+ * hash — no extra read, no buffer retained past this one iteration. A path
+ * is only scanned when its hash differs from `knownHashes[path]` (new or
+ * changed content; unknown paths count as changed) — unchanged files are
+ * never rescanned. The result, `findingsByPath`, is handed to
+ * `screenPushEntries` (secret-gate.ts), which uses it when the hash still
+ * matches and falls back to reading the file itself otherwise (e.g. a
+ * phase-3 conflict copy this walk didn't know about yet).
  */
 export async function scanLocal(
   deps: Pick<SyncDeps, 'fs' | 'hash'>,
   vaultDir: string,
-): Promise<{ snapshot: LocalSnapshot; blobSource: Map<string, string> }> {
+  knownHashes?: Record<string, string | null>,
+): Promise<{
+  snapshot: LocalSnapshot;
+  blobSource: Map<string, string>;
+  findingsByPath: Map<string, PrecomputedFileFindings>;
+}> {
   const { fs, hash } = deps;
   const snapshot: LocalSnapshot = {};
   const blobSource = new Map<string, string>(); // hash → vault-absolute path
+  const findingsByPath = new Map<string, PrecomputedFileFindings>();
 
   async function walk(dir: string, relDir: string): Promise<void> {
     let entries: Awaited<ReturnType<FilesystemPort['readDir']>>;
@@ -219,6 +254,16 @@ export async function scanLocal(
         const h = await hash.sha256(bytes);
         snapshot[normalizedRel] = h;
         blobSource.set(h, absPath);
+
+        if (knownHashes !== undefined && knownHashes[normalizedRel] !== h) {
+          const text = shouldScanContent(bytes, normalizedRel);
+          if (text !== null) {
+            const findings = await scanText({ hash }, text, normalizedRel);
+            findingsByPath.set(normalizedRel, { hash: h, findings, scanned: true });
+          } else {
+            findingsByPath.set(normalizedRel, { hash: h, findings: [], scanned: false });
+          }
+        }
       }
     }
   }
@@ -230,7 +275,7 @@ export async function scanLocal(
     throw new CaseCollisionError(collisions);
   }
 
-  return { snapshot, blobSource };
+  return { snapshot, blobSource, findingsByPath };
 }
 
 // ─── checkAbort ───────────────────────────────────────────────────────────────
@@ -285,12 +330,19 @@ function missingBlobsError(hashes: string[]): Error {
 
 /**
  * Push all entries in batches of ≤batchSize using a push-first strategy.
- * Returns updated SyncState.
+ * Returns the updated SyncState plus every blob the SERVER rejected as a
+ * possible secret this call (CHAMBA-023 S4).
  *
  * Flow per batch:
  *   push → if 422 missing_blobs: PUT only the reported hashes (dedup, in reported
- *   order) → retry push. Repeat while the set of missing blobs reduces, up to
- *   MAX_422_ROUNDS rounds of 422 per batch.
+ *   order) → retry push. Repeat until every missing hash this round is already
+ *   FULLY handled — rejected as a secret (1 attempt, never retried), or PUT
+ *   successfully and then re-reported missing again (2 attempts max, review
+ *   item 5) — "progress by containment" (review ronda 2, N1) — up to
+ *   MAX_422_ROUNDS rounds per batch regardless of whether progress is still
+ *   being made (e.g. 4+ distinct hashes each reported missing one at a time,
+ *   never repeating, still stops at round 3 — the cap is a hard ceiling on
+ *   round-trips, not just a stall detector).
  *
  * Safety (parche/src/routes/push.ts): 422 is returned before the transaction, so
  * nothing is written on 422. Push is idempotent: if the row already exists with
@@ -298,9 +350,27 @@ function missingBlobsError(hashes: string[]): Error {
  * later batch fails, state is not written and the next sync re-pushes all batches —
  * idempotent by protocol (§3), so the re-push returns ok with the existing seq.
  *
+ * CHAMBA-023 S4 (secret rejection):
+ *  - `allowFingerprintsByHash` is forwarded to every `putBlob` call so the
+ *    server can skip findings already exempted locally for that content.
+ *  - `rejectedHashes` is a `hash → kinds` map SHARED across every batch AND
+ *    across phase 1 and phase 3 (the caller owns it): once a hash is
+ *    rejected here, it is never PUT again this sync, in any batch, in any
+ *    phase — every entry (any path) carrying that hash is excluded from its
+ *    batch's push request and reported in the returned `serverBlocked`
+ *    list instead.
+ *  - A rejected hash's entries are removed from the CURRENT batch too
+ *    (mid-retry-loop) so the retried `push()` never asks the server about
+ *    it again.
+ *  - B3 (review ronda 1): if excluding rejected entries leaves a batch
+ *    empty, `push()`/`applyPushResults` are skipped entirely for that
+ *    batch slice (never send an empty `changes` array — `pushRequestSchema`
+ *    requires ≥1) and the loop moves on to the next batch.
+ *
  * Throws without writing state when:
  *  - A hash reported as missing has no local source.
- *  - The set of missing hashes does not reduce vs the previous round.
+ *  - Every hash the server reports missing this round was already handled
+ *    (PUT ok or rejected) in a prior round — no real progress.
  *  - MAX_422_ROUNDS rounds of 422 are exhausted.
  */
 async function pushAll(
@@ -311,22 +381,62 @@ async function pushAll(
   blobSource: Map<string, string>,
   fs: FilesystemPort,
   batchSize: number,
+  allowFingerprintsByHash: Map<string, string[]>,
+  rejectedHashes: Map<string, string[]>,
   signal?: AbortSignal,
-): Promise<SyncState> {
-  if (entries.length === 0) return state;
+): Promise<{ state: SyncState; serverBlocked: ServerBlockedBlob[] }> {
+  const serverBlocked: ServerBlockedBlob[] = [];
+  if (entries.length === 0) return { state, serverBlocked };
 
   const MAX_422_ROUNDS = 3;
   let currentState = state;
 
   for (let i = 0; i < entries.length; i += batchSize) {
     checkAbort(signal);
-    const batch = entries.slice(i, i + batchSize);
+
+    // Never re-send bytes already rejected earlier THIS SYNC (any batch, any
+    // phase) — report them again (one entry per path sharing the hash) and
+    // drop them from this batch before even attempting a push.
+    let batch: PushEntry[] = [];
+    for (const e of entries.slice(i, i + batchSize)) {
+      const kinds = e.newHash !== null ? rejectedHashes.get(e.newHash) : undefined;
+      if (e.newHash !== null && kinds !== undefined) {
+        serverBlocked.push({
+          path: e.path,
+          hash: e.newHash,
+          kinds,
+          allowDigest: allowDigestOf(allowFingerprintsByHash.get(e.newHash)),
+        });
+      } else {
+        batch.push(e);
+      }
+    }
+
+    // B3: nothing left to push in this batch slice — skip push()/applyPushResults
+    // entirely (an empty `changes` array fails pushRequestSchema's min(1)).
+    let batchSkipped = batch.length === 0;
 
     let roundsDone = 0;
-    let prevMissingSet: Set<string> | null = null;
     let batchResponse: Awaited<ReturnType<ParcheClient['push']>> | undefined;
+    // Hashes rejected as a secret THIS batch — handled immediately (there is
+    // no point retrying the exact same bytes with the exact same exemptions).
+    const secretRejected = new Set<string>();
+    // Hashes PUT successfully THIS batch, with a count of how many times
+    // (review item 5): a hash that succeeded once but the server STILL
+    // reports as missing on a LATER round gets ONE retry (2 total PUT
+    // attempts) before it's treated as "no further progress possible" —
+    // real servers shouldn't do this, but a flaky/eventually-consistent one
+    // might, and one extra attempt is cheap insurance against treating that
+    // as a hard failure prematurely.
+    const putSuccessCount = new Map<string, number>();
+    const MAX_PUT_ATTEMPTS_AFTER_SUCCESS = 2;
 
-    for (;;) {
+    // "Nothing more to try for this hash" — either it was rejected as a
+    // secret (never retried) or it already got its 2 PUT attempts in.
+    const isFullyHandled = (h: string): boolean =>
+      secretRejected.has(h) || (putSuccessCount.get(h) ?? 0) >= MAX_PUT_ATTEMPTS_AFTER_SUCCESS;
+
+    while (!batchSkipped) {
       checkAbort(signal);
       let pushErr: unknown;
       try {
@@ -348,40 +458,73 @@ async function pushAll(
           missingHashes.push(h);
         }
       }
-      const missingSet = new Set(missingHashes);
 
       // Any missing hash without a local source → cannot complete; don't write state
       const noSource = missingHashes.filter((h) => !blobSource.has(h));
       if (noSource.length > 0) throw missingBlobsError(noSource);
 
-      // Set didn't reduce vs previous round (§4.0: by size; the 3-round cap bounds the rest)
-      if (prevMissingSet !== null && missingSet.size >= prevMissingSet.size) {
+      // Progress-by-containment (B4/N1, review ronda 2; item 5 refines what
+      // "handled" means): every missing hash this round is already fully
+      // handled (secret-rejected, or already got its 2 PUT attempts) → the
+      // server isn't reporting anything actionable, no point retrying.
+      // Terminates: when this does NOT throw, at least one hash below is
+      // not yet fully handled, so progress strictly accrues every round it's
+      // reached — bounded by (distinct hashes × 2 attempts), and
+      // MAX_422_ROUNDS is still a hard cap on top regardless.
+      if (missingHashes.every((h) => isFullyHandled(h))) {
         throw missingBlobsError(missingHashes);
       }
 
-      // Rounds exhausted → don't write state
+      // Rounds exhausted → don't write state. With 4+ hashes each reported
+      // missing one at a time (never repeating), MAX_422_ROUNDS=3 stops the
+      // retry loop here even though every round WAS making progress — the
+      // cap is a hard ceiling on total round-trips per batch, independent
+      // of whether progress is still happening.
       if (roundsDone >= MAX_422_ROUNDS) throw missingBlobsError(missingHashes);
-
-      prevMissingSet = missingSet;
       roundsDone++;
 
-      // PUT only the reported missing blobs (checkAbort before each one).
+      // PUT only the reported missing blobs not already fully handled this
+      // batch (checkAbort before each one).
       for (const h of missingHashes) {
+        if (isFullyHandled(h)) continue;
         const src = blobSource.get(h);
         if (src === undefined) throw missingBlobsError([h]); // unreachable: checked above
         checkAbort(signal);
         const data = await fs.readBytes(src);
         checkAbort(signal);
-        await client.putBlob(h, data, signal);
+        try {
+          await client.putBlob(h, data, signal, {
+            allowFingerprints: allowFingerprintsByHash.get(h),
+          });
+          putSuccessCount.set(h, (putSuccessCount.get(h) ?? 0) + 1);
+        } catch (err) {
+          if (!(err instanceof ParcheSecretDetectedError)) throw err;
+          secretRejected.add(h);
+          rejectedHashes.set(h, err.kinds);
+          const allowDigest = allowDigestOf(allowFingerprintsByHash.get(h));
+          for (const e of batch) {
+            if (e.newHash === h) {
+              serverBlocked.push({ path: e.path, hash: h, kinds: err.kinds, allowDigest });
+            }
+          }
+          batch = batch.filter((e) => e.newHash !== h);
+        }
+      }
+
+      if (batch.length === 0) {
+        batchSkipped = true;
+        break;
       }
     }
 
-    // batchResponse is always assigned before break (loop invariant)
+    if (batchSkipped) continue;
+
+    // batchResponse is always assigned before break when !batchSkipped (loop invariant)
     if (batchResponse === undefined) throw new Error('unexpected: no push response for batch');
     currentState = applyPushResults(currentState, batch, batchResponse);
   }
 
-  return currentState;
+  return { state: currentState, serverBlocked };
 }
 
 // ─── downloadBlob ────────────────────────────────────────────────────────────
@@ -755,6 +898,21 @@ async function executePullActions(
   };
 }
 
+/**
+ * Dedup server rejections by path (keep the LAST one seen — phase 3 is more
+ * recent than phase 1 for the same path, though in practice a path only
+ * appears in one phase per sync) and sort by path, for `SyncSummary.blockedBySecretServer`.
+ */
+function dedupeServerBlockedForSummary(
+  all: ServerBlockedBlob[],
+): Array<{ path: string; kinds: string[] }> {
+  const byPath = new Map<string, string[]>();
+  for (const b of all) byPath.set(b.path, b.kinds);
+  return [...byPath.entries()]
+    .map(([path, kinds]) => ({ path, kinds }))
+    .sort((a, b) => a.path.localeCompare(b.path));
+}
+
 // ─── syncOnce ─────────────────────────────────────────────────────────────────
 
 export async function syncOnce(deps: SyncDeps, opts: SyncOpts): Promise<SyncSummary> {
@@ -786,18 +944,33 @@ export async function syncOnce(deps: SyncDeps, opts: SyncOpts): Promise<SyncSumm
   // ── Phase 1: Push ──────────────────────────────────────────────────────────
   checkAbort(signal);
 
-  const { snapshot: localSnapshot, blobSource } = await scanLocal({ fs, hash }, vaultDir);
+  // CHAMBA-023 D-Q3: previous syncedHash per path, so scanLocal can scan for
+  // secrets on the SAME bytes it reads to hash each file (no extra read) —
+  // only for paths whose content actually changed since the last sync.
+  const knownHashes1: Record<string, string | null> = {};
+  for (const [p, f] of Object.entries(syncState.files)) knownHashes1[p] = f.syncedHash;
+
+  const {
+    snapshot: localSnapshot,
+    blobSource,
+    findingsByPath: findingsByPath1,
+  } = await scanLocal({ fs, hash }, vaultDir, knownHashes1);
   const allPushEntries = planPush(syncState, localSnapshot);
 
   // CHAMBA-021 S6: screen for un-allowlisted secrets BEFORE pushing. A file
   // with ≥1 finding is excluded entirely from this batch; the rest proceeds.
   const allowlist = await readSecretAllowlist(fs, vaultDir);
-  const { allowed: pushEntries, blocked: blocked1 } = await screenPushEntries(
+  const {
+    allowed: pushEntries,
+    blocked: blocked1,
+    allowFingerprintsByHash: allowFingerprintsByHash1,
+  } = await screenPushEntries(
     { fs, hash },
     vaultDir,
     allPushEntries,
     allowlist,
     signal,
+    findingsByPath1,
   );
 
   const now1 = clock.now().toISOString();
@@ -814,6 +987,44 @@ export async function syncOnce(deps: SyncDeps, opts: SyncOpts): Promise<SyncSumm
     now1,
   );
 
+  // CHAMBA-023 S4/S5 (D-Q1(b) + B3, owner decision §9 + review ronda 3):
+  // hash-based lifecycle for server rejections. While a path's CURRENT local
+  // hash AND CURRENT allowDigest (the fingerprints this sync would send in
+  // `X-Parche-Secret-Allow` for this content) both still equal what's
+  // recorded, skip it WITHOUT a PUT — retrying the exact same bytes with the
+  // exact same exemptions would just get the exact same 422. The moment
+  // EITHER changes — the file is edited (new hash), OR the user exempted a
+  // newly-detected finding for the SAME content via `allow-secret` (new
+  // allowDigest, e.g. after a chamba update added a rule that now also
+  // matches this file) — fall through to a normal push attempt, so this is
+  // never permanently stuck on an unresolved rule mismatch. `rejectedHashes`
+  // (hash → kinds) is created ONCE here and shared across every batch AND
+  // phase 1/phase 3 below, so a hash rejected in one never gets re-PUT
+  // anywhere else this sync.
+  const rejectedHashes = new Map<string, string[]>();
+  const stillServerBlocked1: ServerBlockedBlob[] = [];
+  const pushEntriesAfterServerGate: PushEntry[] = [];
+  for (const entry of pushEntries) {
+    const recorded = baseStateFile.blockedSecretServer?.[entry.path];
+    const currentAllowDigest =
+      entry.newHash !== null ? allowDigestOf(allowFingerprintsByHash1.get(entry.newHash)) : '';
+    if (
+      recorded &&
+      entry.newHash !== null &&
+      entry.newHash === recorded.hash &&
+      currentAllowDigest === recorded.allowDigest
+    ) {
+      stillServerBlocked1.push({
+        path: entry.path,
+        hash: recorded.hash,
+        kinds: recorded.kinds,
+        allowDigest: recorded.allowDigest,
+      });
+    } else {
+      pushEntriesAfterServerGate.push(entry);
+    }
+  }
+
   let pushedCount = 0;
   // CHAMBA-015 D2.4: warn when pushing a file whose name is invalid on Windows.
   // The push proceeds normally — this is informational only.
@@ -826,25 +1037,52 @@ export async function syncOnce(deps: SyncDeps, opts: SyncOpts): Promise<SyncSumm
     }
   }
 
-  if (pushEntries.length > 0) {
-    syncState = await pushAll(
+  let serverBlocked1: ServerBlockedBlob[] = [...stillServerBlocked1];
+  if (pushEntriesAfterServerGate.length > 0) {
+    const pushResult = await pushAll(
       client,
       slug,
       syncState,
-      pushEntries,
+      pushEntriesAfterServerGate,
       blobSource,
       fs,
       batchSize,
+      allowFingerprintsByHash1,
+      rejectedHashes,
       signal,
     );
-    pushedCount = pushEntries.filter((e) => e.newHash !== null).length;
+    syncState = pushResult.state;
+    serverBlocked1 = [...serverBlocked1, ...pushResult.serverBlocked];
   }
+  {
+    const rejectedPaths1 = new Set(serverBlocked1.map((b) => b.path));
+    pushedCount = pushEntries.filter(
+      (e) => e.newHash !== null && !rejectedPaths1.has(e.path),
+    ).length;
+  }
+
+  let serverBlockedMap = computeServerBlockedMap(
+    baseStateFile.blockedSecretServer,
+    pushEntries,
+    serverBlocked1,
+    now1,
+  );
+  // Accumulates every server rejection across phase 1 AND phase 3, for the
+  // `SyncSummary.blockedBySecretServer` field (deduplicated/sorted below).
+  let blockedBySecretServerAll: ServerBlockedBlob[] = [...serverBlocked1];
 
   // Save state after phase 1 (preserves any existing skippedPaths from stateFile)
   await writeState(
     fs,
     vaultDir,
-    mergeIntoStateFile(baseStateFile, syncState, now1, undefined, blockedSecretMap),
+    mergeIntoStateFile(
+      baseStateFile,
+      syncState,
+      now1,
+      undefined,
+      blockedSecretMap,
+      serverBlockedMap,
+    ),
   );
 
   // ── Phase 2: Pull ──────────────────────────────────────────────────────────
@@ -1001,15 +1239,22 @@ export async function syncOnce(deps: SyncDeps, opts: SyncOpts): Promise<SyncSumm
     }
   }
 
-  // Save state after phase 2 with the updated skippedPaths. blockedSecretMap is
-  // threaded through unchanged (phase 2 doesn't rescan) so it isn't lost —
-  // `mergeIntoStateFile` would otherwise fall back to `baseStateFile.blockedSecret`,
-  // the PRE-phase-1 value.
+  // Save state after phase 2 with the updated skippedPaths. blockedSecretMap /
+  // serverBlockedMap are threaded through unchanged (phase 2 doesn't rescan)
+  // so they aren't lost — `mergeIntoStateFile` would otherwise fall back to
+  // `baseStateFile.blockedSecret`/`blockedSecretServer`, the PRE-phase-1 value.
   const now2 = clock.now().toISOString();
   await writeState(
     fs,
     vaultDir,
-    mergeIntoStateFile(baseStateFile, postPullState, now2, newSkippedPaths, blockedSecretMap),
+    mergeIntoStateFile(
+      baseStateFile,
+      postPullState,
+      now2,
+      newSkippedPaths,
+      blockedSecretMap,
+      serverBlockedMap,
+    ),
   );
 
   // ── Phase 3: Push conflict copies ─────────────────────────────────────────
@@ -1017,11 +1262,18 @@ export async function syncOnce(deps: SyncDeps, opts: SyncOpts): Promise<SyncSumm
   if (conflicts.length > 0) {
     checkAbort(signal);
 
-    // Re-scan to pick up the new copy files
-    const { snapshot: localSnapshot2, blobSource: blobSource2 } = await scanLocal(
-      { fs, hash },
-      vaultDir,
-    );
+    // Re-scan to pick up the new copy files. CHAMBA-023 D-Q3: pass
+    // postPullState.files as knownHashes so this scanLocal ALSO precomputes
+    // findings for every new/changed path (including the freshly written
+    // conflict copies — they're not in postPullState.files yet, so they
+    // always count as "changed") on the same bytes read for hashing.
+    const knownHashes2: Record<string, string | null> = {};
+    for (const [p, f] of Object.entries(postPullState.files)) knownHashes2[p] = f.syncedHash;
+    const {
+      snapshot: localSnapshot2,
+      blobSource: blobSource2,
+      findingsByPath: findingsByPath2,
+    } = await scanLocal({ fs, hash }, vaultDir, knownHashes2);
     // Merge conflict blob sources into blobSource2
     for (const [h, absPath] of conflictBlobSource) {
       blobSource2.set(h, absPath);
@@ -1031,6 +1283,8 @@ export async function syncOnce(deps: SyncDeps, opts: SyncOpts): Promise<SyncSumm
     // CHAMBA-021 S6: gate conflict-copy pushes too — a conflict copy of a file
     // with a secret is a brand-new local file; without this it would leak
     // through this back door even though phase 1 blocked the original.
+    // Falls back to reading the file itself (screenPushEntries) if, for any
+    // reason, a pushed path isn't in `findingsByPath2` (e.g. hash mismatch).
     const allowlist2 = await readSecretAllowlist(fs, vaultDir);
     const screened2 = await screenPushEntries(
       { fs, hash },
@@ -1038,24 +1292,60 @@ export async function syncOnce(deps: SyncDeps, opts: SyncOpts): Promise<SyncSumm
       allPushEntries2,
       allowlist2,
       signal,
+      findingsByPath2,
     );
     const pushEntries2 = screened2.allowed;
     blocked2 = screened2.blocked;
 
+    // CHAMBA-023 D-Q1(b) + B3: same hash+allowDigest lifecycle as phase 1 —
+    // a conflict copy whose content AND exemptions still match a server
+    // rejection is skipped WITHOUT a PUT (and `rejectedHashes` is already
+    // shared with phase 1, so a hash rejected there is never retried here
+    // either — one PUT per hash per sync, S7.10).
+    const stillServerBlocked2: ServerBlockedBlob[] = [];
+    const pushEntries2AfterServerGate: PushEntry[] = [];
+    for (const entry of pushEntries2) {
+      const recorded = serverBlockedMap[entry.path];
+      const currentAllowDigest2 =
+        entry.newHash !== null
+          ? allowDigestOf(screened2.allowFingerprintsByHash.get(entry.newHash))
+          : '';
+      if (
+        recorded &&
+        entry.newHash !== null &&
+        entry.newHash === recorded.hash &&
+        currentAllowDigest2 === recorded.allowDigest
+      ) {
+        stillServerBlocked2.push({
+          path: entry.path,
+          hash: recorded.hash,
+          kinds: recorded.kinds,
+          allowDigest: recorded.allowDigest,
+        });
+      } else {
+        pushEntries2AfterServerGate.push(entry);
+      }
+    }
+
     if (pushEntries2.length > 0 || allPushEntries2.length > 0) {
       let phase3State = postPullState;
-      if (pushEntries2.length > 0) {
+      let serverBlocked2: ServerBlockedBlob[] = [...stillServerBlocked2];
+      if (pushEntries2AfterServerGate.length > 0) {
         try {
-          phase3State = await pushAll(
+          const pushResult2 = await pushAll(
             client,
             slug,
             postPullState,
-            pushEntries2,
+            pushEntries2AfterServerGate,
             blobSource2,
             fs,
             batchSize,
+            screened2.allowFingerprintsByHash,
+            rejectedHashes,
             signal,
           );
+          phase3State = pushResult2.state;
+          serverBlocked2 = [...serverBlocked2, ...pushResult2.serverBlocked];
         } catch (err) {
           if (err instanceof ParcheCaseCollisionError) {
             errors.push(
@@ -1074,6 +1364,13 @@ export async function syncOnce(deps: SyncDeps, opts: SyncOpts): Promise<SyncSumm
         blocked2,
         clock.now().toISOString(),
       );
+      serverBlockedMap = computeServerBlockedMap(
+        serverBlockedMap,
+        pushEntries2,
+        serverBlocked2,
+        clock.now().toISOString(),
+      );
+      blockedBySecretServerAll = [...blockedBySecretServerAll, ...serverBlocked2];
 
       // Save state after phase 3 — pass newSkippedPaths so phase-2 skipped entries
       // are not lost when conflicts cause a re-write of state here.
@@ -1081,7 +1378,14 @@ export async function syncOnce(deps: SyncDeps, opts: SyncOpts): Promise<SyncSumm
       await writeState(
         fs,
         vaultDir,
-        mergeIntoStateFile(baseStateFile, phase3State, now3, newSkippedPaths, blockedSecretMap),
+        mergeIntoStateFile(
+          baseStateFile,
+          phase3State,
+          now3,
+          newSkippedPaths,
+          blockedSecretMap,
+          serverBlockedMap,
+        ),
       );
     }
   }
@@ -1098,6 +1402,7 @@ export async function syncOnce(deps: SyncDeps, opts: SyncOpts): Promise<SyncSumm
     needsReindex,
     derivedConflictsResolved,
     blockedBySecret: [...blocked1, ...blocked2],
+    blockedBySecretServer: dedupeServerBlockedForSummary(blockedBySecretServerAll),
   };
 }
 

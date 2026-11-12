@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { FakeHash } from '../testing/fake-hash.js';
-import { isScannable, scanText, scanWriteFields } from './scanner.js';
+import {
+  isScannable,
+  MAX_SCAN_BYTES,
+  scanText,
+  scanWriteFields,
+  shouldScanContent,
+} from './scanner.js';
 
 const AKIA_BODY = 'ABCDEFGHIJKLMNOP';
 
@@ -190,6 +196,158 @@ describe('scanText', () => {
     const findings = await scanText({ hash }, text, 'x.md');
     const lines = findings.map((f) => f.line);
     expect(lines).toEqual([...lines].sort((a, b) => a - b));
+  });
+});
+
+describe('scanText — CHAMBA-023 S1 fingerprint stability', () => {
+  // These 3 values still produce a finding AFTER the `assignment` post-filter
+  // ships (none of them are exempt — no dot-segment ≤15/24, no trailing
+  // "(", no path shape). Their fingerprints are hardcoded here as literal
+  // hex snapshots, computed BEFORE this change, from the exact same
+  // `kind + "\n" + value` the post-filter never touches (rules.ts header
+  // (a)): if a FUTURE change narrows the captured character class instead of
+  // post-filtering, these snapshots break loudly instead of silently
+  // invalidating live allowlists.
+  it('a quoted base64-ish assignment value keeps its fingerprint', async () => {
+    const value = `${'aG9sYS5tdW5kby5lc3RvLmVz'}`;
+    const findings = await scanText({ hash: new FakeHash() }, `api_key = ${value}`, 'x.md');
+    expect(findings).toHaveLength(1);
+    expect(findings[0]?.kind).toBe('assignment');
+    expect(findings[0]?.fingerprint).toBe('1e4c2d7b1b45');
+  });
+
+  it('a JWT keeps its fingerprint', async () => {
+    const jwtHeader = `eyJ${'A'.repeat(17)}`;
+    const jwtPayload = `eyJ${'B'.repeat(47)}`;
+    const jwtSig = 'C'.repeat(20);
+    const jwt = `${jwtHeader}.${jwtPayload}.${jwtSig}`;
+    const findings = await scanText({ hash: new FakeHash() }, jwt, 'x.md');
+    const jwtFinding = findings.find((f) => f.kind === 'jwt');
+    expect(jwtFinding?.fingerprint).toBe('f733a4fee0b1');
+  });
+
+  it('a GOCSPX-shaped OAuth client secret keeps its fingerprint', async () => {
+    const value = `${'GOCSPX-'}${'1a2B3c4D5e6F7g8H9i0J'}`;
+    const findings = await scanText({ hash: new FakeHash() }, `client_secret = ${value}`, 'x.md');
+    expect(findings).toHaveLength(1);
+    expect(findings[0]?.kind).toBe('assignment');
+    expect(findings[0]?.fingerprint).toBe('6b8deb42f08d');
+  });
+});
+
+describe('scanText — the CHAMBA-023 seed false positive (auth/magic-link.md)', () => {
+  // Exact content of `auth/magic-link.md` from `parche/scripts/seed-cya.ts`
+  // (~L244-271, read-only reference — nothing in `parche` is modified here).
+  // Before this fix, `token = crypto.randomUUID()` on its "Generación" code
+  // block fired as an `assignment` finding (fingerprint 787b470d859d). After
+  // the post-filter, the whole file is clean.
+  const MAGIC_LINK_MD = `---
+title: Magic Links
+tags: [tema/auth]
+work_item: AUTH-40
+---
+
+# Magic Links
+
+Un magic link es un URL con un token de un solo uso para autenticación sin contraseña.
+
+## Generación
+
+\`\`\`
+token = crypto.randomUUID()
+tokenHash = sha256(token)
+link = publicUrl + "/auth#" + token
+\`\`\`
+
+## Validación
+
+El servidor valida que:
+- El token exista en \`magic_links\`.
+- No haya expirado (\`expires_at > now\`).
+- No se haya usado ya (\`used_at IS NULL\`).
+
+Ver [[auth/flujo-login]] para el flujo completo.
+`;
+
+  it('scanText returns [] for the full seed content', async () => {
+    const findings = await scanText({ hash: new FakeHash() }, MAGIC_LINK_MD, 'auth/magic-link.md');
+    expect(findings).toEqual([]);
+  });
+});
+
+describe('shouldScanContent (CHAMBA-023 D-Q3 + B1 fix: content-based scan gate, returns text or null)', () => {
+  it('returns null for a real PNG (signature 0x89 50 4E 47), a non-isScannable extension', () => {
+    // A real PNG file starts with the 8-byte signature 0x89 'P' 'N' 'G' \r \n 0x1A \n,
+    // followed by binary chunk data (never valid UTF-8).
+    const png = new Uint8Array([
+      0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44,
+      0x52, 0xff, 0xfe, 0xfd, 0xfc,
+    ]);
+    expect(shouldScanContent(png, 'image.png')).toBeNull();
+    expect(shouldScanContent(png)).toBeNull(); // path omitted → same strict-UTF-8 gate
+  });
+
+  it('returns the decoded text for plain UTF-8 content', () => {
+    const text = new TextEncoder().encode('# nota\n\ntoken = crypto.randomUUID()\n');
+    expect(shouldScanContent(text, 'note.md')).toBe('# nota\n\ntoken = crypto.randomUUID()\n');
+    expect(shouldScanContent(text, 'note.pdf')).toBe('# nota\n\ntoken = crypto.randomUUID()\n');
+  });
+
+  it('a non-isScannable extension over MAX_SCAN_BYTES (2 MB) returns null', () => {
+    const big = new TextEncoder().encode('a'.repeat(MAX_SCAN_BYTES + 1));
+    expect(shouldScanContent(big, 'big.pdf')).toBeNull();
+    expect(shouldScanContent(big)).toBeNull();
+  });
+
+  it('a non-isScannable extension with invalid UTF-8 (a lone continuation byte) returns null', () => {
+    const invalid = new Uint8Array([0x61, 0x62, 0x80, 0x63]); // 0x80 is a stray continuation byte
+    expect(shouldScanContent(invalid, 'file.pdf')).toBeNull();
+    expect(shouldScanContent(invalid)).toBeNull();
+  });
+
+  // ── Review B1: 1.15.0 parity for the 4 ORIGINAL isScannable extensions ────
+  // (.md/.canvas/.base/.svg) — lossy decode, NO size cap. A strict-UTF-8 +
+  // 2MB-only gate would be a NEW fail-open vs. 1.15.0 for these extensions.
+
+  it('B1 — a .md file in ISO-8859-1 (invalid strict UTF-8) with a secret is still scanned, not null', () => {
+    // ISO-8859-1 "ñ" (0xF1) is NOT valid UTF-8 on its own — a strict decode
+    // would throw, but 1.15.0's lossy decode just replaces it and keeps going.
+    const latin1Bytes = new Uint8Array([
+      ...new TextEncoder().encode('# No'),
+      0xf1, // "ñ" in ISO-8859-1 — invalid UTF-8 byte
+      ...new TextEncoder().encode(`ta\ntoken: ${'pch_'}${'A'.repeat(24)}\n`),
+    ]);
+    const text = shouldScanContent(latin1Bytes, 'nota.md');
+    expect(text).not.toBeNull();
+  });
+
+  it('B1 — a .md file over 2 MB with a secret is still scanned (no size cap for isScannable extensions)', () => {
+    const bigBody = `${'a'.repeat(MAX_SCAN_BYTES + 1)}\ntoken: ${'pch_'}${'A'.repeat(24)}\n`;
+    const bytes = new TextEncoder().encode(bigBody);
+    expect(bytes.byteLength).toBeGreaterThan(MAX_SCAN_BYTES);
+    const text = shouldScanContent(bytes, 'huge.md');
+    expect(text).not.toBeNull();
+  });
+
+  it('B1 integration: scanText over the lossy-decoded ISO-8859-1 .md text still finds the secret', async () => {
+    const latin1Bytes = new Uint8Array([
+      ...new TextEncoder().encode('# No'),
+      0xf1,
+      ...new TextEncoder().encode(`ta\ntoken: ${'pch_'}${'A'.repeat(24)}\n`),
+    ]);
+    const text = shouldScanContent(latin1Bytes, 'nota.md');
+    expect(text).not.toBeNull();
+    const findings = await scanText({ hash: new FakeHash() }, text ?? '', 'nota.md');
+    expect(findings.length).toBeGreaterThan(0);
+  });
+
+  it('B1 integration: scanText over the >2MB .md text still finds the secret', async () => {
+    const bigBody = `${'a'.repeat(MAX_SCAN_BYTES + 1)}\ntoken: ${'pch_'}${'A'.repeat(24)}\n`;
+    const bytes = new TextEncoder().encode(bigBody);
+    const text = shouldScanContent(bytes, 'huge.md');
+    expect(text).not.toBeNull();
+    const findings = await scanText({ hash: new FakeHash() }, text ?? '', 'huge.md');
+    expect(findings.length).toBeGreaterThan(0);
   });
 });
 

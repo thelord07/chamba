@@ -105,6 +105,100 @@ const POSITIVES: Case[] = [
     kind: 'assignment',
     line: `client_secret=${assignmentValue}`,
   },
+  {
+    name: 'stripe secret key',
+    kind: 'stripe-secret-key',
+    line: `STRIPE_SECRET_KEY=${'sk_live_'}${'A'.repeat(32)}`,
+  },
+  {
+    name: 'stripe restricted key',
+    kind: 'stripe-restricted-key',
+    line: `STRIPE_RESTRICTED_KEY=${'rk_live_'}${'B'.repeat(32)}`,
+  },
+  {
+    name: 'stripe webhook secret',
+    kind: 'stripe-webhook-secret',
+    line: `STRIPE_WEBHOOK_SECRET=${'whsec_'}${'C'.repeat(32)}`,
+  },
+
+  // ── CHAMBA-023 S1 — `assignment` post-filter: fail-open regression guards.
+  // Each case below still matches (`kind: 'assignment'`) AFTER the post-filter
+  // ships, fixing the exact edge where an earlier, broader version of the
+  // filter would have wrongly exempted it too (see rules.ts header (b)/(c)).
+  {
+    name: 'quoted call-looking value stays positive (B1: quote tracked via its own group)',
+    kind: 'assignment',
+    line: `api_key = "${'crypto'}.${'randomUUID'}("`,
+  },
+  {
+    name: 'quoted member-looking value stays positive',
+    kind: 'assignment',
+    line: `token = "${'crypto'}.${'randomUUID'}"`,
+  },
+  {
+    name: 'member exemption respects the 15-char-per-segment cap (first segment is 16)',
+    kind: 'assignment',
+    line: `token = ${'AbCdEfGhIjKlMnOp'}.${'QrStUvWxYz'}`,
+  },
+  {
+    name: 'call exemption respects the 24-char-per-segment cap (segment is 33 > 24)',
+    kind: 'assignment',
+    line: `api_key = ${'sk_live_'}${'51H8xQ2eZvKYlo2C0a1b2c3d4'}(nota)`,
+  },
+  {
+    name: 'quoted base64-ish value stays positive',
+    kind: 'assignment',
+    line: `api_key = "${'aG9sYS5tdW5kby5lc3RvLmVz'}"`,
+  },
+  {
+    name: 'unquoted stripe-shaped value stays positive under assignment too',
+    kind: 'assignment',
+    line: `api_key=${'sk_live_'}${'51H8xQ2eZvKYlo2C0a1b2c3d4'}`,
+  },
+  {
+    name: 'quoted multi-dot value stays positive',
+    kind: 'assignment',
+    line: `token = "${'v1'}.${'MRnAbCdEfGhIjKlMnOpQrStUvWxYz'}.${'0123'}"`,
+  },
+  {
+    name: 'unquoted dotted value with an over-long second segment stays positive',
+    kind: 'assignment',
+    line: `api_key = ${'patAbCdEfGh1234'}.${'c0ffee0123456789abcdef0123456789abcdef0123456789abcdef'}`,
+  },
+  {
+    name: 'password with an entropy margin stays positive (NB2: not right at MIN_ENTROPY)',
+    kind: 'assignment',
+    line: `password = ${'my_Snake_Case_Var_Name_42x'}`,
+  },
+  {
+    name: 'bare camelCase identifier stays positive (D-Q2/OQ3: deliberately fail-closed)',
+    kind: 'assignment',
+    line: `secret: ${'myVeryLongCamelCaseVariableName'}`,
+  },
+
+  // ── Review item 1: Stripe rules — trailing boundary fix regression guards.
+  // With the old trailing `\b` + `{n,247}` cap, BOTH cases below failed to
+  // match at all (see rules.ts comment above the Stripe rules for why).
+  {
+    name: 'stripe secret key with 248+ trailing alphanumeric chars still matches (review item 1)',
+    kind: 'stripe-secret-key',
+    line: `STRIPE_SECRET_KEY=${'sk_live_'}${'A'.repeat(260)}`,
+  },
+  {
+    name: 'stripe secret key immediately followed by an underscore still matches (review item 1)',
+    kind: 'stripe-secret-key',
+    line: `STRIPE_SECRET_KEY=${'sk_live_'}${'B'.repeat(32)}_x`,
+  },
+  {
+    name: 'stripe restricted key with 248+ trailing alphanumeric chars still matches (review item 1)',
+    kind: 'stripe-restricted-key',
+    line: `STRIPE_RESTRICTED_KEY=${'rk_live_'}${'C'.repeat(260)}`,
+  },
+  {
+    name: 'stripe webhook secret immediately followed by an underscore still matches (review item 1)',
+    kind: 'stripe-webhook-secret',
+    line: `STRIPE_WEBHOOK_SECRET=${'whsec_'}${'D'.repeat(32)}_x`,
+  },
 ];
 
 describe('matchRules — positives (CHAMBA-021 §4.1, ≥25 cases)', () => {
@@ -112,7 +206,7 @@ describe('matchRules — positives (CHAMBA-021 §4.1, ≥25 cases)', () => {
     expect(POSITIVES.length).toBeGreaterThanOrEqual(25);
   });
 
-  it('covers all 14 kinds at least once', () => {
+  it('covers all 17 kinds at least once', () => {
     const kinds = new Set(POSITIVES.map((c) => c.kind));
     const expected: SecretKind[] = [
       'parche-token',
@@ -129,6 +223,9 @@ describe('matchRules — positives (CHAMBA-021 §4.1, ≥25 cases)', () => {
       'private-key',
       'connection-string',
       'assignment',
+      'stripe-secret-key',
+      'stripe-restricted-key',
+      'stripe-webhook-secret',
     ];
     for (const k of expected) {
       expect(kinds.has(k), `missing a positive case for kind "${k}"`).toBe(true);
@@ -192,6 +289,23 @@ const NEGATIVES: string[] = [
   'secret_phrase = "nombre de mi perro"', // low entropy prose-like value, len<16 anyway
   'token: no-expiration-by-default', // hyphenated lowercase prose, not a token shape
   'token: always-use-https-in-production', // same — only [a-z-], no digits/mixed case
+
+  // ── CHAMBA-023 S1 — `assignment` post-filter negatives.
+  // ★ = this exact case fires today (false positive) and is the one the
+  // post-filter actually fixes. The rest fix nothing new; they're regression
+  // fixation for cases that were already negative for an unrelated reason.
+  `token = ${'crypto'}.${'randomUUID'}()`, // ★ the seed's exact false positive (auth/magic-link.md)
+  'tokenHash = sha256(token)', // never captures ≥16 chars — unrelated to this fix
+  `const token = req.body.accessToken`, // ★ member exemption
+  `password: user.profile.passwordHash`, // ★ member exemption
+  'token: this.auth.session.token', // entropy 3.33 < MIN_ENTROPY — already negative
+  'secret = process.env.SESSION_SECRET', // already a placeholder — already negative
+  `secret = path/to/some/file.json`, // ★ path exemption
+  `token = ../../fixtures/tokens.json`, // ★ path exemption
+  `api-key: docs/reference/api-keys.md`, // ★ path exemption
+  `client_secret = ${'getClientSecretFromVault'}()`, // ★ call exemption (24-char segment, exact boundary)
+  `api_key = ${'readApiKeyFromDisk'}()`, // ★ call exemption
+  `${'pk_live_'}${'51H8xQ2eZvKYlo2C0a1b2c3d4'}`, // Stripe PUBLISHABLE key — intentionally not detected (D-Q2)
 ];
 
 describe('matchRules — negatives (CHAMBA-021 §4.1, ≥20 cases)', () => {
@@ -234,5 +348,25 @@ describe('matchRules — windowing (hot-path)', () => {
     matchRules(text);
     const elapsed = performance.now() - start;
     expect(elapsed).toBeLessThan(150);
+  });
+});
+
+describe('matchRules — a JWT assigned to a key reports BOTH kinds on the same line (NB1)', () => {
+  it('reports kind "jwt" AND kind "assignment" for the same line, each once', () => {
+    // A varied (non-repetitive) JWT, unlike the top-of-file fixtures above:
+    // those repeat a single letter per segment, which tanks Shannon entropy
+    // below MIN_ENTROPY and would make this test pass for the wrong reason
+    // (entropy filter, not the post-filter this test targets).
+    const header = `${'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9'}`;
+    const payload = `${'eyJzdWIiOiIxMjM0NTY3ODkwIn0'}`;
+    const signature = `${'dQw4w9WgXcQdQw4w9WgXcQ'}`;
+    const jwt = `${header}.${payload}.${signature}`;
+    const text = `token = ${jwt}`;
+    const matches = matchRules(text);
+    const kinds = matches.map((m) => m.kind);
+    expect(kinds).toContain('jwt');
+    expect(kinds).toContain('assignment');
+    expect(kinds.filter((k) => k === 'jwt')).toHaveLength(1);
+    expect(kinds.filter((k) => k === 'assignment')).toHaveLength(1);
   });
 });

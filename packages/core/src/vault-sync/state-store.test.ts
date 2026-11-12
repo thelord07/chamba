@@ -5,9 +5,11 @@
 
 import { describe, expect, it } from 'vitest';
 import { MemoryFilesystem } from '../testing/memory-filesystem.js';
+import type { SyncStateFile } from './state-store.js';
 import { mergeIntoStateFile, readState, syncStateFileSchema, writeState } from './state-store.js';
 
 const VAULT = '/vault';
+const now = '2026-10-29T10:00:00.000Z';
 
 const BASE_STATE = {
   server: 'https://parche.example.com',
@@ -155,5 +157,142 @@ describe('mergeIntoStateFile', () => {
       {},
     );
     expect(merged.blockedSecret).toBeUndefined();
+  });
+
+  // ── CHAMBA-023 S5: blockedSecretServer ────────────────────────────────────
+
+  it('preserves blockedSecretServer from base when newBlockedSecretServer is not given', () => {
+    const blockedSecretServer = {
+      'c.md': {
+        kinds: ['assignment'],
+        hash: 'h1',
+        allowDigest: '',
+        detectedAt: '2026-10-29T10:00:00.000Z',
+      },
+    };
+    const base = { ...BASE_STATE, blockedSecretServer };
+    const merged = mergeIntoStateFile(base, { cursor: 1, files: {} }, '2026-10-29T12:00:00.000Z');
+    expect(merged.blockedSecretServer).toEqual(blockedSecretServer);
+  });
+
+  it('replaces blockedSecretServer when newBlockedSecretServer is given (6th param)', () => {
+    const base = {
+      ...BASE_STATE,
+      blockedSecretServer: {
+        'old.md': {
+          kinds: ['jwt'],
+          hash: 'hold',
+          allowDigest: '',
+          detectedAt: '2026-10-29T09:00:00.000Z',
+        },
+      },
+    };
+    const next = {
+      'new.md': {
+        kinds: ['stripe-secret-key'],
+        hash: 'hnew',
+        allowDigest: 'fp1',
+        detectedAt: '2026-10-29T12:00:00.000Z',
+      },
+    };
+    const merged = mergeIntoStateFile(
+      base,
+      { cursor: 1, files: {} },
+      '2026-10-29T12:00:00.000Z',
+      undefined,
+      undefined,
+      next,
+    );
+    expect(merged.blockedSecretServer).toEqual(next);
+  });
+
+  it('omits blockedSecretServer entirely when the map is empty', () => {
+    const base = { ...BASE_STATE };
+    const merged = mergeIntoStateFile(
+      base,
+      { cursor: 1, files: {} },
+      '2026-10-29T12:00:00.000Z',
+      undefined,
+      undefined,
+      {},
+    );
+    expect(merged.blockedSecretServer).toBeUndefined();
+  });
+});
+
+describe('syncStateFileSchema — blockedSecretServer (CHAMBA-023 S5)', () => {
+  it('accepts a v1.15.0 state on disk with no blockedSecretServer field (backward compat)', () => {
+    const result = syncStateFileSchema.safeParse(BASE_STATE);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.blockedSecretServer).toBeUndefined();
+      expect(result.data.cursor).toBe(0);
+    }
+  });
+
+  it('a garbage-shaped blockedSecretServer is caught to undefined, cursor/files stay intact', () => {
+    const result = syncStateFileSchema.safeParse({
+      ...BASE_STATE,
+      cursor: 7,
+      files: { 'a.md': { syncedHash: 'h' } },
+      blockedSecretServer: { 'c.md': { kinds: 'not-an-array' } },
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.blockedSecretServer).toBeUndefined();
+      expect(result.data.cursor).toBe(7);
+      expect(result.data.files['a.md']?.syncedHash).toBe('h');
+    }
+  });
+
+  it('accepts a well-formed blockedSecretServer entry', () => {
+    const result = syncStateFileSchema.safeParse({
+      ...BASE_STATE,
+      blockedSecretServer: {
+        'c.md': {
+          kinds: ['assignment'],
+          hash: 'h1',
+          allowDigest: 'fp1',
+          detectedAt: '2026-10-29T10:00:00.000Z',
+        },
+      },
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.blockedSecretServer?.['c.md']?.kinds).toEqual(['assignment']);
+      expect(result.data.blockedSecretServer?.['c.md']?.allowDigest).toBe('fp1');
+    }
+  });
+
+  // ── Review B2: `kinds` must NOT require .min(1) ───────────────────────────
+
+  it('B2 — round-trips through write/read with `kinds: []` on one entry alongside a valid entry', async () => {
+    const fs = new MemoryFilesystem();
+    const state: SyncStateFile = {
+      ...BASE_STATE,
+      blockedSecretServer: {
+        // A defensively-parsed 422 body with no kinds at all.
+        'empty-kinds.md': { kinds: [], hash: 'h1', allowDigest: '', detectedAt: now },
+        'normal.md': { kinds: ['assignment'], hash: 'h2', allowDigest: 'fp1', detectedAt: now },
+      },
+    };
+    await writeState(fs, VAULT, state);
+    const got = await readState(fs, VAULT);
+    expect(got).not.toBeNull();
+    // Both entries survive the round-trip — `kinds: []` on one path never
+    // invalidates the whole map (which would have silently un-blocked
+    // 'normal.md' too).
+    expect(got?.blockedSecretServer?.['empty-kinds.md']).toEqual({
+      kinds: [],
+      hash: 'h1',
+      allowDigest: '',
+      detectedAt: now,
+    });
+    expect(got?.blockedSecretServer?.['normal.md']).toEqual({
+      kinds: ['assignment'],
+      hash: 'h2',
+      allowDigest: 'fp1',
+      detectedAt: now,
+    });
   });
 });

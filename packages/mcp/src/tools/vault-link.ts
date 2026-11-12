@@ -8,7 +8,7 @@
  * The token is never returned.
  */
 
-import { blockedSecretsSummary } from '@chamba/core';
+import { blockedSecretsSummary, serverBlockedSecretsSummary } from '@chamba/core';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { Logger } from 'pino';
 import { z } from 'zod';
@@ -157,6 +157,7 @@ export function registerVaultLink(server: McpServer, logger: Logger, services: S
           `Vault "${slug}" re-vinculado a "${canonicalDir}".`,
           oldDir !== canonicalDir ? `Ruta anterior: "${oldDir}" (sigue en disco intacta).` : null,
           `Sync: pushed ${syncOut.pushed}, pulled ${syncOut.pulled}, conflicts ${syncResult.conflicts.length}`,
+          ...serverBlockedSecretsSummary(syncOut.blockedBySecretServer ?? []),
           ...updatedBindings,
           ...credWarnings.map((w) => `⚠ ${w}`),
         ].filter(Boolean);

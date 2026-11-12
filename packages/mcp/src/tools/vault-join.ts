@@ -21,6 +21,7 @@ import {
   ParcheRateLimitedError,
   parseJoinInput,
   resolveServerUrl,
+  serverBlockedSecretsSummary,
 } from '@chamba/core';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { Logger } from 'pino';
@@ -339,11 +340,13 @@ export function registerVaultJoin(server: McpServer, logger: Logger, services: S
         }
 
         const syncOut = formatSyncOutput(syncResult);
+        const serverBlockedLines = serverBlockedSecretsSummary(syncOut.blockedBySecretServer ?? []);
         const text =
           [
             `Joined group vault: ${result.slug}`,
             `Vault location: ${result.vaultDir}`,
             `First sync: pushed ${syncOut.pushed}, pulled ${syncOut.pulled}, conflicts ${syncResult.conflicts.length}`,
+            ...serverBlockedLines,
           ].join('\n') +
           bindingNote +
           credWarningText;
