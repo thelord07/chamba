@@ -1,5 +1,19 @@
 # @chamba/core
 
+## 1.15.1
+
+### Patch Changes
+
+- bee3853: CHAMBA-023: el cliente de chamba ahora es compatible con el gate de secretos del servidor (`parche`).
+
+  - **Header `X-Parche-Secret-Allow`:** `PUT /api/blob/:hash` envía, solo cuando aplica, los fingerprints (12 hex) que el gate local ya exoneró para ESE contenido — nunca la allowlist completa, nunca un fingerprint de otra ruta, nunca un valor. Filtrado estricto (`/^[0-9a-f]{12}$/`), deduplicado, ordenado y recortado a ≤4096 bytes.
+  - **`422 secret_detected` por archivo:** si el servidor rechaza un blob por posible secreto, ese archivo (y cualquier otra ruta con el mismo contenido) queda excluido del lote — nunca se reintenta con el mismo contenido y las mismas exenciones en el mismo sync — y el resto del push continúa normalmente; el sync termina sin error. El bloqueo queda registrado en el estado local (`blockedSecretServer`, separado de `blockedSecret`) con el hash rechazado y un `allowDigest` (solo fingerprints, nunca valores) de lo que se exoneró en ese intento; mientras ambos no cambien, el siguiente sync no reintenta el PUT — en cuanto el archivo cambia o el usuario exime un hallazgo nuevo para ese mismo contenido, se reintenta solo. `vault status`, `vault sync` y `vault allow-secret` (CLI y tools) muestran este bloqueo como "rechazado por el servidor" — sin ofrecer `allow-secret` (el 422 no trae fingerprint): se sugiere actualizar chamba (`npx -y @chamba/mcp@latest`, el servidor puede tener reglas más nuevas) o quitar el valor.
+  - **Fix de falso positivo en la regla `assignment`:** ya no marca llamadas (`token = crypto.randomUUID()`), miembros (`crypto.randomUUID`) ni rutas de archivo (`docs/api-keys.md`) sin comillas como posible secreto — el caso real que lo motivó era íntegramente de código/rutas, no secretos. Un valor **entre comillas** sigue marcando igual que antes (fail-closed). Los fingerprints de los hallazgos que siguen detectándose no cambian — ninguna allowlist existente se invalida.
+  - **Reglas nuevas de Stripe:** `stripe-secret-key` (`sk_live_…`), `stripe-restricted-key` (`rk_live_…`) y `stripe-webhook-secret` (`whsec_…`) se detectan ahora como hallazgos propios; `pk_live_…` (clave pública) sigue sin detectarse. Nota: una línea como `api_key = sk_live_…` ahora produce DOS hallazgos (`assignment` + `stripe-secret-key`) — si ya habías exonerado el de `assignment`, el nuevo hallazgo de Stripe necesita su propio `allow-secret`.
+  - **Escaneo por contenido (`shouldScanContent`):** el gate de push y la adopción ya no escanean solo por las 4 extensiones de siempre (`.md`/`.canvas`/`.base`/`.svg`) — cualquier archivo sincronizable (incluidos `.pdf`/`.png`/etc.) se escanea también si sus bytes decodifican como UTF-8 estricto y pesan ≤2 MB, igual que lo hace el servidor. Un binario real (una imagen, por ejemplo) nunca se escanea. Las 4 extensiones de siempre (`.md`/`.canvas`/`.base`/`.svg`) mantienen el comportamiento de la versión anterior sin cambios: se escanean siempre, sin tope de tamaño y con decodificación tolerante — así un `.md` en una codificación distinta a UTF-8, o uno de más de 2 MB, con un secreto adentro, sigue detectándose igual que antes.
+
+  Sin cambios destructivos: nada se borra ni se resetea; las entradas de allowlist que queden inertes por el fix del falso positivo se dejan tal cual.
+
 ## 1.15.0
 
 ### Minor Changes
