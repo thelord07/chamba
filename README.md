@@ -143,7 +143,8 @@ the log directory and worktrees.
 | `chamba_create_worktrees` | `{ ticket, repos? }` | Multi-repo worktrees for a ticket (config-driven); keeps branches |
 | `chamba_cleanup_worktrees` | `{ ticket, repos? }` | Removes a ticket's worktrees, **keeps every branch** |
 | `chamba_classify_task` | `{ task, repos?, planText?, acceptanceCriteria?, knownRepos? }` | Classifies a task into one of 4 routes (trivial, small, substantial, risky) using deterministic heuristics — no LLM. Signals: risk terms (auth, DB, payments, crypto, PII, prod, secrets), ticket completeness, repos involved, triviality. Returns `{ route, reasons (≤5, in Spanish), signals, confidence, overridable }`. Powers `/ticket` and `/orq` |
-| `chamba_task_metrics` | `{ action: 'start'\|'event'\|'end', workItem, … }` | Records task-progress metrics without storing ticket text or secrets. `start` begins tracking; `event` logs a milestone (`planReview`, `verify`, `escalation`, `override`); `end` closes and appends one line to `<wsRoot>/.chamba/metrics/tasks.jsonl` (gitignored). Lock is in-process; chamba never sees tokens |
+| `chamba_task_metrics` | `{ action: 'start'\|'event'\|'end', workItem, … }` | Records task-progress metrics without storing ticket text or secrets. `start` begins tracking (opens the `context` phase); `event` logs a milestone (`planReview`, `verify`, `escalation`, `override`) or a phase/human-wait boundary (`phase_start`, `phase_end`, `human_wait_start`, `human_wait_end` — CHAMBA-024); `end` closes and appends one line to `<wsRoot>/.chamba/metrics/tasks.jsonl` (gitignored). Lock is in-process; chamba never sees tokens |
+| `chamba_create_worktree` / `chamba_create_worktrees` | `{ …, workItem? }` | Optional `workItem` (CHAMBA-024): attributes the tool's own git time to that task's `phases.setup.toolMs` in `chamba_task_metrics`. Best-effort — never changes the tool's result, never fails it. |
 
 ## How it works
 
@@ -203,10 +204,38 @@ no file paths, no secrets.** chamba never sees tokens (MCP protocol). In-flight
 state lives in `<wsRoot>/.chamba/metrics/inflight/<workItem>.json` (atomic write,
 7-day sweep); lock is in-process only (cross-process access is a known limitation).
 
+**Phases and human attention (CHAMBA-024).** Two optional fields ride on the same
+line, both absent on lines written before 1.16.0 (the CLI reports those as "sin
+desglose" — no breakdown):
+
+- `phases: { <phase>: { ms, count, inferred?, toolMs?, toolCount?, humanWaitMs? } }` —
+  10 phases: `context`, `setup`, `plan`, `plan_review`, `implement`, `test`, `review`,
+  `qa`, `verify` (reserved for CHAMBA-022), `close`. `ms`/`count` are the only fields
+  in the % share; `toolMs` (git time `chamba_create_worktree(s)` measured itself) is
+  informative and never counted in the share. **`phase: 'verify'` is a different axis
+  from `kind: 'verify'`** (CHAMBA-020's review-round counter) — they coexist.
+- `humanWaits: { count, ms, byReason }` — 6 reasons: `clarification`, `risky_confirm`,
+  `needs_approval`, `qa_interactive`, `final_review` (counted — `byReason.final_review.count`
+  increases on every ticket, even inferred ones — but its duration is always `n/d`:
+  samples only come from non-inferred pauses, and `final_review` always closes
+  `inferred` right before `end`), `other`.
+- **`test` phase scope:** in `substantial`/`risky`, `/ticket`'s `test` phase sums the
+  tester subagent's run (step 6) **and** the full verification suite (step 7) — they
+  share the same phase, summed across rounds. In `trivial`/`small`, only the suite run
+  (there's no separate tester step) counts.
+
 ```bash
-npx @chamba/mcp metrics           # table by route, split by source (ticket / orq) + total
-npx @chamba/mcp metrics --since 30d  # filter by the last 30 days (also: 24h, 2w)
+npx @chamba/mcp metrics                         # table by route, split by source (ticket / orq) + total
+npx @chamba/mcp metrics --since 30d             # filter by the last 30 days (also: 24h, 2w)
+npx @chamba/mcp metrics --phases --route small --since 30d  # per-phase medians/p90/% + human-wait breakdown
 ```
+
+`--phases` computes each phase's `%` **over the ticket's wall clock**
+(`endedAt - startedAt`), not over the sum of phases — the gap is reported as its own
+`unaccounted` row ("sin fase / traspasos": time no phase claimed, e.g. hand-offs
+between subagents). Phase rows + `unaccounted` always add up to exactly 100%; if
+`unaccounted` is the largest share, the render says so explicitly. The default table
+(without `--phases`) is byte-for-byte unchanged from 1.15.1.
 
 ## Editor extras (optional)
 

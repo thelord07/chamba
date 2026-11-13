@@ -68,6 +68,13 @@ export { renderDoctorReport, runDoctor } from './doctor/doctor.js';
 export { FilesystemMemoryStore, MEMORY_DIR } from './memory/filesystem-store.js';
 // Memory
 export type { Memory, MemoryStore, RememberInput } from './memory/store.js';
+// Metrics — phases + human waits (CHAMBA-024)
+export type {
+  HumanWaitStat,
+  PhaseStat,
+  PhasesReport,
+} from './metrics/phase-summary.js';
+export { renderPhasesTable, summarizePhases } from './metrics/phase-summary.js';
 // Metrics — task metrics (CHAMBA-020)
 export type {
   InflightMetric,
@@ -85,6 +92,24 @@ export {
   serializeTaskMetric,
   summarizeMetricsByRoute,
 } from './metrics/task-metrics.js';
+export type {
+  HumanWaitReason,
+  HumanWaitsRecord,
+  Phase,
+  PhaseEvent,
+  PhaseRecord,
+  PhaseState,
+  PhasesMap,
+} from './metrics/task-phases.js';
+export {
+  applyPhaseEvent,
+  closeOpenSpans,
+  emptyPhaseState,
+  HUMAN_WAIT_REASONS,
+  normalizeWorkItemId,
+  PHASES,
+  WORK_ITEM_REGEX,
+} from './metrics/task-phases.js';
 // Model catalog
 export type { ModelInfo, ModelProvider } from './models/catalog.js';
 export {

@@ -1,10 +1,78 @@
-import { FakeHash, FakeParche, FakeRandom, MemoryFilesystem } from '@chamba/core';
+import {
+  type DirEntry,
+  FakeHash,
+  FakeParche,
+  FakeRandom,
+  type FileStat,
+  type FilesystemPort,
+  MemoryFilesystem,
+  type WriteBytesOptions,
+} from '@chamba/core';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { pino } from 'pino';
 import { describe, expect, it } from 'vitest';
 import { createServer } from './server.js';
 import type { Services } from './services.js';
+
+/**
+ * Same delegating wrapper as worktree.test.ts (B2 de la review ronda 1): un
+ * spread `{...memoryFilesystemInstance}` pierde los métodos del prototipo
+ * (`mkdir` queda `undefined`), haciendo que la escritura del span falle en
+ * silencio y el contador de operaciones sea vacuo. Esta clase delega cada
+ * método explícitamente.
+ */
+class CountingFilesystem implements FilesystemPort {
+  readonly calls: string[] = [];
+  constructor(private readonly inner: FilesystemPort) {}
+  private count(op: string, path: string): void {
+    if (path.includes('.chamba/metrics')) this.calls.push(op);
+  }
+  readFile(path: string): Promise<string> {
+    this.count('readFile', path);
+    return this.inner.readFile(path);
+  }
+  writeFile(path: string, content: string): Promise<void> {
+    this.count('writeFile', path);
+    return this.inner.writeFile(path, content);
+  }
+  readDir(path: string): Promise<DirEntry[]> {
+    this.count('readDir', path);
+    return this.inner.readDir(path);
+  }
+  exists(path: string): Promise<boolean> {
+    this.count('exists', path);
+    return this.inner.exists(path);
+  }
+  mkdir(path: string): Promise<void> {
+    this.count('mkdir', path);
+    return this.inner.mkdir(path);
+  }
+  remove(path: string): Promise<void> {
+    this.count('remove', path);
+    return this.inner.remove(path);
+  }
+  readBytes(path: string): Promise<Uint8Array> {
+    this.count('readBytes', path);
+    return this.inner.readBytes(path);
+  }
+  writeBytes(path: string, data: Uint8Array, opts?: WriteBytesOptions): Promise<void> {
+    this.count('writeBytes', path);
+    return this.inner.writeBytes(path, data, opts);
+  }
+  rename(from: string, to: string): Promise<void> {
+    this.count('rename', from);
+    return this.inner.rename(from, to);
+  }
+  stat(path: string): Promise<FileStat | null> {
+    this.count('stat', path);
+    return this.inner.stat(path);
+  }
+  realpath(path: string): Promise<string> {
+    this.count('realpath', path);
+    return this.inner.realpath(path);
+  }
+}
 
 const silentLogger = pino({ level: 'silent' });
 
@@ -158,6 +226,95 @@ describe('chamba_cleanup_worktrees', () => {
     const wts = out.worktrees as Array<{ repo: string; removed: boolean; mergeSuggestion: string }>;
     expect(wts[0]?.removed).toBe(true);
     expect(wts[0]?.mergeSuggestion).toContain('merge --no-ff ticket/T-9');
+
+    await server.close();
+  });
+});
+
+describe('chamba_create_worktrees — CHAMBA-024 span attribution', () => {
+  it('attributes git span to phases.setup.toolMs when workItem matches an inflight', async () => {
+    const svc = makeServices(
+      {
+        '/ws/api/.git/HEAD': 'ref: refs/heads/main\n',
+        '/ws/.chamba/config.json': JSON.stringify({
+          version: 1,
+          worktrees: { branchPrefix: 'ticket/', repos: ['api'] },
+        }),
+        '/ws/.chamba/metrics/inflight/TICKET-9.json': JSON.stringify({
+          workItem: 'TICKET-9',
+          startedAt: '2026-06-09T09:00:00Z',
+          routeSuggested: 'small',
+          routeFinal: 'small',
+          escalations: 0,
+          planReviewRounds: 0,
+          verifyRounds: 0,
+          sessionId: 's1',
+          navReadBodyBaseline: 0,
+          source: 'ticket',
+          phases: {},
+        }),
+      },
+      allNew,
+    );
+    const { client, server } = await connect(svc);
+
+    await client.callTool({
+      name: 'chamba_create_worktrees',
+      arguments: { ticket: 'TICKET-9', workItem: 'TICKET-9' },
+    });
+
+    const raw = await svc.fs.readFile('/ws/.chamba/metrics/inflight/TICKET-9.json');
+    const inflight = JSON.parse(raw);
+    expect(inflight.phases.setup.toolCount).toBe(1);
+    expect(inflight.phases.setup.ms).toBe(0);
+
+    await server.close();
+  });
+
+  it('B3: el contador de operaciones FS es independiente del número de repos (>=2 repos)', async () => {
+    const svc = makeServices(
+      {
+        '/ws/api/.git/HEAD': 'ref: refs/heads/main\n',
+        '/ws/web/.git/HEAD': 'ref: refs/heads/main\n',
+        '/ws/worker/.git/HEAD': 'ref: refs/heads/main\n',
+        '/ws/.chamba/config.json': JSON.stringify({
+          version: 1,
+          worktrees: { branchPrefix: 'ticket/', repos: ['api', 'web', 'worker'] },
+        }),
+        '/ws/.chamba/metrics/inflight/TICKET-9.json': JSON.stringify({
+          workItem: 'TICKET-9',
+          startedAt: '2026-06-09T09:00:00Z',
+          routeSuggested: 'small',
+          routeFinal: 'small',
+          escalations: 0,
+          planReviewRounds: 0,
+          verifyRounds: 0,
+          sessionId: 's1',
+          navReadBodyBaseline: 0,
+          source: 'ticket',
+          phases: {},
+        }),
+      },
+      allNew,
+    );
+    const baseFs = svc.fs;
+    const counting = new CountingFilesystem(baseFs);
+    svc.fs = counting;
+    const { client, server } = await connect(svc);
+
+    await client.callTool({
+      name: 'chamba_create_worktrees',
+      arguments: { ticket: 'TICKET-9', workItem: 'TICKET-9' },
+    });
+
+    // 3 repos, pero el span se mide/escribe UNA sola vez, fuera del bucle de repos.
+    expect(counting.calls.filter((c) => c === 'readDir')).toHaveLength(1);
+    expect(counting.calls.filter((c) => c === 'readFile')).toHaveLength(1);
+    expect(counting.calls.filter((c) => c === 'writeBytes')).toHaveLength(1);
+
+    const raw = await baseFs.readFile('/ws/.chamba/metrics/inflight/TICKET-9.json');
+    const inflight = JSON.parse(raw);
+    expect(inflight.phases.setup.toolCount).toBe(1);
 
     await server.close();
   });

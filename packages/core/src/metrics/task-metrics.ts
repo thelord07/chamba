@@ -6,6 +6,8 @@
  * §3.3 campos de TaskMetric. Nunca contiene texto libre del ticket ni secretos.
  */
 
+import type { HumanWaitReason, HumanWaitsRecord, Phase, PhasesMap } from './task-phases.js';
+
 export type QaResult = 'pass' | 'fail' | 'skipped';
 export type MetricRoute = 'trivial' | 'small' | 'substantial' | 'risky';
 export type MetricSource = 'ticket' | 'orq';
@@ -43,6 +45,10 @@ export interface TaskMetric {
   delivered: boolean;
   /** Fuente del ticket: "ticket" para /ticket, "orq" para /orq. */
   source: MetricSource;
+  /** CHAMBA-024 — opcional: desglose de tiempo por fase. Ausente en líneas < 1.16.0. */
+  phases?: PhasesMap;
+  /** CHAMBA-024 — opcional: pausas al humano agregadas. Ausente en líneas < 1.16.0. */
+  humanWaits?: HumanWaitsRecord;
 }
 
 /**
@@ -63,6 +69,11 @@ export interface InflightMetric {
   /** Baseline del contador navReadBody cuando se hizo start (R2). */
   navReadBodyBaseline: number;
   source: MetricSource;
+  /** CHAMBA-024 — opcional, por retrocompatibilidad con inflights de 1.15.x. */
+  phases?: PhasesMap;
+  humanWaits?: HumanWaitsRecord;
+  activePhase?: { phase: Phase; startedAt: string };
+  activeHumanWait?: { reason: HumanWaitReason; startedAt: string };
 }
 
 // ─── Serialization ─────────────────────────────────────────────────────────────

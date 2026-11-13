@@ -152,3 +152,33 @@ describe('chamba_classify_task tool', () => {
     await server.close();
   });
 });
+
+describe('chamba_classify_task — CHAMBA-024 D1: independencia de chamba_load_context', () => {
+  // D1 (decisión del owner): chamba_classify_task NO depende de la salida de
+  // chamba_load_context — lee sus parámetros explícitos (task/repos/planText/
+  // acceptanceCriteria/knownRepos), nunca un resultado cacheado de load_context.
+  // Esta prueba llama classify_task con y sin un load_context previo en la misma
+  // sesión del server y exige el mismo route/reasons/signals/confidence.
+  const args = {
+    task: 'Agregar índice al modelo de usuario para mejorar performance de query',
+    repos: ['backend'],
+  };
+
+  it('misma tarea → misma ruta, reasons y signals, con o sin load_context previo', async () => {
+    // Sesión A: classify_task primero (sin load_context).
+    const { client: clientA, server: serverA } = await connect();
+    const resultA = await clientA.callTool({ name: 'chamba_classify_task', arguments: args });
+    await serverA.close();
+
+    // Sesión B: load_context primero, luego classify_task con los mismos args.
+    const { client: clientB, server: serverB } = await connect();
+    await clientB.callTool({
+      name: 'chamba_load_context',
+      arguments: { task: args.task },
+    });
+    const resultB = await clientB.callTool({ name: 'chamba_classify_task', arguments: args });
+    await serverB.close();
+
+    expect(structuredOf(resultB)).toEqual(structuredOf(resultA));
+  });
+});

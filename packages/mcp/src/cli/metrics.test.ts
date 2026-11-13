@@ -178,3 +178,186 @@ describe('runMetricsCli', () => {
     expect(deps.exit).toHaveBeenCalledWith(0);
   });
 });
+
+describe('runMetricsCli — CHAMBA-024 --phases', () => {
+  const PHASE_FIXTURE: TaskMetric[] = [
+    makeMetric({
+      workItem: 'P1',
+      routeFinal: 'small',
+      startedAt: '2026-11-01T08:00:00Z',
+      endedAt: '2026-11-01T08:10:00Z',
+      phases: { plan: { ms: 240_000, count: 1 }, implement: { ms: 180_000, count: 1 } },
+    }),
+    makeMetric({
+      workItem: 'P2',
+      routeFinal: 'small',
+      startedAt: '2026-11-02T08:00:00Z',
+      endedAt: '2026-11-02T08:20:00Z',
+      phases: { plan: { ms: 300_000, count: 1 }, implement: { ms: 600_000, count: 1 } },
+    }),
+    // 2 líneas sin phases (sin desglose, retrocompat con 1.15.1)
+    makeMetric({ workItem: 'NO1', routeFinal: 'small' }),
+    makeMetric({ workItem: 'NO2', routeFinal: 'small' }),
+  ];
+  const PHASE_JSONL = PHASE_FIXTURE.map(serializeTaskMetric).join('');
+
+  it('T3: muestra medianas, p90, %total y fase dominante; 2 sin desglose', async () => {
+    const deps = makeDeps({ '/proj/.chamba/metrics/tasks.jsonl': PHASE_JSONL });
+    await runMetricsCli(['--phases'], deps);
+    const output = deps.captured.join('\n');
+    expect(output).toContain('plan');
+    expect(output).toContain('implement');
+    expect(output).toContain('2 ticket(s) sin desglose');
+    expect(deps.exit).toHaveBeenCalledWith(0);
+  });
+
+  it('--route small filtra', async () => {
+    const deps = makeDeps({ '/proj/.chamba/metrics/tasks.jsonl': PHASE_JSONL });
+    await runMetricsCli(['--phases', '--route', 'small'], deps);
+    const output = deps.captured.join('\n');
+    expect(output).toContain('[small]');
+    expect(deps.exit).toHaveBeenCalledWith(0);
+  });
+
+  it('--route basura → exit 1', async () => {
+    const deps = makeDeps({ '/proj/.chamba/metrics/tasks.jsonl': PHASE_JSONL });
+    await runMetricsCli(['--phases', '--route', 'basura'], deps);
+    const output = deps.captured.join('\n');
+    expect(output).toContain('STDERR:');
+    expect(deps.exit).toHaveBeenCalledWith(1);
+  });
+
+  it('un caso donde unaccounted es la dominante y el render lo dice', async () => {
+    const dominated: TaskMetric = makeMetric({
+      workItem: 'U1',
+      routeFinal: 'small',
+      startedAt: '2026-11-01T08:00:00Z',
+      endedAt: '2026-11-01T08:10:00Z', // 600_000ms
+      phases: { plan: { ms: 10_000, count: 1 } }, // resto sin fase domina
+    });
+    const deps = makeDeps({ '/proj/.chamba/metrics/tasks.jsonl': serializeTaskMetric(dominated) });
+    await runMetricsCli(['--phases'], deps);
+    const output = deps.captured.join('\n');
+    expect(output).toContain('dominante: sin fase / traspasos');
+  });
+});
+
+describe('runMetricsCli — AC-8b/T4e: bloque "Pausas al humano" + "Por ticket"', () => {
+  it('cuenta pausas por motivo (final_review n/d) y lista "Por ticket" con pauses/blockedMs', async () => {
+    const withWaits: TaskMetric[] = [
+      makeMetric({
+        workItem: 'W1',
+        routeFinal: 'small',
+        startedAt: '2026-11-01T08:00:00Z',
+        endedAt: '2026-11-01T08:10:00Z',
+        phases: { plan: { ms: 60_000, count: 1 } },
+        humanWaits: {
+          count: 2,
+          ms: 10_000,
+          byReason: {
+            clarification: { count: 1, ms: 10_000, inferred: false },
+            final_review: { count: 1, ms: 0, inferred: true },
+          },
+        },
+      }),
+      makeMetric({
+        workItem: 'W2',
+        routeFinal: 'small',
+        startedAt: '2026-11-02T08:00:00Z',
+        endedAt: '2026-11-02T08:10:00Z',
+        phases: { plan: { ms: 60_000, count: 1 } },
+        humanWaits: {
+          count: 1,
+          ms: 0,
+          byReason: { final_review: { count: 1, ms: 0, inferred: true } },
+        },
+      }),
+    ];
+    const jsonl = withWaits.map(serializeTaskMetric).join('');
+    const deps = makeDeps({ '/proj/.chamba/metrics/tasks.jsonl': jsonl });
+    await runMetricsCli(['--phases'], deps);
+    const output = deps.captured.join('\n');
+
+    expect(output).toContain('Pausas al humano');
+    // final_review: 2 pausas totales (Σ entry.count across both tickets), n/d
+    expect(output).toMatch(/final_review:\s*2\s*\(mediana n\/d\)/);
+    // clarification: 1 pausa medible, mediana 10s
+    expect(output).toMatch(/clarification:\s*1\s*\(mediana 10s\)/);
+
+    expect(output).toContain('Por ticket:');
+    expect(output).toMatch(/W1.*pausas=2.*bloqueado=10s/);
+    expect(output).toMatch(/W2.*pausas=1.*bloqueado=0s/);
+  });
+});
+
+describe('runMetricsCli — T3b: salida por defecto idéntica a 1.15.1', () => {
+  it('es byte a byte idéntica sobre el fixture existente', async () => {
+    const deps = makeDeps({ '/proj/.chamba/metrics/tasks.jsonl': FIXTURE_JSONL });
+    await runMetricsCli([], deps);
+    const output = deps.captured.join('\n');
+    expect(output).toMatchInlineSnapshot(`
+      "Métricas de tareas — /proj
+      Total: 5 ticket(s)
+
+      ---------------------------------------------------------------------------------------------------
+      Fuente    Ruta         Tickets  Duración md  Avg plan  Avg verify  %entregado  %escalado  %override
+      ---------------------------------------------------------------------------------------------------
+      [ticket]
+      ticket    small              2         2.0h       0.0         1.0         50%        50%         0%
+      ticket    risky              1         2.0h       2.0         2.0        100%         0%         0%
+
+      [orq]
+      orq       small              1         2.0h       0.0         1.0        100%         0%         0%
+      orq       substantial        1         2.0h       0.0         1.0        100%         0%         0%
+
+      [total]
+      total     small              3         2.0h       0.0         1.0         67%        33%         0%
+      total     substantial        1         2.0h       0.0         1.0        100%         0%         0%
+      total     risky              1         2.0h       2.0         2.0        100%         0%         0%
+      ---------------------------------------------------------------------------------------------------"
+    `);
+  });
+});
+
+describe('runMetricsCli — T3d: parseo de flags', () => {
+  it('--since --phases → exit 1 ("falta el valor de --since")', async () => {
+    const deps = makeDeps({ '/proj/.chamba/metrics/tasks.jsonl': FIXTURE_JSONL });
+    await runMetricsCli(['--since', '--phases'], deps);
+    const output = deps.captured.join('\n');
+    expect(output).toContain('falta el valor de --since');
+    expect(deps.exit).toHaveBeenCalledWith(1);
+  });
+
+  it('--since final sin valor → exit 1', async () => {
+    const deps = makeDeps({ '/proj/.chamba/metrics/tasks.jsonl': FIXTURE_JSONL });
+    await runMetricsCli(['--since'], deps);
+    expect(deps.exit).toHaveBeenCalledWith(1);
+  });
+
+  it('--route sin valor → exit 1', async () => {
+    const deps = makeDeps({ '/proj/.chamba/metrics/tasks.jsonl': FIXTURE_JSONL });
+    await runMetricsCli(['--route'], deps);
+    expect(deps.exit).toHaveBeenCalledWith(1);
+  });
+});
+
+describe('runMetricsCli — win32 (cheap cross-platform case)', () => {
+  it('resolves and renders correctly with Windows-style cwd/homedir', async () => {
+    const wsRoot = 'C:\\proj';
+    const jsonlPath = `${wsRoot}/.chamba/metrics/tasks.jsonl`; // joinPath always uses "/" internally
+    const deps: MetricsCliDeps & { captured: string[] } = {
+      ...makeDeps(),
+      services: {
+        ...makeDeps().services,
+        fs: new MemoryFilesystem({ [jsonlPath]: FIXTURE_JSONL }),
+        cwd: wsRoot,
+        homedir: 'C:\\Users\\test',
+        platform: 'win32',
+      },
+    };
+    await runMetricsCli([], deps);
+    const output = deps.captured.join('\n');
+    expect(output).toContain('[ticket]');
+    expect(deps.exit).toHaveBeenCalledWith(0);
+  });
+});
