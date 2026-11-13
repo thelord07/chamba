@@ -11,6 +11,7 @@
  */
 
 import {
+  type ClockPort,
   FakeHash,
   FakeParche,
   FakeRandom,
@@ -26,11 +27,31 @@ import type { Services } from '../services.js';
 
 const silentLogger = pino({ level: 'silent' });
 
-function makeServices(files?: Record<string, string>): Services {
+/**
+ * Clock that advances `stepMs` on every `now()` call (B9 del plan). Cada
+ * handler (`handleStart`/`handleEvent`/`handleEnd`) llama `now()` exactamente
+ * una vez, así la secuencia es determinista y se pueden afirmar ms exactos
+ * (múltiplos de `stepMs`) en vez de solo `>= 0`.
+ */
+function advancingClock(startIso: string, stepMs = 1_000): ClockPort {
+  let t = Date.parse(startIso);
+  return {
+    now: () => {
+      const d = new Date(t);
+      t += stepMs;
+      return d;
+    },
+    today: () => new Date(t).toISOString().slice(0, 10),
+  };
+}
+
+function makeServices(files?: Record<string, string>, clock?: ClockPort): Services {
   return {
     fs: new MemoryFilesystem(files ?? {}),
     process: { exec: async () => ({ stdout: '', stderr: '', exitCode: 0 }) },
-    clock: {
+    // El reloj de `http`/FakeParche se mantiene constante por separado — solo
+    // `clock` (el que usan los handlers de task-metrics) puede avanzar.
+    clock: clock ?? {
       now: () => new Date('2026-11-07T10:00:00Z'),
       today: () => '2026-11-07',
     },
@@ -413,6 +434,282 @@ describe('chamba_task_metrics — source field', () => {
     const raw = await services.fs.readFile('/proj/.chamba/metrics/tasks.jsonl');
     const [m] = parseTaskMetricsJsonl(raw);
     expect(m?.source).toBe('orq');
+
+    await server.close();
+  });
+});
+
+// ─── CHAMBA-024: phase_start/phase_end, human_wait_*, strict schema ────────
+
+describe('chamba_task_metrics — CHAMBA-024 fases y pausas', () => {
+  it('start abre la fase context; phase_start/phase_end producen phases en la línea', async () => {
+    const services = makeServices();
+    const { client, server } = await connect(services);
+
+    await client.callTool({
+      name: 'chamba_task_metrics',
+      arguments: { action: 'start', workItem: 'PH-001', routeSuggested: 'small', source: 'ticket' },
+    });
+    await client.callTool({
+      name: 'chamba_task_metrics',
+      arguments: { action: 'event', workItem: 'PH-001', kind: 'phase_start', phase: 'plan' },
+    });
+    await client.callTool({
+      name: 'chamba_task_metrics',
+      arguments: { action: 'event', workItem: 'PH-001', kind: 'phase_end', phase: 'plan' },
+    });
+    await client.callTool({
+      name: 'chamba_task_metrics',
+      arguments: { action: 'end', workItem: 'PH-001', testsPassed: true, delivered: true },
+    });
+
+    const raw = await services.fs.readFile('/proj/.chamba/metrics/tasks.jsonl');
+    const [m] = parseTaskMetricsJsonl(raw);
+    expect(m?.phases?.context).toBeDefined();
+    expect(m?.phases?.plan).toBeDefined();
+    expect(m?.phases?.context?.inferred).toBe(true); // cerrada por el phase_start de plan
+
+    await server.close();
+  });
+
+  it('kind="phase_start" sin phase → isError con mensaje en español', async () => {
+    const services = makeServices();
+    const { client, server } = await connect(services);
+    await client.callTool({
+      name: 'chamba_task_metrics',
+      arguments: { action: 'start', workItem: 'PH-002', routeSuggested: 'small', source: 'ticket' },
+    });
+    const result = await client.callTool({
+      name: 'chamba_task_metrics',
+      arguments: { action: 'event', workItem: 'PH-002', kind: 'phase_start' },
+    });
+    expect(isError(result)).toBe(true);
+    expect(textOf(result)).toContain('phase');
+    await server.close();
+  });
+
+  it('kind="verify" con phase → isError (R1: colisión phase vs kind=verify)', async () => {
+    const services = makeServices();
+    const { client, server } = await connect(services);
+    await client.callTool({
+      name: 'chamba_task_metrics',
+      arguments: { action: 'start', workItem: 'PH-003', routeSuggested: 'small', source: 'ticket' },
+    });
+    const result = await client.callTool({
+      name: 'chamba_task_metrics',
+      arguments: { action: 'event', workItem: 'PH-003', kind: 'verify', phase: 'verify' },
+    });
+    expect(isError(result)).toBe(true);
+    await server.close();
+  });
+
+  it('clave desconocida → isError con el texto del SDK en inglés (B1, AC-9)', async () => {
+    const services = makeServices();
+    const { client, server } = await connect(services);
+    const result = await client.callTool({
+      name: 'chamba_task_metrics',
+      arguments: {
+        action: 'start',
+        workItem: 'PH-004',
+        routeSuggested: 'small',
+        source: 'ticket',
+        somethingUnknown: 'x',
+      },
+    });
+    expect(isError(result)).toBe(true);
+    expect(textOf(result)).toMatch(/Invalid arguments for tool chamba_task_metrics/i);
+    await server.close();
+  });
+
+  it('event con clave declarada pero ajena a la acción (routeFinal) sigue funcionando (B2)', async () => {
+    const services = makeServices();
+    const { client, server } = await connect(services);
+    await client.callTool({
+      name: 'chamba_task_metrics',
+      arguments: { action: 'start', workItem: 'PH-005', routeSuggested: 'small', source: 'ticket' },
+    });
+    const result = await client.callTool({
+      name: 'chamba_task_metrics',
+      arguments: {
+        action: 'event',
+        workItem: 'PH-005',
+        kind: 'planReview',
+        routeFinal: 'substantial',
+      },
+    });
+    expect(isError(result)).toBe(false);
+    await server.close();
+  });
+
+  it('phase: "verify" y kind: "verify" coexisten (S6)', async () => {
+    const services = makeServices();
+    const { client, server } = await connect(services);
+    await client.callTool({
+      name: 'chamba_task_metrics',
+      arguments: {
+        action: 'start',
+        workItem: 'PH-006',
+        routeSuggested: 'substantial',
+        source: 'ticket',
+      },
+    });
+    await client.callTool({
+      name: 'chamba_task_metrics',
+      arguments: { action: 'event', workItem: 'PH-006', kind: 'verify' },
+    });
+    await client.callTool({
+      name: 'chamba_task_metrics',
+      arguments: { action: 'event', workItem: 'PH-006', kind: 'phase_start', phase: 'verify' },
+    });
+    await client.callTool({
+      name: 'chamba_task_metrics',
+      arguments: { action: 'event', workItem: 'PH-006', kind: 'phase_end', phase: 'verify' },
+    });
+    await client.callTool({
+      name: 'chamba_task_metrics',
+      arguments: { action: 'end', workItem: 'PH-006', testsPassed: true, delivered: true },
+    });
+    const raw = await services.fs.readFile('/proj/.chamba/metrics/tasks.jsonl');
+    const [m] = parseTaskMetricsJsonl(raw);
+    expect(m?.verifyRounds).toBe(1);
+    expect(m?.phases?.verify).toBeDefined();
+    await server.close();
+  });
+
+  it('human_wait_start/end: suma a humanWaits de la línea', async () => {
+    const services = makeServices();
+    const { client, server } = await connect(services);
+    await client.callTool({
+      name: 'chamba_task_metrics',
+      arguments: { action: 'start', workItem: 'PH-007', routeSuggested: 'small', source: 'ticket' },
+    });
+    await client.callTool({
+      name: 'chamba_task_metrics',
+      arguments: {
+        action: 'event',
+        workItem: 'PH-007',
+        kind: 'human_wait_start',
+        reason: 'clarification',
+      },
+    });
+    await client.callTool({
+      name: 'chamba_task_metrics',
+      arguments: { action: 'event', workItem: 'PH-007', kind: 'human_wait_end' },
+    });
+    await client.callTool({
+      name: 'chamba_task_metrics',
+      arguments: { action: 'end', workItem: 'PH-007', testsPassed: true, delivered: true },
+    });
+    const raw = await services.fs.readFile('/proj/.chamba/metrics/tasks.jsonl');
+    const [m] = parseTaskMetricsJsonl(raw);
+    expect(m?.humanWaits?.count).toBe(1);
+    expect(m?.humanWaits?.byReason.clarification?.count).toBe(1);
+    await server.close();
+  });
+
+  it('listTools publica phase y reason, y additionalProperties: false', async () => {
+    const services = makeServices();
+    const { client, server } = await connect(services);
+    const { tools } = await client.listTools();
+    const tool = tools.find((t) => t.name === 'chamba_task_metrics');
+    expect(tool).toBeDefined();
+    const schema = tool?.inputSchema as {
+      properties?: Record<string, unknown>;
+      additionalProperties?: boolean;
+    };
+    expect(schema.properties?.phase).toBeDefined();
+    expect(schema.properties?.reason).toBeDefined();
+    expect(schema.additionalProperties).toBe(false);
+    await server.close();
+  });
+});
+
+describe('chamba_task_metrics — CHAMBA-024 advancingClock (ms exactos a nivel tool)', () => {
+  it('phase_start/phase_end producen ms exactos (múltiplos de stepMs)', async () => {
+    const STEP_MS = 1_000;
+    const services = makeServices(undefined, advancingClock('2026-11-07T10:00:00Z', STEP_MS));
+    const { client, server } = await connect(services);
+
+    // now() calls: start(1) → opens context @ t=0, t becomes 1000
+    await client.callTool({
+      name: 'chamba_task_metrics',
+      arguments: {
+        action: 'start',
+        workItem: 'CLOCK-001',
+        routeSuggested: 'small',
+        source: 'ticket',
+      },
+    });
+    // event phase_start plan(2): nowIso = t=1000 → closes context (ms=1000), t becomes 2000
+    await client.callTool({
+      name: 'chamba_task_metrics',
+      arguments: { action: 'event', workItem: 'CLOCK-001', kind: 'phase_start', phase: 'plan' },
+    });
+    // event phase_end plan(3): nowIso = t=2000 → closes plan (ms=1000), t becomes 3000
+    await client.callTool({
+      name: 'chamba_task_metrics',
+      arguments: { action: 'event', workItem: 'CLOCK-001', kind: 'phase_end', phase: 'plan' },
+    });
+    // end(4): nowIso = t=3000
+    await client.callTool({
+      name: 'chamba_task_metrics',
+      arguments: { action: 'end', workItem: 'CLOCK-001', testsPassed: true, delivered: true },
+    });
+
+    const raw = await services.fs.readFile('/proj/.chamba/metrics/tasks.jsonl');
+    const [m] = parseTaskMetricsJsonl(raw);
+    expect(m?.phases?.context).toEqual({ ms: STEP_MS, count: 1, inferred: true });
+    expect(m?.phases?.plan).toEqual({ ms: STEP_MS, count: 1 });
+
+    await server.close();
+  });
+
+  it('human_wait_start/human_wait_end producen ms exactos y quedan en humanWaits + humanWaitMs de la fase activa', async () => {
+    const STEP_MS = 2_000;
+    const services = makeServices(undefined, advancingClock('2026-11-07T10:00:00Z', STEP_MS));
+    const { client, server } = await connect(services);
+
+    // start(1): t=0 → 2000, abre context
+    await client.callTool({
+      name: 'chamba_task_metrics',
+      arguments: {
+        action: 'start',
+        workItem: 'CLOCK-002',
+        routeSuggested: 'small',
+        source: 'ticket',
+      },
+    });
+    // human_wait_start(2): nowIso=2000 → 4000
+    await client.callTool({
+      name: 'chamba_task_metrics',
+      arguments: {
+        action: 'event',
+        workItem: 'CLOCK-002',
+        kind: 'human_wait_start',
+        reason: 'clarification',
+      },
+    });
+    // human_wait_end(3): nowIso=4000 → delta = 4000-2000 = 2000 (1 step), t → 6000
+    await client.callTool({
+      name: 'chamba_task_metrics',
+      arguments: { action: 'event', workItem: 'CLOCK-002', kind: 'human_wait_end' },
+    });
+    // end(4): nowIso=6000 → closes context: delta = 6000-0 = 6000
+    await client.callTool({
+      name: 'chamba_task_metrics',
+      arguments: { action: 'end', workItem: 'CLOCK-002', testsPassed: true, delivered: true },
+    });
+
+    const raw = await services.fs.readFile('/proj/.chamba/metrics/tasks.jsonl');
+    const [m] = parseTaskMetricsJsonl(raw);
+    expect(m?.humanWaits).toEqual({
+      count: 1,
+      ms: STEP_MS,
+      byReason: { clarification: { count: 1, ms: STEP_MS } },
+    });
+    expect(m?.phases?.context?.humanWaitMs).toBe(STEP_MS);
+    expect(m?.phases?.context?.ms).toBe(3 * STEP_MS); // 0 → 6000
+    expect(m?.phases?.context?.inferred).toBe(true);
 
     await server.close();
   });

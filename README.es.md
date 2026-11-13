@@ -145,7 +145,8 @@ el directorio de logs y los worktrees.
 | `chamba_create_worktrees` | `{ ticket, repos? }` | Worktrees multi-repo para un ticket (por config); conserva ramas |
 | `chamba_cleanup_worktrees` | `{ ticket, repos? }` | Borra los worktrees del ticket, **conserva todas las ramas** |
 | `chamba_classify_task` | `{ task, repos?, planText?, acceptanceCriteria?, knownRepos? }` | Clasifica una tarea en una de 4 rutas (trivial, small, substantial, risky) con heurísticas deterministas — sin LLM. Señales: términos de riesgo (auth, DB, pagos, crypto, PII, prod, secrets), completitud del ticket, repos involucrados, trivialidad. Devuelve `{ route, reasons (≤5, en español), signals, confidence, overridable }`. Potencia `/ticket` y `/orq` |
-| `chamba_task_metrics` | `{ action: 'start'\|'event'\|'end', workItem, … }` | Registra métricas de progreso de tareas sin guardar texto del ticket ni secretos. `start` inicia el tracking; `event` registra un hito (`planReview`, `verify`, `escalation`, `override`); `end` cierra y agrega una línea a `<wsRoot>/.chamba/metrics/tasks.jsonl` (gitignored). Lock in-process; chamba nunca ve tokens |
+| `chamba_task_metrics` | `{ action: 'start'\|'event'\|'end', workItem, … }` | Registra métricas de progreso de tareas sin guardar texto del ticket ni secretos. `start` inicia el tracking (abre la fase `context`); `event` registra un hito (`planReview`, `verify`, `escalation`, `override`) o un límite de fase/pausa (`phase_start`, `phase_end`, `human_wait_start`, `human_wait_end` — CHAMBA-024); `end` cierra y agrega una línea a `<wsRoot>/.chamba/metrics/tasks.jsonl` (gitignored). Lock in-process; chamba nunca ve tokens |
+| `chamba_create_worktree` / `chamba_create_worktrees` | `{ …, workItem? }` | `workItem` opcional (CHAMBA-024): atribuye el tiempo de git del propio tool a `phases.setup.toolMs` de esa tarea en `chamba_task_metrics`. Best-effort — nunca cambia el resultado del tool ni lo hace fallar. |
 
 ## Cómo funciona
 
@@ -201,10 +202,39 @@ sin rutas de archivos, sin secretos.** chamba nunca ve tokens (protocolo MCP). E
 en vuelo vive en `<wsRoot>/.chamba/metrics/inflight/<workItem>.json` (escritura atómica,
 limpieza cada 7 días); el lock es in-process (el acceso cross-process es una limitación conocida).
 
+**Fases y atención humana (CHAMBA-024).** Dos campos opcionales viajan en la misma
+línea, ambos ausentes en líneas escritas antes de 1.16.0 (el CLI las reporta como
+"sin desglose"):
+
+- `phases: { <fase>: { ms, count, inferred?, toolMs?, toolCount?, humanWaitMs? } }` —
+  10 fases: `context`, `setup`, `plan`, `plan_review`, `implement`, `test`, `review`,
+  `qa`, `verify` (reservada para CHAMBA-022), `close`. Solo `ms`/`count` entran en el
+  % del share; `toolMs` (tiempo de git que `chamba_create_worktree(s)` mide por sí
+  mismo) es informativo y nunca cuenta en el share. **`phase: 'verify'` es un eje
+  distinto de `kind: 'verify'`** (el contador de rondas de revisión de CHAMBA-020) —
+  coexisten.
+- `humanWaits: { count, ms, byReason }` — 6 motivos: `clarification`, `risky_confirm`,
+  `needs_approval`, `qa_interactive`, `final_review` (se cuenta — `byReason.final_review.count`
+  sube en cada ticket, incluso inferido — pero su duración siempre es `n/d`: las
+  muestras solo vienen de pausas no inferidas, y `final_review` siempre se cierra
+  `inferred` justo antes de `end`), `other`.
+- **Alcance de la fase `test`:** en `substantial`/`risky`, la fase `test` de `/ticket`
+  suma la corrida del tester (paso 6) **y** la corrida completa de la suite (paso 7)
+  — comparten la misma fase, sumada por ronda. En `trivial`/`small`, solo cuenta la
+  corrida de la suite (no hay paso de tester separado).
+
 ```bash
-npx @chamba/mcp metrics           # tabla por ruta, separada por source (ticket / orq) + total
-npx @chamba/mcp metrics --since 30d  # filtra los últimos 30 días (también: 24h, 2w)
+npx @chamba/mcp metrics                         # tabla por ruta, separada por source (ticket / orq) + total
+npx @chamba/mcp metrics --since 30d             # filtra los últimos 30 días (también: 24h, 2w)
+npx @chamba/mcp metrics --phases --route small --since 30d  # medianas/p90/% por fase + pausas al humano
 ```
+
+`--phases` calcula el `%` de cada fase **sobre el reloj de pared** del ticket
+(`endedAt - startedAt`), no sobre la suma de fases — la diferencia se reporta en su
+propia fila `unaccounted` ("sin fase / traspasos": tiempo que ninguna fase reclamó,
+p. ej. traspasos entre subagentes). Las fases + `unaccounted` siempre suman
+exactamente 100 %; si `unaccounted` es la mayor, el render lo dice explícitamente.
+La tabla por defecto (sin `--phases`) queda idéntica, byte a byte, a la de 1.15.1.
 
 ## Extras por editor (opcional)
 

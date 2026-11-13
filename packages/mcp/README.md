@@ -48,7 +48,16 @@ trivial / small / substantial / risky — no LLM) · `chamba_generate_plan` ·
 
 **Metrics:** `chamba_task_metrics` (`start` / `event` / `end` — records outcomes per
 ticket in `<wsRoot>/.chamba/metrics/tasks.jsonl`, gitignored; no ticket text or
-secrets; chamba never sees tokens) · `npx @chamba/mcp metrics [--since 30d]`
+secrets; chamba never sees tokens; `event` also takes `phase_start`/`phase_end`
+(with `phase`) and `human_wait_start`/`human_wait_end` (with `reason`) — CHAMBA-024) ·
+`npx @chamba/mcp metrics [--since 30d] [--route <r>] [--phases]` — `--phases` adds
+per-phase median/p90/% (over wall clock, plus an `unaccounted` row) and a
+human-wait breakdown (per reason, `final_review` always shows as `n/d`); the
+default table is unchanged · `chamba_create_worktree` / `chamba_create_worktrees`
+take an optional `workItem` to attribute their own git time to that task's `setup`
+phase · note: in `substantial`/`risky` the `test` phase sums both the tester
+subagent run and the verification-suite run; in `trivial`/`small` only the suite
+run counts (there's no separate tester step)
 
 **Worktrees (parallel work):** `chamba_create_worktree` · `chamba_create_worktrees` ·
 `chamba_list_worktrees` · `chamba_worktree_status` · `chamba_conflict_preview` ·
