@@ -224,6 +224,7 @@ Encontrado dogfooding en **finalis**. El check "Git repo" corría `git rev-parse
 - ✅ **1.13.0** — CHAMBA-017: navegación de la red de conocimiento (`chamba_vault_navigate`, mapa del vault en `load_context`, regla "navega antes de leer" en los prompts).
 - ✅ **1.14.0** — CHAMBA-020: rutas proporcionales (`chamba_classify_task`, 4 rutas en `/ticket` y `/orq`, `chamba_task_metrics` + CLI `metrics`); CHAMBA-019: subcomandos de `/vault` en inglés.
 - ✅ **1.15.0** — CHAMBA-021: vault compartido seguro (escáner de secretos de 14 reglas, procedencia + `estado: propuesto | canonico`, `chamba_vault_promote`, `chamba_vault_allow_secret`, notas devueltas como datos contra prompt-injection).
+- ✅ **1.15.1** — CHAMBA-023: cliente compatible con el gate de secretos del servidor de parche (header `X-Parche-Secret-Allow`, `422 secret_detected` por archivo sin cortar el push), fix de falso positivo en `assignment`, reglas de Stripe, escaneo por contenido UTF-8.
 
 ## Orden sugerido (lo que sigue)
 1. ✅ **1.0.0** — Tier 3 completo. Pulido y estabilización: superficie de tools revisada, docs
