@@ -24,6 +24,7 @@ import {
   computeNextStep,
   detectGitRepos,
   detectStyle,
+  dirname,
   evaluateCloseGate,
   isUnderLocal,
   joinPath,
@@ -31,7 +32,6 @@ import {
   normalizeWorkItemId,
   parseChambaConfig,
   reposWithVerifyConfigured,
-  type ScopeChangeEntry,
   type TaskDoc,
   type VerifyRun,
   type VerifyRunCommandResult,
@@ -359,7 +359,13 @@ async function resolveKnownEvidencePaths(
   doc: TaskDoc,
 ): Promise<string[]> {
   const known = new Set<string>([
-    ...doc.evidence.map((e) => e.path),
+    // NB-3 (round 2 review): a `linkOnly` ref (`local:<filename>`) points at
+    // the AUTHOR's own disk — nobody else on the team can resolve it, so it
+    // never counts as real evidence for an AC claiming `pasa` (rule 2 of
+    // `evaluateCloseGate`). It still shows up in `## Evidencia` (so the
+    // author doesn't lose track of it), just not as something an AC can
+    // point to and close on.
+    ...doc.evidence.filter((e) => !e.linkOnly).map((e) => e.path),
     ...doc.verifyRuns.flatMap((r) =>
       r.commands.map((c) => c.evidencePath).filter((p): p is string => Boolean(p)),
     ),
@@ -566,8 +572,12 @@ async function handleUpdate(
     (u) => u.estado === 'pasa' && u.evidence !== undefined,
   );
   if (pasaUpdatesWithEvidence.length > 0) {
+    // NB-3: same exclusion as `resolveKnownEvidencePaths` — a `linkOnly`
+    // ref never counts as real evidence (it resolves to nothing off the
+    // author's own disk), so `update` must not let an AC claim `pasa`
+    // against one either; `close` would reject it right after anyway.
     const known = new Set<string>([
-      ...doc.evidence.map((e) => e.path),
+      ...doc.evidence.filter((e) => !e.linkOnly).map((e) => e.path),
       ...doc.verifyRuns.flatMap((r) =>
         r.commands.map((c) => c.evidencePath).filter((p): p is string => Boolean(p)),
       ),
@@ -791,25 +801,33 @@ async function handleVerify(
     if (existing.found) doc = existing.doc;
   }
 
+  // NB-1 (round 2 review): resolve the realpath ONCE, up front, and reuse it
+  // both for the B1 comparison below AND for whatever gets stamped into
+  // `VerifyRun.worktreePath`/`TaskDoc.worktreePath` further down — storing
+  // the raw (un-resolved) input there is exactly what causes a false
+  // positive later (close-gate's own worktreePath check, or a second verify
+  // call) on "/a/b/" vs "/a/b" or (win32) casing differences that realpath
+  // would have already normalized away.
+  const style = detectStyle(services.platform);
+  let realWorktreePath: string;
+  try {
+    realWorktreePath = await services.fs.realpath(input.worktreePath);
+  } catch {
+    return errResult(`worktreePath no existe o no se pudo resolver: "${input.worktreePath}".`);
+  }
+
   // B1: verify MUST target the same worktree the document is bound to. If
   // the document has no worktreePath yet, this call binds it (first verify
   // wins) — see the write below. Comparison uses realpath + the B5 win32-
   // safe case-fold helper, never a raw string `===`.
   if (doc?.worktreePath) {
-    const style = detectStyle(services.platform);
-    let realInput: string;
-    try {
-      realInput = await services.fs.realpath(input.worktreePath);
-    } catch {
-      return errResult(`worktreePath no existe o no se pudo resolver: "${input.worktreePath}".`);
-    }
     let realDoc: string;
     try {
       realDoc = await services.fs.realpath(doc.worktreePath);
     } catch {
       realDoc = doc.worktreePath;
     }
-    if (caseFoldLocal(realInput, style) !== caseFoldLocal(realDoc, style)) {
+    if (caseFoldLocal(realWorktreePath, style) !== caseFoldLocal(realDoc, style)) {
       return errResult(
         `verify debe correr sobre el worktree de ${input.workItem} ("${doc.worktreePath}"), no "${input.worktreePath}". ` +
           'Si el worktree cambió legítimamente, abrí la tarea de nuevo (open) desde el worktree correcto.',
@@ -835,7 +853,7 @@ async function handleVerify(
   const vaultPath = vaultRes.vaultPath;
 
   const runId = await generateRunId(services, vaultPath, input.workItem, date);
-  const finalRun: VerifyRun = { ...run, runId, worktreePath: input.worktreePath };
+  const finalRun: VerifyRun = { ...run, runId, worktreePath: realWorktreePath };
 
   const commandsWithEvidence: VerifyRunCommandResult[] = [];
   for (const [i, outcome] of result.outcomes.entries()) {
@@ -843,7 +861,7 @@ async function handleVerify(
     const relDir = `tareas/${normalizeWorkItemId(input.workItem)}/evidencia/${runId}`;
     const relPath = `${relDir}/tests-${outcome.name}.md`;
     const absPath = joinPath(vaultPath, relPath);
-    await services.fs.mkdir(absPath.slice(0, absPath.lastIndexOf('/')));
+    await services.fs.mkdir(dirname(absPath));
     await services.fs.writeBytes(absPath, new TextEncoder().encode(evidenceMd));
     commandsWithEvidence.push({
       ...(finalRun.commands[i] as VerifyRunCommandResult),
@@ -855,8 +873,9 @@ async function handleVerify(
   const updated: TaskDoc = {
     ...doc,
     verifyRuns: [...doc.verifyRuns, finalRun],
-    // B1: first verify binds the document to this worktree.
-    ...(doc.worktreePath ? {} : { worktreePath: input.worktreePath }),
+    // B1: first verify binds the document to this worktree — the realpath,
+    // same as `finalRun.worktreePath` (NB-1).
+    ...(doc.worktreePath ? {} : { worktreePath: realWorktreePath }),
   };
   const author = await resolveTaskAuthor(services);
   await writeTaskDoc(services, vaultPath, updated, {
@@ -953,6 +972,7 @@ async function handleClose(
     reposTouched,
     knownEvidencePaths,
     documentWorktreePath: doc.worktreePath,
+    platform: services.platform,
     partial: input.partial,
     approvedByUser: input.approvedByUser,
   };
@@ -974,20 +994,19 @@ async function handleClose(
   };
 
   if (gate.partial) {
-    const entry: ScopeChangeEntry = {
-      date,
-      change: 'reopen',
-      acId: 'AC-0',
-      reason: `cierre parcial aprobado por el usuario — pendiente: ${gate.pending.join('; ') || '(ninguno adicional)'}`,
-      requestedByUser: true,
-    };
+    // NB-5 (round 2 review): a partial close is progress/close bookkeeping,
+    // NOT a scope change — the old code logged a synthetic `reopen AC-0`
+    // scope_change entry with no matching AC, polluting the scope_changes
+    // log that rule 6 (evaluateCloseGate) validates. It now only gets its
+    // own progress entry (persisted on every route — NB-4) with the date
+    // and what's still pending; `renderCloseBlock` already stamps the same
+    // note into `## Cierre` either way.
     updated = {
       ...updated,
       progressLog: [
         ...updated.progressLog,
         `- ${date}: cierre parcial aprobado por el usuario. Pendiente: ${gate.pending.join('; ') || '(ninguno)'}`,
       ],
-      scopeChanges: [...updated.scopeChanges, entry],
     };
   }
 
@@ -1177,6 +1196,7 @@ async function handleGet(
     reposTouched,
     knownEvidencePaths,
     documentWorktreePath: doc.worktreePath,
+    platform: services.platform,
   });
 
   const siguientePaso = computeNextStep(doc);

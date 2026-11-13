@@ -138,11 +138,18 @@ describe('renderTaskDoc / parseTaskDoc — round trip', () => {
     expect(withHumanNote).toContain('Esto lo escribió un humano.');
   });
 
-  it('small route omits Checklist/Progreso/Siguiente paso', () => {
+  it('small route omits Checklist/Siguiente paso but keeps Progreso (NB-4)', () => {
     const doc: TaskDoc = { ...fullDoc(), route: 'small' };
     const md = renderTaskDoc(doc, { date: '2026-11-13' });
     expect(md).not.toContain('## Checklist');
-    expect(md).not.toContain('## Progreso');
+    expect(md).not.toContain('## Siguiente paso');
+    // NB-4 (round 2 review): `## Progreso` must survive on `small` — a
+    // progress note (from `update` or a partial close) must never be
+    // silently dropped just because the route is `small`.
+    expect(md).toContain('## Progreso');
+    const reparsed = parseTaskDoc(md);
+    if ('error' in reparsed) throw new Error(reparsed.error);
+    expect(reparsed.doc.progressLog).toEqual(doc.progressLog);
   });
 
   it('fails clearly when work_item is missing', () => {

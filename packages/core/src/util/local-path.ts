@@ -323,6 +323,20 @@ export function isUnderLocal(
   return foldCandidate.startsWith(`${foldRoot}/`);
 }
 
+// ─── sameLocalPath ────────────────────────────────────────────────────────────
+
+/**
+ * NB-1 (CHAMBA-022 round 2 review): compare two local paths for EQUALITY
+ * tolerant of a trailing separator ("/a/b/" vs "/a/b") and, on win32, case
+ * — never a bare `===`, which false-positives on either. Pairs with
+ * `isUnderLocal`'s own fold+strip logic; use this when the two paths are
+ * meant to name the SAME directory/file, not one containing the other.
+ */
+export function sameLocalPath(a: string, b: string, style: PathStyle): boolean {
+  const norm = (p: string) => caseFoldLocal(p, style).replace(/[/\\]+$/, '');
+  return norm(a) === norm(b);
+}
+
 // ─── isInvalidPath ────────────────────────────────────────────────────────────
 
 /**

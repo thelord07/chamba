@@ -469,6 +469,61 @@ describe('Test 3 — evidence', () => {
     expect(res.isError).toBeFalsy();
     expect(text(res)).toMatch(/1 archivo\(s\) copiado/);
     expect(text(res)).toMatch(/enlazado/);
+
+    // NB-3 (round 2 review): the linked-only evidence ref must NEVER carry
+    // the user's absolute local disk path into the synced note — only a
+    // non-identifying `local:<filename>` reference, with the reason stated
+    // alongside it.
+    const doc = (res.structuredContent as { document?: { workItem: string } }).document;
+    expect(doc).toBeDefined();
+    const notePath = '/vault/tareas/chamba-120.md';
+    const raw = await services.fs.readFile(notePath);
+    expect(raw).toContain('local:shot.png');
+    expect(raw).not.toContain('/ws/.chamba/qa-evidence');
+    expect(raw).toContain('solo enlace — excede el presupuesto, quedó en tu disco');
+  });
+
+  it('NB-3: a linkOnly evidence ref does not count as real evidence for an AC claiming pasa', async () => {
+    const bigImage = 'x'.repeat(3 * 1024 * 1024); // 3 MB > 2 MB/image limit
+    const services = makeServices({
+      files: {
+        '/ws/.chamba/qa-evidence/CHAMBA-121/run1/shot.png': bigImage,
+      },
+    });
+    const { client } = await connect(services);
+    await client.callTool({
+      name: 'chamba_task',
+      arguments: { action: 'open', workItem: 'CHAMBA-121', route: 'small', criteria: ['hace X'] },
+    });
+    const evRes = await client.callTool({
+      name: 'chamba_task',
+      arguments: {
+        action: 'evidence',
+        workItem: 'CHAMBA-121',
+        kind: 'qa',
+        sourcePath: '/ws/.chamba/qa-evidence/CHAMBA-121/run1',
+      },
+    });
+    expect(evRes.isError).toBeFalsy();
+
+    const raw = await services.fs.readFile('/vault/tareas/chamba-121.md');
+    const linkOnlyPathMatch = raw.match(/qa: \[\[(local:[^\]]+)\]\]/);
+    expect(linkOnlyPathMatch).toBeTruthy();
+    const linkOnlyPath = linkOnlyPathMatch?.[1] as string;
+
+    // Pointing AC-1 at the linkOnly ref must NOT be accepted as real
+    // evidence — it resolves to nothing the rest of the team can see.
+    // `update` itself rejects it (same exclusion `close`'s gate applies).
+    const updateRes = await client.callTool({
+      name: 'chamba_task',
+      arguments: {
+        action: 'update',
+        workItem: 'CHAMBA-121',
+        acUpdates: [{ id: 'AC-1', estado: 'pasa', evidence: [linkOnlyPath] }],
+      },
+    });
+    expect(updateRes.isError).toBeTruthy();
+    expect(text(updateRes)).toMatch(/no resuelven a nada registrado/);
   });
 
   it('B7: report.md with a secret is never copied, and is reported', async () => {
@@ -767,6 +822,35 @@ describe('Test 4 — close', () => {
     });
     expect(getRes.isError).toBeFalsy();
     expect((getRes.structuredContent as Record<string, unknown>).integrityViolation).toBe(true);
+  });
+
+  it('NB-2: hand-editing `ruta` in the frontmatter (risky→small) blocks close as a hand-edit, not as a normal gate check', async () => {
+    const services = makeServices();
+    const { client } = await connect(services);
+    await client.callTool({
+      name: 'chamba_task',
+      arguments: {
+        action: 'open',
+        workItem: 'CHAMBA-139',
+        route: 'risky',
+        criteria: ['AC uno'],
+      },
+    });
+
+    const path = '/vault/tareas/chamba-139.md';
+    const raw = await services.fs.readFile(path);
+    expect(raw).toContain('ruta: risky');
+    // Hand-edit `ruta` only — dodging the risky route's verify-config
+    // requirement without touching criteria/evidence/scope_changes at all.
+    const corrupted = raw.replace('ruta: risky', 'ruta: small');
+    await services.fs.writeBytes(path, new TextEncoder().encode(corrupted));
+
+    const res = await client.callTool({
+      name: 'chamba_task',
+      arguments: { action: 'close', workItem: 'CHAMBA-139', partial: true, approvedByUser: true },
+    });
+    expect(res.isError).toBeTruthy();
+    expect(text(res)).toMatch(/editado a mano/);
   });
 
   it('happy close produces Implementado/Verificado/Pendiente and taskEvidence that end() uses', async () => {

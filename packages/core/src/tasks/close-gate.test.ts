@@ -142,6 +142,43 @@ describe('evaluateCloseGate — rule 3: último verify falló', () => {
     if (result.ok) throw new Error('expected blocked');
     expect(result.missing[0]).toMatch(/no corresponde al worktree/);
   });
+
+  it('NB-1: a trailing-separator difference alone is NOT a different worktree', () => {
+    const result = evaluateCloseGate(
+      baseInput({
+        documentWorktreePath: '/ws/CHAMBA-022/chamba',
+        lastVerifyRun: {
+          runId: 'run-1',
+          date: '2026-11-13',
+          level: 'executed',
+          commands: [
+            { name: 'test', exitCode: 0, timedOut: false, truncated: false, durationMs: 10 },
+          ],
+          worktreePath: '/ws/CHAMBA-022/chamba/',
+        },
+      }),
+    );
+    expect(result).toEqual({ ok: true, partial: false, pending: [] });
+  });
+
+  it('NB-1: a casing difference alone is NOT a different worktree on win32', () => {
+    const result = evaluateCloseGate(
+      baseInput({
+        documentWorktreePath: 'C:\\ws\\CHAMBA-022\\chamba',
+        platform: 'win32',
+        lastVerifyRun: {
+          runId: 'run-1',
+          date: '2026-11-13',
+          level: 'executed',
+          commands: [
+            { name: 'test', exitCode: 0, timedOut: false, truncated: false, durationMs: 10 },
+          ],
+          worktreePath: 'c:\\WS\\chamba-022\\CHAMBA',
+        },
+      }),
+    );
+    expect(result).toEqual({ ok: true, partial: false, pending: [] });
+  });
 });
 
 describe('evaluateCloseGate — rule 4 (O2): risky sin verify configurado', () => {

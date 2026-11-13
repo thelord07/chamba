@@ -249,10 +249,15 @@ Acceptance-criterion text is immutable once written: the only way to drop one is
 `scope_change(change='discard')`, which requires a `reason` **and**
 `requestedByUser: true` — the agent prompts you for that go-ahead first. Immutability is
 enforced, not just documented: every write stamps a digest (`chamba_digest` in the
-frontmatter) over the criteria/evidence/scope-change blocks, and every read recomputes
-and compares it — a hand-edit to one of those three blocks between writes makes
+frontmatter) over the criteria/evidence/scope-change blocks plus the `route`,
+`worktree_path`, `repos` and `estado_tarea` frontmatter fields, and every read
+recomputes and compares it — a hand-edit to any of those between writes makes
 `update`/`scope_change`/`verify`/`close` refuse to act on the document until it's fixed
-(`get` only reports the violation, since it doesn't write).
+(`get` only reports the violation, since it doesn't write). This digest is an
+**integrity check against accidental or agent edits**, not an anti-tamper
+mechanism — it's a plain hash stamped in the open, not a cryptographic signature, so it
+doesn't defend against a team member deliberately editing the document and recomputing
+it (nothing here does; the vault is a shared, trusted space).
 
 **`verify` runs real commands, not a claim.** `chamba_task(action='verify')` executes
 the commands configured for each touched repo and writes their output as evidence —
@@ -330,7 +335,11 @@ set in the same two config layers as `repos.*.verify`:
 
 The first sync that includes an evidence image under that setting warns once that
 screenshots are **not scanned for secrets** and may contain sensitive data — an explicit
-trade-off, not a silent default.
+trade-off, not a silent default. With `syncEvidence: false` (the default), evidence
+images are excluded from sync in **both** directions — never pushed, never pulled, and
+never tombstoned just because they're absent from your local snapshot — so a link to a
+screenshot in an AC's evidence **won't resolve for the rest of the team** until someone
+syncs with `syncEvidence: true`.
 
 **Known limitations** (documented, not solved here): the task-document lock is
 in-process only, and the vault reindex isn't serialized across tools in the same

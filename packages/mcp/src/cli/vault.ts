@@ -21,6 +21,7 @@ import {
   CredentialsStore,
   countProposed,
   defaultDeviceLabel,
+  excludeEvidencePush,
   InvalidJoinInputError,
   joinFirstHint,
   joinOnce,
@@ -68,6 +69,7 @@ import {
   resyncPrepare,
   updateBindingVaultDirForSlug,
 } from '../parche/binding-ops.js';
+import { resolveSyncEvidenceFlag } from '../parche/vault-config.js';
 import type { Services } from '../services.js';
 import { obsidianSearchRoots } from '../services.js';
 
@@ -718,6 +720,11 @@ async function runStatus(deps: VaultCliDeps): Promise<void> {
     return;
   }
 
+  // B-2: same evidence-image exclusion `syncOnce` applies — otherwise a
+  // vault with evidence images synced before (or by a teammate) would show
+  // a scary "pending: N" for a push that would never actually happen.
+  const syncEvidence = await resolveSyncEvidenceFlag(services);
+
   // Count personal memories
   try {
     const personalMemDir = joinPath(services.cwd, MEMORY_DIR);
@@ -756,8 +763,13 @@ async function runStatus(deps: VaultCliDeps): Promise<void> {
             const { snapshot } = await scanLocal(
               { fs: services.fs, hash: services.hash },
               vaultDir,
+              undefined,
+              { syncEvidence },
             );
-            const pushEntries = planPush(toSyncState(state), snapshot);
+            const pushEntries = excludeEvidencePush(
+              planPush(toSyncState(state), snapshot),
+              syncEvidence,
+            );
             pending = String(pushEntries.length);
           } catch {
             pending = 'error';

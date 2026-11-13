@@ -250,10 +250,15 @@ es `scope_change(change='discard')`, que exige `reason` **y**
 `requestedByUser: true` — el prompt del agente te pide esa aprobación primero. La
 inmutabilidad se hace cumplir, no solo se documenta: cada escritura estampa un digest
 (`chamba_digest` en el frontmatter) sobre los bloques de criterios/evidencia/cambios de
-alcance, y cada lectura lo recalcula y compara — una edición a mano de alguno de esos
-tres bloques entre escrituras hace que `update`/`scope_change`/`verify`/`close`
+alcance más los campos `ruta`, `worktree_path`, `repos` y `estado_tarea` del
+frontmatter, y cada lectura lo recalcula y compara — una edición a mano de cualquiera
+de esos campos entre escrituras hace que `update`/`scope_change`/`verify`/`close`
 rechacen actuar sobre el documento hasta que se resuelva (`get` solo reporta la
-violación, porque no escribe).
+violación, porque no escribe). Este digest es un **control de integridad contra
+ediciones accidentales o del agente**, no un mecanismo anti-tamper — es un hash simple
+estampado a la vista, no una firma criptográfica, así que no defiende contra alguien
+del equipo editando el documento a propósito y recalculándolo (nada en chamba lo
+hace; el vault es un espacio compartido y de confianza).
 
 **`verify` corre comandos reales, no una afirmación.** `chamba_task(action='verify')`
 ejecuta los comandos configurados para cada repo tocado y escribe su salida como
@@ -336,7 +341,12 @@ mismas dos capas de config que `repos.*.verify`:
 
 La primera sincronización que incluye una imagen de evidencia bajo esa opción avisa
 una vez que las capturas **no se escanean por secretos** y pueden contener datos
-sensibles — es una decisión explícita, no un default silencioso.
+sensibles — es una decisión explícita, no un default silencioso. Con
+`syncEvidence: false` (el default), las imágenes de evidencia quedan excluidas del
+sync en **ambas** direcciones — nunca se pulean, nunca se bajan, y nunca se les
+emite un tombstone solo por estar ausentes del snapshot local — así que un enlace a
+una captura en un AC **no va a resolver para el resto del equipo** hasta que alguien
+sincronice con `syncEvidence: true`.
 
 **Limitaciones conocidas** (documentadas, no resueltas aquí): el lock del documento
 de tarea es solo in-process, y el reindex del vault no está serializado entre tools

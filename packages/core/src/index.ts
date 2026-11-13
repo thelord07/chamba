@@ -377,12 +377,6 @@ export {
 export type { CloseGateInput, CloseGateResult } from './tasks/close-gate.js';
 export { evaluateCloseGate } from './tasks/close-gate.js';
 // Tasks — live task documents + close gate + verify evidence (CHAMBA-022)
-export type { AcLike, CriteriaImmutableResult } from './tasks/criteria.js';
-// N4: `normalizeAcText` is an internal comparison helper. `assertCriteriaImmutable`
-// predates N1's `chamba_digest` integrity check (task-store.ts), which is a strict
-// superset — it catches ANY hand-edit of the criteria block, not just a text
-// mismatch — so nothing outside this module calls `assertCriteriaImmutable`
-// anymore; it stays defined (and tested) here, just not re-exported publicly.
 export { assignAcIds } from './tasks/criteria.js';
 export type {
   EvidenceBudgetLimits,
@@ -467,6 +461,7 @@ export {
   localDirname,
   localRelative,
   normalizeLocal,
+  sameLocalPath,
   toAbsoluteLocal,
 } from './util/local-path.js';
 // Path helpers
@@ -594,6 +589,7 @@ export {
   AdoptionPendingError,
   BlobHashMismatchError,
   CaseCollisionError,
+  excludeEvidencePush,
   joinOnce,
   scanLocal,
   syncOnce,

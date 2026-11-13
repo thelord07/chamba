@@ -238,7 +238,11 @@ function renderEvidenceBlock(verifyRuns: VerifyRun[], evidence: EvidenceRef[]): 
     }
   }
   for (const ev of evidence) {
-    const linkNote = ev.linkOnly ? ' (solo enlace)' : '';
+    // NB-3 (round 2 review): a `linkOnly` evidence ref NEVER carries an
+    // absolute disk path here — `ev.path` is already a non-identifying
+    // `local:<filename>` reference (tasks/evidence-copy.ts) by the time it
+    // reaches this render; the note just explains WHY it's link-only.
+    const linkNote = ev.linkOnly ? ' (solo enlace — excede el presupuesto, quedó en tu disco)' : '';
     lines.push(`- ${ev.kind}: [[${ev.path}]]${linkNote}`);
   }
   return lines.join('\n');
@@ -253,9 +257,23 @@ function renderEvidenceBlock(verifyRuns: VerifyRun[], evidence: EvidenceRef[]): 
  * next_step/request/close — those are expected to be edited freely (by
  * `update`, or even by hand for progress notes) and aren't the integrity
  * surface this guards.
+ *
+ * NB-2 (round 2 review): also covers `ruta` (route), `worktree_path`,
+ * `repos` and `estado_tarea` — these frontmatter fields drive the close
+ * gate (route decides which verify config applies, worktreePath gates
+ * which worktree `verify` trusts, estadoTarea gates whether `close` even
+ * runs) and a hand-edit of any of them (e.g. `ruta: risky` → `small` to
+ * dodge the verify-config requirement) is exactly the kind of accidental/
+ * agent edit this digest exists to catch. `close` itself legitimately
+ * changes `estadoTarea` — it recomputes the digest on write (same as every
+ * other mutating action), so that transition is never flagged.
  */
 export function controlledBlocksDigestInput(doc: TaskDoc): string {
   return [
+    doc.route,
+    doc.worktreePath ?? '',
+    (doc.repos ?? []).join(','),
+    doc.estadoTarea,
     renderCriteriaBlock(doc.criteria),
     renderEvidenceBlock(doc.verifyRuns, doc.evidence),
     renderScopeChangesBlock(doc.scopeChanges),
@@ -291,27 +309,25 @@ export function renderTaskDoc(doc: TaskDoc, opts: { date: string; digest?: strin
     sections.push('## Checklist');
     sections.push(upsertBlock('', 'checklist', renderChecklistBlock(doc.checklist)).trim());
     sections.push('');
-    sections.push('## Progreso');
-    sections.push(upsertBlock('', 'progress', doc.progressLog.join('\n')).trim());
-    sections.push('');
+  }
+  // NB-4 (round 2 review): `## Progreso` is persisted for EVERY route,
+  // `small` included — `chamba_task update` accepts a `progress` note
+  // regardless of route, and a partial close always appends its own
+  // "cierre parcial aprobado por el usuario" line (NB-5's dedicated entry,
+  // not a synthetic scope change); neither may silently vanish on `small`.
+  sections.push('## Progreso');
+  sections.push(upsertBlock('', 'progress', doc.progressLog.join('\n')).trim());
+  sections.push('');
+  if (doc.route === 'substantial' || doc.route === 'risky') {
     sections.push('## Siguiente paso');
     sections.push(upsertBlock('', 'next_step', doc.nextStep).trim());
     sections.push('');
-    sections.push('## Cambios de alcance');
-    sections.push(
-      upsertBlock('', 'scope_changes', renderScopeChangesBlock(doc.scopeChanges)).trim(),
-    );
-    sections.push('');
-  } else {
-    // route === 'small': Pedido, AC, Evidencia, Cierre only — but scope_changes
-    // still exists as an empty block so scope_change never hits a missing
-    // section (NN5).
-    sections.push('## Cambios de alcance');
-    sections.push(
-      upsertBlock('', 'scope_changes', renderScopeChangesBlock(doc.scopeChanges)).trim(),
-    );
-    sections.push('');
   }
+  // scope_changes always exists (even empty) so scope_change never hits a
+  // missing section (NN5), on every route.
+  sections.push('## Cambios de alcance');
+  sections.push(upsertBlock('', 'scope_changes', renderScopeChangesBlock(doc.scopeChanges)).trim());
+  sections.push('');
   sections.push('## Evidencia');
   sections.push(
     upsertBlock('', 'evidence', renderEvidenceBlock(doc.verifyRuns, doc.evidence)).trim(),
@@ -455,7 +471,12 @@ function parseEvidenceBlock(body: string): { verifyRuns: VerifyRun[]; evidence: 
       });
       continue;
     }
-    const evMatch = line.match(/^-\s*(qa|manual|verify):\s*\[\[([^\]]+)\]\](\s*\(solo enlace\))?/);
+    // NB-3: the "(solo enlace...)" suffix now carries a reason after it
+    // (renderEvidenceBlock) — match the whole parenthetical, not just the
+    // exact literal "(solo enlace)", so `linkOnly` round-trips correctly.
+    const evMatch = line.match(
+      /^-\s*(qa|manual|verify):\s*\[\[([^\]]+)\]\](\s*\(solo enlace[^)]*\))?/,
+    );
     if (evMatch) {
       evidence.push({
         kind: evMatch[1] as EvidenceRef['kind'],

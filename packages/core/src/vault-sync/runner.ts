@@ -305,6 +305,40 @@ export async function scanLocal(
   return { snapshot, blobSource, findingsByPath, includedEvidenceImages };
 }
 
+// ─── Evidence-image policy (B-2, round 2 review) ──────────────────────────────
+
+/**
+ * B-2: `scanLocal` already excludes evidence images from `localSnapshot` when
+ * `syncEvidence` is false (O1), but `planPush`/`planPull` don't know about
+ * that policy — they just see "absent locally" and, for a path that's still
+ * in `state.files` from a PRIOR sync (evidence was pushed while
+ * `syncEvidence: true`, or by a teammate with it enabled), that reads as "was
+ * synced, now deleted locally" and emits a destructive tombstone.
+ *
+ * Fix: the policy is symmetric. When `syncEvidence` is false, evidence image
+ * paths are excluded from sync in BOTH directions — never pushed (not even
+ * as a delete) and never pulled (neither a write nor a delete is applied
+ * locally for them). A path already in `state.files` from before is simply
+ * left alone: no entry/action is ever generated for it, so `state.files`
+ * keeps its old value and nothing touches the remote or the local disk.
+ */
+export function excludeEvidencePush(
+  entries: PushEntry[],
+  syncEvidence: boolean | undefined,
+): PushEntry[] {
+  if (syncEvidence) return entries;
+  return entries.filter((e) => !isEvidenceImagePath(e.path));
+}
+
+/** Pull-side counterpart of `excludeEvidencePush` — see its doc comment. */
+function excludeEvidencePull(
+  actions: PullAction[],
+  syncEvidence: boolean | undefined,
+): PullAction[] {
+  if (syncEvidence) return actions;
+  return actions.filter((a) => !isEvidenceImagePath(a.path));
+}
+
 // ─── checkAbort ───────────────────────────────────────────────────────────────
 
 function checkAbort(signal?: AbortSignal): void {
@@ -1004,7 +1038,10 @@ export async function syncOnce(deps: SyncDeps, opts: SyncOpts): Promise<SyncSumm
       'vault.syncEvidence está activo: las capturas de evidencia se sincronizan sin escanear ' +
       '— pueden contener datos sensibles.';
   }
-  const allPushEntries = planPush(syncState, localSnapshot);
+  // B-2: never push an evidence image when syncEvidence is off — not even a
+  // tombstone for one left in `state.files` from a prior sync (see
+  // `excludeEvidencePush`'s doc comment above).
+  const allPushEntries = excludeEvidencePush(planPush(syncState, localSnapshot), syncEvidence);
 
   // CHAMBA-021 S6: screen for un-allowlisted secrets BEFORE pushing. A file
   // with ≥1 finding is excluded entirely from this batch; the rest proceeds.
@@ -1157,8 +1194,15 @@ export async function syncOnce(deps: SyncDeps, opts: SyncOpts): Promise<SyncSumm
     if (!page.hasMore) break;
   }
 
-  // Single planPull over all changes
-  const pullPlan = planPull(syncState, localSnapshot, allChanges, { localAuthor });
+  // Single planPull over all changes. B-2: a remote evidence-image
+  // write/delete is never applied locally when syncEvidence is off (cursor
+  // still advances off the full `allChanges`, so this doesn't cause a
+  // refetch loop — only the generated actions are filtered).
+  const rawPullPlan = planPull(syncState, localSnapshot, allChanges, { localAuthor });
+  const pullPlan = {
+    ...rawPullPlan,
+    actions: excludeEvidencePull(rawPullPlan.actions, syncEvidence),
+  };
 
   // Execute actions in order (passes style so invalid Windows names are skipped)
   const {
@@ -1337,7 +1381,12 @@ export async function syncOnce(deps: SyncDeps, opts: SyncOpts): Promise<SyncSumm
       blobSource2.set(h, absPath);
     }
 
-    const allPushEntries2 = planPush(postPullState, localSnapshot2);
+    // B-2: same exclusion as phase 1 — a conflict-copy pass must not push an
+    // evidence-image tombstone either.
+    const allPushEntries2 = excludeEvidencePush(
+      planPush(postPullState, localSnapshot2),
+      syncEvidence,
+    );
     // CHAMBA-021 S6: gate conflict-copy pushes too — a conflict copy of a file
     // with a secret is a brand-new local file; without this it would leak
     // through this back door even though phase 1 blocked the original.

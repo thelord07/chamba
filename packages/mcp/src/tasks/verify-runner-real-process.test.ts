@@ -17,16 +17,24 @@
  *     variable present in the parent (`CHAMBA_TEST_SECRETISH`) does NOT
  *     reach the child by default, and DOES reach it with `inheritEnv: true`.
  *
- * Portable: no shell, no OS-specific syntax — only `node <script>.js`
- * fixtures, exactly like `packages/adapters/src/node-process.test.ts`.
+ * Round 2 review (B-1): the previous version mixed real OS temp paths
+ * (`mkdtemp(tmpdir())`, which on win32 produce `C:\...`) with
+ * `MemoryFilesystem`, which is POSIX-only (`readDir` on a `C:\...` root
+ * returns `[]`, `realpath` just prefixes with `/`). That made the test fail
+ * on windows-latest for reasons that have nothing to do with the behaviour
+ * under test. Fixed by mounting the ENTIRE scenario on the real filesystem
+ * (`NodeFilesystem` from `@chamba/adapters`) inside one `mkdtemp` root —
+ * workspace, repo (with `.git/HEAD`), vault (with `.obsidian/`) and homedir
+ * (with `.chamba/config.json`) all as real directories/files — so this is a
+ * genuinely portable "real process" test on all three OSes.
  */
 
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { NodeProcess } from '@chamba/adapters';
-import { FakeHash, FakeRandom, MemoryFilesystem, type RandomPort } from '@chamba/core';
+import { NodeFilesystem, NodeProcess } from '@chamba/adapters';
+import { FakeHash, FakeRandom, type RandomPort } from '@chamba/core';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { pino } from 'pino';
@@ -55,22 +63,29 @@ function sequentialRandom(): RandomPort {
 }
 
 describe('chamba_task action=verify — real process end-to-end (CHAMBA-022)', () => {
+  const realFs = new NodeFilesystem();
+
+  let tempRoot: string;
+  let wsRoot: string;
   let worktreePath: string;
   let repoName: string;
+  let vaultPath: string;
+  let homedir: string;
 
   beforeEach(async () => {
-    worktreePath = await mkdtemp(join(tmpdir(), 'chamba-verify-real-'));
-    repoName = worktreePath.split(/[\\/]/).pop() as string;
-    process.env.CHAMBA_TEST_SECRETISH = LEAK_MARKER;
-  });
+    tempRoot = await realFs.realpath(await mkdtemp(join(tmpdir(), 'chamba-verify-real-')));
+    wsRoot = join(tempRoot, 'ws');
+    repoName = 'repo';
+    worktreePath = join(wsRoot, repoName);
+    vaultPath = join(tempRoot, 'vault');
+    homedir = join(tempRoot, 'home');
 
-  afterEach(async () => {
-    delete process.env.CHAMBA_TEST_SECRETISH;
-    await rm(worktreePath, { recursive: true, force: true });
-  });
+    await mkdir(join(worktreePath, '.git'), { recursive: true });
+    await writeFile(join(worktreePath, '.git', 'HEAD'), 'ref: refs/heads/main\n', 'utf8');
 
-  function makeRealServices(): Services {
-    const wsRoot = dirname(worktreePath);
+    await mkdir(join(vaultPath, '.obsidian'), { recursive: true });
+    await writeFile(join(vaultPath, '.obsidian', 'app.json'), '{}', 'utf8');
+
     const config = JSON.stringify({
       version: 1,
       repos: {
@@ -90,15 +105,20 @@ describe('chamba_task action=verify — real process end-to-end (CHAMBA-022)', (
         },
       },
     });
+    await mkdir(join(homedir, '.chamba'), { recursive: true });
+    await writeFile(join(homedir, '.chamba', 'config.json'), config, 'utf8');
 
-    const files: Record<string, string> = {
-      '/vault/.obsidian/app.json': '{}',
-      [`${worktreePath}/.git/HEAD`]: 'ref: refs/heads/main\n',
-      '/home/test/.chamba/config.json': config,
-    };
+    process.env.CHAMBA_TEST_SECRETISH = LEAK_MARKER;
+  });
 
+  afterEach(async () => {
+    delete process.env.CHAMBA_TEST_SECRETISH;
+    await rm(tempRoot, { recursive: true, force: true });
+  });
+
+  function makeRealServices(): Services {
     return {
-      fs: new MemoryFilesystem(files),
+      fs: new NodeFilesystem(),
       process: new NodeProcess(),
       clock: {
         now: () => new Date('2026-11-13T10:00:00Z'),
@@ -120,8 +140,8 @@ describe('chamba_task action=verify — real process end-to-end (CHAMBA-022)', (
       hash: new FakeHash(),
       random: sequentialRandom(),
       cwd: wsRoot,
-      homedir: '/home/test',
-      obsidianVaultPath: '/vault',
+      homedir,
+      obsidianVaultPath: vaultPath,
       parchePullTtlMin: 5,
       vaultMutex: new Map(),
       metricsMutex: new Map(),
@@ -172,7 +192,7 @@ describe('chamba_task action=verify — real process end-to-end (CHAMBA-022)', (
     const readEvidence = async (name: string): Promise<string> => {
       const cmd = byName.get(name);
       if (!cmd) throw new Error(`no command named ${name} in the response`);
-      return services.fs.readFile(`/vault/${cmd.evidencePath}`);
+      return services.fs.readFile(join(vaultPath, cmd.evidencePath));
     };
 
     const passEvidence = await readEvidence('pass');

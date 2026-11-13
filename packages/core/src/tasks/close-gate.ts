@@ -22,6 +22,7 @@
  * self-grants that approval.
  */
 
+import { detectStyle, sameLocalPath } from '../util/local-path.js';
 import type {
   AcceptanceCriterion,
   ScopeChangeEntry,
@@ -49,6 +50,14 @@ export interface CloseGateInput {
   knownEvidencePaths: string[];
   /** `TaskDoc.worktreePath`, if bound (B1 defense-in-depth, see rule 3). */
   documentWorktreePath?: string;
+  /**
+   * NB-1: OS platform string, used ONLY to case-fold the
+   * `lastVerifyRun.worktreePath` vs `documentWorktreePath` comparison below
+   * (win32 is case-insensitive) — defaults to `'posix'` (still strips a
+   * trailing separator either way) when omitted. Pure: never touches the
+   * filesystem, just a string tag the caller already has on `services`.
+   */
+  platform?: string;
   partial?: boolean;
   approvedByUser?: boolean;
 }
@@ -111,10 +120,18 @@ export function evaluateCloseGate(input: CloseGateInput): CloseGateResult {
     // B1 defense-in-depth: `chamba_task verify` itself refuses to run
     // against a worktree other than the document's — this only catches a
     // document that somehow carries a run from a different worktree.
+    // NB-1: compare with `sameLocalPath` (trailing-separator + win32
+    // case-fold tolerant), never a raw `!==` — both values are ALSO stored
+    // as realpaths now (tools/task.ts), but a document written before that
+    // fix may still carry a non-normalized path.
     if (
       input.lastVerifyRun.worktreePath !== undefined &&
       input.documentWorktreePath !== undefined &&
-      input.lastVerifyRun.worktreePath !== input.documentWorktreePath
+      !sameLocalPath(
+        input.lastVerifyRun.worktreePath,
+        input.documentWorktreePath,
+        detectStyle(input.platform ?? 'posix'),
+      )
     ) {
       exemptable.push(
         'el último verify no corresponde al worktree de esta tarea; corré verify de nuevo desde el worktree correcto.',

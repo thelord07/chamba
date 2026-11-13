@@ -13,6 +13,7 @@
  */
 
 import {
+  basename,
   DEFAULT_EVIDENCE_BUDGET,
   detectStyle,
   dirname,
@@ -213,8 +214,13 @@ export async function copyQaEvidence(input: CopyQaEvidenceInput): Promise<CopyQa
 
   for (const entry of plan.linkOnly) {
     notes.push(`"${entry.path}": ${entry.reason} — se enlaza sin copiar.`);
-    const src = safeFiles.find((f) => f.relPath === entry.path);
-    linkedOnly.push({ path: src?.absPath ?? entry.path, kind: 'qa', linkOnly: true });
+    // NB-3 (round 2 review): NEVER persist the user's absolute local disk
+    // path into a note that gets synced to the whole team — a non-
+    // identifying `local:<filename>` reference is enough for the author to
+    // find it again on their own machine; the reason ("excede el
+    // presupuesto, quedó en tu disco") is rendered alongside it
+    // (task-doc.ts's `renderEvidenceBlock`).
+    linkedOnly.push({ path: `local:${basename(entry.path)}`, kind: 'qa', linkOnly: true });
   }
 
   void reportRetained; // already reflected in `notes` and the missing copy entry

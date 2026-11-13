@@ -267,7 +267,7 @@ for (const { name, content } of PROMPTS) {
     // que aparecerían de todos modos).
     for (const phase of ALL_PHASES) {
       it(`lists phase "${phase}" in the canonical Phases enum`, () => {
-        expect(content).toMatch(new RegExp('`' + phase + '`'));
+        expect(content).toMatch(new RegExp(`\`${phase}\``));
       });
     }
 
