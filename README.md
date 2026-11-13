@@ -130,7 +130,7 @@ the log directory and worktrees.
 | `chamba_triage_ticket` | `{ ticket }` | Heuristic completeness check for a support/bug ticket (no LLM): `{ present, missing, questions, enoughToStart, score }` — flags whether it has reproduction, expected-vs-actual, environment, scope, acceptance criteria, severity, with the questions to ask back. Powers `/triage` |
 | `chamba_generate_plan` | `{ task, context? }` | A structured plan template to fill |
 | `chamba_review_plan` | `{ plan, task, context? }` | `{ approved, issues, suggestions, riskFlags }` — no LLM |
-| `chamba_create_worktree` | `{ taskSlug, workerId, baseBranch? }` | An isolated git worktree |
+| `chamba_create_worktree` | `{ taskSlug, workerId, baseBranch?, workItem? }` | An isolated git worktree |
 | `chamba_list_worktrees` | `{}` | Worktrees with dirty/stale/ahead-behind flags and file overlap |
 | `chamba_worktree_status` | `{ repos?, baseBranch? }` | Full status + overlaps (no LLM). `ok: false` if `failOnOverlap` and files collide |
 | `chamba_conflict_preview` | `{ baseBranch?, branches? }` | `git merge-tree` dry-run vs base + pairwise — **never merges** |
@@ -140,7 +140,7 @@ the log directory and worktrees.
 | `chamba_remember` | `{ key, content, tags? }` | Persists a markdown memory |
 | `chamba_recall` | `{ query }` | Searches saved memories |
 | `chamba_get_agent_config` | `{ role }` | `{ model, effort, reasoning_priority, provider, hint }` for a role — no LLM |
-| `chamba_create_worktrees` | `{ ticket, repos? }` | Multi-repo worktrees for a ticket (config-driven); keeps branches |
+| `chamba_create_worktrees` | `{ ticket, repos?, workItem? }` | Multi-repo worktrees for a ticket (config-driven); keeps branches |
 | `chamba_cleanup_worktrees` | `{ ticket, repos? }` | Removes a ticket's worktrees, **keeps every branch** |
 | `chamba_classify_task` | `{ task, repos?, planText?, acceptanceCriteria?, knownRepos? }` | Classifies a task into one of 4 routes (trivial, small, substantial, risky) using deterministic heuristics — no LLM. Signals: risk terms (auth, DB, payments, crypto, PII, prod, secrets), ticket completeness, repos involved, triviality. Returns `{ route, reasons (≤5, in Spanish), signals, confidence, overridable }`. Powers `/ticket` and `/orq` |
 | `chamba_task_metrics` | `{ action: 'start'\|'event'\|'end', workItem, … }` | Records task-progress metrics without storing ticket text or secrets. `start` begins tracking (opens the `context` phase); `event` logs a milestone (`planReview`, `verify`, `escalation`, `override`) or a phase/human-wait boundary (`phase_start`, `phase_end`, `human_wait_start`, `human_wait_end` — CHAMBA-024); `end` closes and appends one line to `<wsRoot>/.chamba/metrics/tasks.jsonl` (gitignored). Lock is in-process; chamba never sees tokens |
@@ -462,6 +462,7 @@ The scan reads each file once before uploading it; if you edit a note in the exa
 - ✅ **1.13.0 — Navigate the knowledge network:** `chamba_vault_navigate` walks topics → subtopics → notes (with backlinks and `work_item` siblings) and `chamba_load_context` returns a vault map instead of a flat list, so agents navigate before they read
 - ✅ **1.14.0 — Proportional routes (ODD step 1):** `chamba_classify_task` picks the right flow heuristically — no LLM — (trivial → small → substantial → risky); `/ticket` and `/orq` follow the route; `chamba_task_metrics` records outcomes per ticket in a local `.jsonl` (gitignored); `npx @chamba/mcp metrics` renders a table by route and source
 - ✅ **1.15.0 — Shared vault security:** a deterministic secret scanner (14 rules: API keys, cloud and forge tokens, JWTs, PEM keys, credentialed connection strings, high-entropy assignments) blocks any note with a possible secret before it leaves the machine; every chamba write carries provenance and `estado: propuesto | canonico` (`chamba_vault_promote` marks a note reviewed); note bodies come back wrapped as data so they cannot inject instructions
+- ✅ **1.16.0 — Time per phase:** `/ticket` and `/orq` record how long each phase takes (context, setup, plan, review, implement, test, QA, close) and how long they wait on a human, by reason; `npx @chamba/mcp metrics --phases` shows median, p90 and share per route, plus the unaccounted time, so you can see where a ticket's time actually goes
 - 🔭 V2: semantic vault search, MCP sampling, more knowledge bases
 
 See [`PLAN.md`](./PLAN.md) for the full phase plan.

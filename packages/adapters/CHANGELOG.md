@@ -1,5 +1,12 @@
 # @chamba/adapters
 
+## 1.16.0
+
+### Patch Changes
+
+- Updated dependencies [ea30ca1]
+  - @chamba/core@1.16.0
+
 ## 1.15.1
 
 ### Patch Changes

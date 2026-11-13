@@ -1,5 +1,19 @@
 # @chamba/core
 
+## 1.16.0
+
+### Minor Changes
+
+- ea30ca1: CHAMBA-024: métricas de tiempo por fase y de atención humana, para encontrar dónde se va el tiempo de `/ticket` y `/orq` antes de diseñar la "ruta rápida".
+
+  - **Fases (`@chamba/core`):** nuevo enum `Phase` (`context`, `setup`, `plan`, `plan_review`, `implement`, `test`, `review`, `qa`, `verify` — reservada para CHAMBA-022 —, `close`) y un reductor puro `applyPhaseEvent`/`closeOpenSpans` (recibe `nowIso`, nunca lee un reloj). `TaskMetric`/`InflightMetric` ganan campos **opcionales** `phases`/`humanWaits` — totalmente retrocompatibles: una línea de `tasks.jsonl` de 1.15.x sigue siendo válida y se reporta como "sin desglose".
+  - **`chamba_task_metrics`:** 4 `kind` nuevos — `phase_start`/`phase_end` (con `phase`, enum cerrado) y `human_wait_start`/`human_wait_end` (con `reason`, enum cerrado: `clarification`, `risky_confirm`, `needs_approval`, `qa_interactive`, `final_review`, `other`). `start` abre la fase `context` por sí mismo. Una fase sin `phase_end` se cierra al iniciar la siguiente o en `end`, marcada `inferred`; rondas repetidas (p. ej. 2 de `review`) suman `ms` y `count`. El `inputSchema` **registrado** del tool pasa a `z.object(...).strict()` — único lugar donde la strictness surte efecto (el SDK de MCP valida ahí antes de llamar al handler) — y publica `additionalProperties: false`; una clave desconocida sigue devolviendo el error del SDK (en inglés), sin cambios en los campos existentes.
+  - **`chamba_create_worktree`/`chamba_create_worktrees`:** parámetro opcional `workItem` para atribuir la duración de su trabajo de git a `phases.setup.toolMs` de la tarea activa — informativo, nunca entra en el `ms`/share de la fase. Sin `workItem` atribuible (0 o ≥2 coincidencias), no se escribe nada y el resultado del tool es idéntico al de hoy; best-effort absoluto, nunca cambia el resultado ni falla el tool.
+  - **CLI `npx @chamba/mcp metrics --phases [--route <r>] [--since <Nd|Nh|Nw>]`:** por ruta y fase, mediana, p90 (nearest-rank) y % sobre el **reloj de pared** del grupo, con la fase dominante marcada; fila `unaccounted` ("sin fase / traspasos") para el tiempo que ninguna fase reclamó — fases + `unaccounted` suman exactamente 100 %. Incluye "Pausas al humano" (por motivo) y "Por ticket". La tabla **sin** `--phases` queda **idéntica byte a byte** a la de 1.15.1. Fix de un bug preexistente: `--since`/`--route` sin valor (o seguidos de otro flag) ahora es un error claro en vez de leer el flag siguiente como valor.
+  - **`/ticket` y `/orq`:** emiten `phase_start`/`phase_end` en cada límite de fase (en las 4 rutas, incluidas `trivial` y `small`) y envuelven cada pausa que ya existía (aclaración, confirmación de `risky`, login de QA, revisión final) en `human_wait_start`/`human_wait_end` — no se autoriza ningún punto de pausa nuevo. `chamba_classify_task` pasa a llamarse antes de `chamba_load_context` (no depende de su salida — lee el workspace map por su cuenta), para que la fase `context` cubra la parte cara de la navegación del vault. Un servidor chamba anterior a esta versión rechaza estos `kind` con un error de validación — el prompt lo ignora y no reintenta, las métricas nunca bloquean el trabajo.
+
+  Sin cambios destructivos: no se borra ni se reescribe ninguna línea de `tasks.jsonl`, no hay migraciones ni resets.
+
 ## 1.15.1
 
 ### Patch Changes
