@@ -17,6 +17,7 @@
  */
 
 import type { DirEntry, FilesystemPort } from '../../ports/filesystem.js';
+import { isTaskEvidencePath } from '../../tasks/evidence-paths.js';
 import { isDerivedPathPattern } from './derived-path.js';
 import type { NoteType } from './note-metadata.js';
 import { readNoteMetadata, upsertNoteMetadata } from './note-metadata.js';
@@ -452,6 +453,7 @@ async function scanRecursive(
       const topPart = relPath.split('/')[0] ?? '';
       if (SKIP_DIRS.has(topPart.toLowerCase())) continue;
       if (name.startsWith('.')) continue;
+      if (isTaskEvidencePath(relPath)) continue; // B8: evidence subtree, never a knowledge note
       await scanRecursive(fs, `${absDir}/${name}`, relPath, results);
     } else if (entry.isFile && name.endsWith('.md')) {
       if (name === 'INDEX.md') continue;

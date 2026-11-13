@@ -49,6 +49,13 @@ export interface TaskMetric {
   phases?: PhasesMap;
   /** CHAMBA-024 — opcional: pausas al humano agregadas. Ausente en líneas < 1.16.0. */
   humanWaits?: HumanWaitsRecord;
+  /**
+   * CHAMBA-022 (O5 — owner decision): `'measured'` cuando `testsPassed`/
+   * `delivered` vienen de `chamba_task close` (dato real); `'agent-reported'`
+   * cuando no hubo `close` previo y se aceptan los booleanos que declaró el
+   * agente (afirmación, no medición). Ausente en líneas < 1.17.0.
+   */
+  evidenceLevel?: 'measured' | 'agent-reported';
 }
 
 /**
@@ -74,6 +81,26 @@ export interface InflightMetric {
   humanWaits?: HumanWaitsRecord;
   activePhase?: { phase: Phase; startedAt: string };
   activeHumanWait?: { reason: HumanWaitReason; startedAt: string };
+  /**
+   * CHAMBA-022 (O5 — owner decision): the facts `chamba_task close` measured
+   * for this work item, written directly by `close` (its own lock, D-9 —
+   * NEVER by calling `chamba_task_metrics`). `handleEnd` prefers these over
+   * the agent's own booleans when present.
+   */
+  taskEvidence?: {
+    testsPassed: boolean;
+    delivered: boolean;
+    partial: boolean;
+    runId?: string;
+    /**
+     * B3: the `VerifyRun.level` that produced `testsPassed` — `'executed'`
+     * when chamba actually ran a command, `'reported-by-agent'` when no
+     * `verify` command was configured (so there's nothing really measured,
+     * even though `close` wrote a `taskEvidence` entry). `handleEnd` only
+     * reports `evidenceLevel: 'measured'` when this is `'executed'`.
+     */
+    verifyLevel?: 'executed' | 'reported-by-agent';
+  };
 }
 
 // ─── Serialization ─────────────────────────────────────────────────────────────

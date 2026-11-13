@@ -59,6 +59,10 @@ phase · note: in `substantial`/`risky` the `test` phase sums both the tester
 subagent run and the verification-suite run; in `trivial`/`small` only the suite
 run counts (there's no separate tester step)
 
+**Live task document:** `chamba_task` (`open` / `update` / `scope_change` / `evidence` /
+`verify` / `close` / `get` — the vault document that is a ticket's source of truth, plus
+real `verify` runs and a close gate that won't accept "done" without evidence)
+
 **Worktrees (parallel work):** `chamba_create_worktree` · `chamba_create_worktrees` ·
 `chamba_list_worktrees` · `chamba_worktree_status` · `chamba_conflict_preview` ·
 `chamba_partition` · `chamba_worktree_env` · `chamba_cleanup_worktree` ·
@@ -75,6 +79,35 @@ live RAM/CPU) · `chamba_qa_capabilities` (web/mobile QA probe) · `chamba_get_a
 
 Full docs, per-editor guides and examples:
 **https://github.com/thelord07/chamba**
+
+## Live tasks and evidence
+
+`chamba_task` keeps `tareas/<work_item>.md` as a ticket's source of truth: acceptance
+criteria (immutable text once written — `scope_change(change='discard')` is the only
+way to drop one, and it requires `reason` + `requestedByUser: true`), progress,
+checklist, scope changes and verify runs. `trivial` tickets never get one.
+
+`action='verify'` runs the commands configured in `repos.<name>.verify` — read **only**
+from `~/.chamba/config.json` and `<workspace-root>/.chamba/config.json`, never from a
+worktree or a cloned repo — as a plain `command` + `args` array (no shell, no string
+parsing), with a timeout and tree-kill, a 200-line/256 KiB evidence tail, and a default
+environment allowlist (`cmd.env`/`inheritEnv: true` opt out per command). A repo without
+`verify` configured still closes, but its evidence is marked **reported by the agent**;
+`risky` tickets must have `verify` configured for every touched repo or close `partial`.
+
+`action='close'` evaluates a 6-rule gate (pending AC with no reason, "passing" AC with no
+evidence, a failing/timed-out verify run, a `risky` repo missing `verify`, an AC in
+`falla`, or a discarded AC with no scope-change entry) before accepting the ticket as
+done. `partial: true` + `approvedByUser: true` exempts the first five (never the sixth)
+and is recorded in the document with the date. `action='evidence'` copies QA output
+with limits (2 MB/image, 20 MB/run, 200 files); images only sync to the vault with
+`vault.syncEvidence: true` (default `false`) — the first sync under that setting warns
+once that screenshots aren't scanned for secrets. `action='get'` returns the computed
+next step, the close-gate result and the `worktreePath`, for `/ticket resume`.
+
+See the root README's **Live tasks and evidence** section for the full config example,
+the Windows `.cmd` note and the known limitations (in-process lock, unserialized
+reindex, evidence TOCTOU, no evidence retention).
 
 ## Knowledge network
 

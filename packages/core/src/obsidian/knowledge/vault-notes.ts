@@ -15,6 +15,7 @@
  */
 
 import type { FilesystemPort } from '../../ports/filesystem.js';
+import { isTaskEvidencePath } from '../../tasks/evidence-paths.js';
 import { isInvalidPath } from '../../util/local-path.js';
 import type { GraphNote } from './knowledge-graph.js';
 import { readNoteMetadata } from './note-metadata.js';
@@ -116,6 +117,10 @@ async function scanNotePaths(
       const topPart = relPath.split('/')[0] ?? '';
       if (VAULT_SKIP_DIRS.has(topPart.toLowerCase())) continue;
       if (name.startsWith('.')) continue;
+      // B8: `tareas/<id>/evidencia/` is a path PREFIX, not a top-level dir —
+      // VAULT_SKIP_DIRS only compares `relPath.split('/')[0]` and can never
+      // match it. Skip the whole subtree so evidence files never become notes.
+      if (isTaskEvidencePath(relPath)) continue;
       const subResults = await scanNotePaths(fs, `${absDir}/${name}`, relPath);
       result.push(...subResults);
     } else if (entry.isFile) {

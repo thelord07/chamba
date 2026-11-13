@@ -131,6 +131,14 @@ export const syncStateFileSchema = z.object({
     .optional()
     // Tolerant for the same reason as `blockedSecret` above.
     .catch(undefined),
+  /**
+   * CHAMBA-022 (O1 — owner decision): set to `true` once this vault has
+   * synced with `vault.syncEvidence: true` and at least one evidence image
+   * was included. Local-only — never shared to the remote vault — so the
+   * "captures aren't scanned" warning is shown exactly once per vault, not
+   * once per team member.
+   */
+  evidenceImagesWarned: z.boolean().optional(),
 });
 
 export type SyncStateFile = z.infer<typeof syncStateFileSchema>;
@@ -209,6 +217,10 @@ export function toSyncState(file: SyncStateFile): SyncState {
  *   same map computed after phase 1 so it isn't lost.
  * @param newBlockedSecretServer - Same semantics, for the `blockedSecretServer`
  *   map (CHAMBA-023 S5) — server-side `422 secret_detected` rejections.
+ * @param newEvidenceImagesWarned - CHAMBA-022 (O1): when `true`, sets the
+ *   "already warned about evidence images" flag going forward (it never
+ *   un-sets it — once warned, always warned). `undefined` preserves `base`'s
+ *   value.
  */
 export function mergeIntoStateFile(
   base: SyncStateFile,
@@ -217,6 +229,7 @@ export function mergeIntoStateFile(
   newSkippedPaths?: Record<string, string>,
   newBlockedSecret?: BlockedSecretMap,
   newBlockedSecretServer?: ServerBlockedSecretMap,
+  newEvidenceImagesWarned?: boolean,
 ): SyncStateFile {
   const result: SyncStateFile = {
     server: base.server,
@@ -249,6 +262,12 @@ export function mergeIntoStateFile(
   const effectiveBlockedSecretServer = newBlockedSecretServer ?? base.blockedSecretServer;
   if (effectiveBlockedSecretServer && Object.keys(effectiveBlockedSecretServer).length > 0) {
     result.blockedSecretServer = effectiveBlockedSecretServer;
+  }
+  // One-way latch (per the JSDoc above): true if EITHER side ever said true.
+  // `??` alone would let an explicit `false` clear a previously-persisted
+  // `true` from `base` — the opposite of "once warned, always warned".
+  if (newEvidenceImagesWarned === true || base.evidenceImagesWarned === true) {
+    result.evidenceImagesWarned = true;
   }
   return result;
 }

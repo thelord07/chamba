@@ -146,6 +146,7 @@ el directorio de logs y los worktrees.
 | `chamba_cleanup_worktrees` | `{ ticket, repos? }` | Borra los worktrees del ticket, **conserva todas las ramas** |
 | `chamba_classify_task` | `{ task, repos?, planText?, acceptanceCriteria?, knownRepos? }` | Clasifica una tarea en una de 4 rutas (trivial, small, substantial, risky) con heurísticas deterministas — sin LLM. Señales: términos de riesgo (auth, DB, pagos, crypto, PII, prod, secrets), completitud del ticket, repos involucrados, trivialidad. Devuelve `{ route, reasons (≤5, en español), signals, confidence, overridable }`. Potencia `/ticket` y `/orq` |
 | `chamba_task_metrics` | `{ action: 'start'\|'event'\|'end', workItem, … }` | Registra métricas de progreso de tareas sin guardar texto del ticket ni secretos. `start` inicia el tracking (abre la fase `context`); `event` registra un hito (`planReview`, `verify`, `escalation`, `override`) o un límite de fase/pausa (`phase_start`, `phase_end`, `human_wait_start`, `human_wait_end` — CHAMBA-024); `end` cierra y agrega una línea a `<wsRoot>/.chamba/metrics/tasks.jsonl` (gitignored). Lock in-process; chamba nunca ve tokens |
+| `chamba_task` | `{ action: 'open'\|'update'\|'scope_change'\|'evidence'\|'verify'\|'close'\|'get', workItem, … }` | Mantiene un documento de tarea vivo en el vault (CHAMBA-022) y bloquea `close` sin evidencia real. `open` lo crea (idempotente, se omite en ruta `trivial`); `update` edita progreso/checklist/estado de AC (nunca el texto del AC); `scope_change` es la única vía para agregar/reabrir/descartar un criterio; `evidence` copia salida de QA dentro de un presupuesto; `verify` corre los comandos configurados del repo vía `ProcessPort.run` (nunca un string de shell) y registra exit codes + salida redactada; `close` rechaza cerrar sin evidencia real (o un `partial` explícito, aprobado por el usuario); `get` devuelve el documento + siguiente paso + estado de la compuerta para `/ticket resume` |
 | `chamba_create_worktree` / `chamba_create_worktrees` | `{ …, workItem? }` | `workItem` opcional (CHAMBA-024): atribuye el tiempo de git del propio tool a `phases.setup.toolMs` de esa tarea en `chamba_task_metrics`. Best-effort — nunca cambia el resultado del tool ni lo hace fallar. |
 
 ## Cómo funciona
@@ -208,7 +209,7 @@ línea, ambos ausentes en líneas escritas antes de 1.16.0 (el CLI las reporta c
 
 - `phases: { <fase>: { ms, count, inferred?, toolMs?, toolCount?, humanWaitMs? } }` —
   10 fases: `context`, `setup`, `plan`, `plan_review`, `implement`, `test`, `review`,
-  `qa`, `verify` (reservada para CHAMBA-022), `close`. Solo `ms`/`count` entran en el
+  `qa`, `verify`, `close`. Solo `ms`/`count` entran en el
   % del share; `toolMs` (tiempo de git que `chamba_create_worktree(s)` mide por sí
   mismo) es informativo y nunca cuenta en el share. **`phase: 'verify'` es un eje
   distinto de `kind: 'verify'`** (el contador de rondas de revisión de CHAMBA-020) —
@@ -235,6 +236,122 @@ propia fila `unaccounted` ("sin fase / traspasos": tiempo que ninguna fase recla
 p. ej. traspasos entre subagentes). Las fases + `unaccounted` siempre suman
 exactamente 100 %; si `unaccounted` es la mayor, el render lo dice explícitamente.
 La tabla por defecto (sin `--phases`) queda idéntica, byte a byte, a la de 1.15.1.
+
+## Tareas vivas y evidencia
+
+`/ticket` y `/orq` mantienen un documento vivo por ticket — `tareas/<work_item>.md` en
+el vault — vía `chamba_task`. Es la fuente de verdad del estado del ticket; a
+diferencia de `chamba_task_metrics`, que solo registra hechos de cómo corrió el
+ticket, este documento guarda qué es el ticket: sus criterios de aceptación, el
+progreso, los cambios de alcance y las corridas de verificación. Los tickets
+`trivial` nunca tienen uno — siguen con un resumen de 3 líneas. El texto de un
+criterio de aceptación es inmutable una vez escrito: la única vía para descartar uno
+es `scope_change(change='discard')`, que exige `reason` **y**
+`requestedByUser: true` — el prompt del agente te pide esa aprobación primero. La
+inmutabilidad se hace cumplir, no solo se documenta: cada escritura estampa un digest
+(`chamba_digest` en el frontmatter) sobre los bloques de criterios/evidencia/cambios de
+alcance, y cada lectura lo recalcula y compara — una edición a mano de alguno de esos
+tres bloques entre escrituras hace que `update`/`scope_change`/`verify`/`close`
+rechacen actuar sobre el documento hasta que se resuelva (`get` solo reporta la
+violación, porque no escribe).
+
+**`verify` corre comandos reales, no una afirmación.** `chamba_task(action='verify')`
+ejecuta los comandos configurados para cada repo tocado y escribe su salida como
+evidencia — chamba de verdad los corrió, el agente no se limitó a decir "pasaron los
+tests". Una vez que el documento queda atado a un worktree (lo fija el primer
+`open`/`verify` con `worktreePath`), todo `verify` posterior de ese ticket tiene que
+apuntar al MISMO worktree — apuntar a otro distinto se rechaza, así la evidencia nunca
+queda recolectada contra el checkout equivocado. Configuralos en `repos.<nombre>.verify`, en **cualquiera** de dos capas:
+`~/.chamba/config.json` (global) o `<raíz-del-workspace>/.chamba/config.json`
+(proyecto) — **nunca** un archivo dentro de un worktree o de un repo clonado: un
+repo hostil o un PR malicioso no puede inyectar un comando por esta vía.
+
+```json
+{
+  "version": 1,
+  "repos": {
+    "chamba": {
+      "verify": [
+        { "name": "unit", "command": "pnpm", "args": ["test"], "timeoutSec": 600 }
+      ]
+    }
+  }
+}
+```
+
+`command` es el ejecutable desnudo — sin espacios, sin metacaracteres de shell — y
+`args` es un array plano; chamba nunca parsea un string a argv (ahí nacen las
+inyecciones) y nunca corre nada a través de un shell. **Nota Windows:**
+`pnpm`/`npm`/etc. son archivos `.cmd`; chamba los corre vía `cmd.exe /d /s /c` con
+una allowlist de caracteres seguros en cada arg (sigue sin ser un string de shell).
+Si preferís no depender de eso, la forma portable funciona en cualquier OS:
+`{ "command": "node", "args": ["<ruta-al-cli>.js", "test"] }`. Opcional por
+comando: `cwd` (relativo, contenido dentro del worktree), `timeoutSec` (default 600,
+máx 1800 — se mata el proceso y todo su árbol al vencer), `env` (vars extra sobre
+la allowlist de abajo) e `inheritEnv: true` (opt-in al entorno completo del padre).
+Por default el proceso hijo recibe una **allowlist**, no tu entorno completo —
+`PATH`, `HOME`/`USERPROFILE`, `SystemRoot`/`windir`, `TEMP`/`TMP`/`TMPDIR`, `ComSpec`,
+`PATHEXT`, `LANG`/`LC_ALL`, `TZ`, `CI`, y todo lo que empiece con `NODE_` o
+`npm_config_` — porque el server MCP hereda el entorno de tu editor, que puede traer
+tokens, y esa salida se escribe en un vault que comparte tu equipo.
+
+**Dos niveles de evidencia.** Un repo con `verify` configurado tiene evidencia
+*medida* — chamba corrió el comando, capturó exit code/duración/las últimas 200
+líneas (redactadas por secretos) y el `head`/estado sucio de git contra el que
+corrió. Un repo sin uno igual cierra, pero su evidencia queda marcada como
+**reportada por el agente** — más débil, y así se dice explícitamente en el bloque
+de cierre. Los tickets `risky` son la excepción: cerrar sin `verify` configurado
+para un repo tocado queda bloqueado (configuralo, o cerrá `partial`).
+
+**La compuerta de cierre.** `chamba_task(action='close')` rechaza cerrar si: (1) un
+AC pendiente sin razón, (2) un AC "pasa" cuya evidencia **no resuelve a nada que
+chamba haya registrado** (un string cualquiera no cuenta), (3) una corrida de verify
+fallida o con timeout, (4) un ticket `risky` donde ni siquiera se puede determinar el
+repo tocado, o el repo tocado no tiene `verify` configurado, (5) un AC en
+`falla`, o (6) un AC descartado sin la entrada correspondiente en el log de cambios
+de alcance. Si rechaza, **no lo rodees** — resolvé lo que falta, o pedí
+`partial: true` + `approvedByUser: true`: esto cierra como entrega parcial y solo se
+alcanza con tu aprobación explícita (chamba nunca se la auto-otorga). Queda
+registrado en el documento con la fecha y la frase "cierre parcial aprobado por el
+usuario" — la regla 6 es la única excepción que `partial` nunca exime, porque un AC
+descartado sin procedencia registrada es un problema de integridad del registro, no
+trabajo pendiente.
+
+**`/ticket resume <work_item>` / `/orq resume`.** `chamba_task(action='get')`
+devuelve el documento, el siguiente paso calculado, el resultado de la compuerta y
+el `worktreePath` del último `open`/`verify`; el agente lo reconcilia contra
+`git status --porcelain` + `git diff --stat` sobre el worktree real y continúa
+desde ahí en vez de reiniciar el ticket.
+
+**La evidencia de QA** se copia a `tareas/<id>/evidencia/<run>/qa/` con límites —
+2 MB por imagen, 20 MB por run, 200 archivos — más allá de los cuales un archivo se
+enlaza en vez de copiarse (nunca se descarta). El texto de evidencia (`report.md`,
+`tests-*.md`) siempre sincroniza a tu vault de parche; las **imágenes** de
+evidencia solo sincronizan con `vault.syncEvidence: true` (default `false`), en las
+mismas dos capas de config que `repos.*.verify`:
+
+```json
+{ "version": 1, "vault": { "syncEvidence": true } }
+```
+
+La primera sincronización que incluye una imagen de evidencia bajo esa opción avisa
+una vez que las capturas **no se escanean por secretos** y pueden contener datos
+sensibles — es una decisión explícita, no un default silencioso.
+
+**Limitaciones conocidas** (documentadas, no resueltas aquí): el lock del documento
+de tarea es solo in-process, y el reindex del vault no está serializado entre tools
+dentro del mismo proceso — dos servers, o `open`/`close` corriendo a la vez que
+`chamba_summarize_to_vault`, pueden pisarse los derivados. Hay una ventana TOCTOU
+entre el chequeo de containment por realpath y la copia real de evidencia de QA
+(la misma clase de brecha ya documentada para el escaneo de secretos). Y la
+evidencia no tiene retención ni rotación — el subárbol `tareas/**/evidencia/` solo
+crece; limpiarlo sería destructivo, así que queda en tus manos. `verify` retiene el
+lock de la tarea durante toda la corrida (hasta `timeoutSec`, 30 minutos máximo) —
+otras acciones de `chamba_task` para el **mismo** `workItem` quedan en cola; otros
+tickets no se ven afectados. Y un `verify` en curso cuando se mata el proceso del
+server MCP (no un SIGINT/SIGTERM prolijo, que solo cierra el transporte) puede dejar
+su árbol de procesos corriendo — chamba hoy no rastrea ni mata árboles de `verify` en
+vuelo al apagar el server.
 
 ## Extras por editor (opcional)
 

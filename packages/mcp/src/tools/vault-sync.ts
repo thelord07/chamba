@@ -21,6 +21,7 @@ import { z } from 'zod';
 import { describeError } from '../fatal.js';
 import { formatSyncOutput } from '../parche/binding-ops.js';
 import { withVaultLock } from '../parche/mutex.js';
+import { resolveSyncEvidenceFlag } from '../parche/vault-config.js';
 import type { Services } from '../services.js';
 
 const TOOL_NAME = 'chamba_vault_sync';
@@ -55,6 +56,8 @@ export function registerVaultSync(server: McpServer, logger: Logger, services: S
       const results: string[] = [];
       const resultDetails: Array<Record<string, unknown>> = [];
       let anyError = false;
+      // O1: read once per call — same two layers `chamba_task verify` reads.
+      const syncEvidence = await resolveSyncEvidenceFlag(services);
 
       for (const { server: srv, slug: sl } of targets) {
         try {
@@ -116,6 +119,7 @@ export function registerVaultSync(server: McpServer, logger: Logger, services: S
                   localAuthor: cred.user.name,
                   device: cred.device.label,
                   platform: services.platform,
+                  syncEvidence,
                 },
               ),
           );
@@ -166,6 +170,10 @@ export function registerVaultSync(server: McpServer, logger: Logger, services: S
             }
           }
           // CHAMBA-016: derived conflict summary line
+          // O1: shown exactly once per vault (persisted in local sync state).
+          if (summary.evidenceImagesWarning) {
+            results.push(`  ⚠ ${summary.evidenceImagesWarning}`);
+          }
           if ((summary.derivedConflictsResolved ?? []).length > 0) {
             const n = (summary.derivedConflictsResolved ?? []).length;
             results.push(

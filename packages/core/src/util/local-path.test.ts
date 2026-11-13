@@ -13,6 +13,7 @@ import {
   caseFoldLocal,
   isAbsoluteLocal,
   isInvalidPath,
+  isUnderLocal,
   joinLocal,
   localBasename,
   localDirname,
@@ -319,5 +320,27 @@ describe('isInvalidPath — posix (always false)', () => {
 
   it('NUL is valid on posix', () => {
     expect(isInvalidPath('NUL', 'posix')).toBe(false);
+  });
+});
+
+describe('isUnderLocal (CHAMBA-022, B5/B7)', () => {
+  it('posix: a strict descendant is contained', () => {
+    expect(isUnderLocal('/ws', '/ws/repo', 'posix')).toBe(true);
+    expect(isUnderLocal('/ws', '/other', 'posix')).toBe(false);
+  });
+
+  it('posix: equality is contained by default, rejected when strict', () => {
+    expect(isUnderLocal('/ws', '/ws', 'posix')).toBe(true);
+    expect(isUnderLocal('/ws', '/ws', 'posix', { strict: true })).toBe(false);
+  });
+
+  it('posix: a sibling with a shared prefix is NOT contained (no false positive on "/ws-other")', () => {
+    expect(isUnderLocal('/ws', '/ws-other/repo', 'posix')).toBe(false);
+  });
+
+  it('win32: case-insensitive and separator-insensitive', () => {
+    expect(isUnderLocal('C:\\ws', 'c:/WS/repo', 'win32')).toBe(true);
+    expect(isUnderLocal('C:\\ws', 'C:\\ws', 'win32', { strict: true })).toBe(false);
+    expect(isUnderLocal('C:\\ws', 'D:\\ws\\repo', 'win32')).toBe(false);
   });
 });

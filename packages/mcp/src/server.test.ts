@@ -79,6 +79,7 @@ describe('chamba MCP server', () => {
       'chamba_review_plan',
       'chamba_save_plan',
       'chamba_summarize_to_vault',
+      'chamba_task',
       'chamba_task_metrics',
       'chamba_triage_ticket',
       'chamba_vault_allow_secret',

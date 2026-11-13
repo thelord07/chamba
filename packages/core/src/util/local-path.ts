@@ -294,6 +294,35 @@ export function localRelative(base: string, target: string, style: PathStyle): s
   return target;
 }
 
+// ─── isUnderLocal ─────────────────────────────────────────────────────────────
+
+/**
+ * Containment check for already-resolved LOCAL paths (typically the result
+ * of `fs.realpath`), portable to win32 (CHAMBA-022, B5/B7).
+ *
+ * Both paths are case-folded per `style` (no-op on posix, lowercased +
+ * separator-unified on win32) before comparison — the single helper every
+ * realpath-containment check in the codebase should go through, instead of
+ * each callsite hand-rolling a POSIX-only `startsWith('/')`.
+ *
+ * `strict: true` (B7) rejects `candidate === root` — used when `root` must
+ * be a strict ANCESTOR of `candidate` (e.g. a worktree can never BE the
+ * workspace root). Default `false` allows equality (e.g. `cmd.cwd` defaults
+ * to the worktree root itself).
+ */
+export function isUnderLocal(
+  root: string,
+  candidate: string,
+  style: PathStyle,
+  opts: { strict?: boolean } = {},
+): boolean {
+  const foldRoot = caseFoldLocal(root, style).replace(/[/\\]+$/, '');
+  const foldCandidate = caseFoldLocal(candidate, style).replace(/[/\\]+$/, '');
+  if (foldCandidate === foldRoot) return opts.strict !== true;
+  // caseFoldLocal already unifies win32 separators to '/'; posix paths use '/' natively.
+  return foldCandidate.startsWith(`${foldRoot}/`);
+}
+
 // ─── isInvalidPath ────────────────────────────────────────────────────────────
 
 /**

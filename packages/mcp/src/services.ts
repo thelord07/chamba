@@ -72,6 +72,14 @@ export interface Services {
    */
   metricsMutex?: Map<string, Promise<void>>;
   /**
+   * Per-task mutex map (CHAMBA-022, D-9). Key is "task|<vaultPath>|<workItem>".
+   * NEVER the same map as `metricsMutex`/`vaultMutex` — `withVaultLock` is
+   * not reentrant, so `chamba_task close` releases this lock before ever
+   * touching `metricsMutex` (its `taskEvidence` write uses its own lock,
+   * same pattern as `recordToolSpan`).
+   */
+  taskMutex?: Map<string, Promise<void>>;
+  /**
    * Session ID for this MCP process (CHAMBA-020, R2).
    * Random string set once at process start. Used to validate notesRead baseline
    * across start/end calls: if sessionId differs, the process restarted.
@@ -131,6 +139,7 @@ export function createNodeServices(logger?: Logger): Services {
     parchePullTtlMin: Number(process.env.CHAMBA_PARCHE_PULL_TTL_MIN ?? '5') || 5,
     vaultMutex: new Map(),
     metricsMutex: new Map(),
+    taskMutex: new Map(),
     metricsSessionId: Math.random().toString(36).slice(2),
     navReadBodyCount: 0,
     workspaceRoot: process.env.CHAMBA_WORKSPACE_ROOT,

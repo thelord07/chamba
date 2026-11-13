@@ -168,6 +168,14 @@ export function applyPhaseEvent(
 
   switch (event.kind) {
     case 'phase_start': {
+      if (activePhase?.phase === event.phase) {
+        // M1: a repeated phase_start for the SAME already-open phase is a
+        // no-op, not an inferred close+reopen — otherwise a single real
+        // phase would double-count (`count: 2, inferred: true`) instead of
+        // the one tramo it actually is.
+        note = `Ya hay una fase "${event.phase}" abierta — se ignora el phase_start repetido.`;
+        return { state: { phases, humanWaits, activePhase, activeHumanWait }, note };
+      }
       if (activePhase) {
         phases = closePhase(phases, activePhase, nowIso, true);
       }

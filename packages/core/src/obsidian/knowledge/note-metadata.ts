@@ -23,7 +23,8 @@ export type NoteType =
   | 'informe'
   | 'decision'
   | 'guia'
-  | 'nota';
+  | 'nota'
+  | 'tarea';
 
 const VALID_NOTE_TYPES: ReadonlySet<string> = new Set<NoteType>([
   'plan',
@@ -33,6 +34,7 @@ const VALID_NOTE_TYPES: ReadonlySet<string> = new Set<NoteType>([
   'decision',
   'guia',
   'nota',
+  'tarea',
 ]);
 
 export interface NoteMetadata {
@@ -67,6 +69,12 @@ export interface NoteMetadata {
   flag?: string;
   /** D-Q4: name of whoever ran `classify apply` on a human note (add-only). */
   clasificado_por?: string;
+
+  // ── CHAMBA-022: live task documents ──────────────────────────────────────
+  /** `abierta` | `en_progreso` | `verificada` | `cerrada` | `bloqueada`. Only on `type: tarea`. */
+  estado_tarea?: string;
+  /** Route profile (`small` | `substantial` | `risky`) the task was opened with. */
+  ruta?: string;
 }
 
 // ─── Internal constants ───────────────────────────────────────────────────────
@@ -93,6 +101,9 @@ const KEY_ORDER: ReadonlyArray<keyof NoteMetadata> = [
   'estado',
   'flag',
   'clasificado_por',
+  // CHAMBA-022: appended at the end to minimize churn on existing notes.
+  'estado_tarea',
+  'ruta',
 ];
 
 /** Keys rendered as block lists (`  - x` per line). */
@@ -117,6 +128,8 @@ const SCALAR_KEYS: ReadonlySet<string> = new Set([
   'estado',
   'flag',
   'clasificado_por',
+  'estado_tarea',
+  'ruta',
 ]);
 
 // ─── NFC normalization ────────────────────────────────────────────────────────
@@ -503,6 +516,8 @@ export function readNoteMetadata(content: string, path: string): NoteMetadata {
     rawEstado === 'propuesto' || rawEstado === 'canonico' ? rawEstado : undefined;
   const flag = asString(fm.get('flag'));
   const clasificado_por = asString(fm.get('clasificado_por'));
+  const estado_tarea = asString(fm.get('estado_tarea'));
+  const ruta = asString(fm.get('ruta'));
 
   return {
     title,
@@ -525,6 +540,8 @@ export function readNoteMetadata(content: string, path: string): NoteMetadata {
     ...(estado !== undefined && { estado }),
     ...(flag !== undefined && { flag }),
     ...(clasificado_por !== undefined && { clasificado_por: nfc(clasificado_por) }),
+    ...(estado_tarea !== undefined && { estado_tarea }),
+    ...(ruta !== undefined && { ruta }),
   };
 }
 

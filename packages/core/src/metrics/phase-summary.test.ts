@@ -2,7 +2,7 @@
  * phase-summary.test.ts — CHAMBA-024 (T3, T3c)
  */
 import { describe, expect, it } from 'vitest';
-import { summarizePhases } from './phase-summary.js';
+import { renderPhasesTable, summarizePhases } from './phase-summary.js';
 import type { TaskMetric } from './task-metrics.js';
 
 function metric(overrides: Partial<TaskMetric>): TaskMetric {
@@ -272,5 +272,147 @@ describe('summarizePhases — CHAMBA-024 review ronda 1 (B1, inconsistent global
     const group = report.byRoute[0];
     expect(group?.unaccounted.dominant).toBe(false);
     expect(group?.phases.every((p) => !p.dominant)).toBe(true);
+  });
+});
+
+describe('summarizePhases — M2 (B6 clamp): esperas al humano fuera de fase', () => {
+  it('secuencia del revisor t0/t10/t90/t95/t100: sin clamp daría discounted negativo', () => {
+    // phase_start A t0 → hw_start t10 → phase_end A t90 → hw_end t95 → end t100.
+    // wall = 100. accountedMs (fase A) = 90 (t0..t90). unaccountedMs = 10 (t90..t100).
+    // humanWaitMs total = 85 (t10..t95). phaseHumanWaitMs (dentro de A, t10..t90) = 80.
+    // Sin clamp: outside = 85 - 80 = 5... ya no da -75 con estos números exactos,
+    // así que se usa el caso del revisor con los mismos nombres de evento pero el
+    // delta que SÍ produce negativo sin clamp: humanWaitMs=85, phaseHumanWaitMs=10.
+    const metrics: TaskMetric[] = [
+      metric({
+        workItem: 'A',
+        routeFinal: 'small',
+        startedAt: '2026-11-01T08:00:00.000Z',
+        endedAt: '2026-11-01T08:00:00.100Z', // wall = 100ms (t0..t100)
+        phases: { plan: { ms: 90, count: 1, humanWaitMs: 10 } }, // accountedMs=90, phaseHumanWaitMs=10
+        humanWaits: { count: 1, ms: 85, byReason: {} }, // humanWaitMs total = 85 (t10..t95)
+      }),
+    ];
+    const report = summarizePhases(metrics, { route: 'small' });
+    const group = report.byRoute[0];
+    expect(group).toBeDefined();
+    if (!group) throw new Error('expected group');
+
+    // unaccountedMs = wall(100) - accounted(90) = 10.
+    // outside = min(max(0, 85 - 10), 10) = min(75, 10) = 10 (clamped!).
+    // discounted = max(0, 10 - 10) = 0. Sin el clamp hubiera sido 10-75 = -65.
+    expect(group.unaccounted.pctOfTotal).toBeGreaterThanOrEqual(0);
+    expect(group.unaccounted.outsideHumanWait.pctOfTotal).toBeGreaterThanOrEqual(0);
+    expect(group.unaccounted.pctOfTotal).toBeCloseTo(0, 5);
+    expect(group.unaccounted.outsideHumanWait.pctOfTotal).toBeCloseTo(10, 5);
+
+    const total =
+      group.phases.reduce((s, p) => s + p.pctOfTotal, 0) +
+      group.unaccounted.pctOfTotal +
+      group.unaccounted.outsideHumanWait.pctOfTotal;
+    expect(total).toBeLessThanOrEqual(100 + 1e-6);
+  });
+
+  it('una espera DENTRO de una fase no se descuenta de "sin fase"', () => {
+    const metrics: TaskMetric[] = [
+      metric({
+        workItem: 'A',
+        routeFinal: 'small',
+        startedAt: '2026-11-01T08:00:00Z',
+        endedAt: '2026-11-01T08:10:00Z', // wall = 600_000
+        // toda la fase y toda la espera caen dentro de la fase ⇒ nada "fuera".
+        phases: { plan: { ms: 500_000, count: 1, humanWaitMs: 100_000 } },
+        humanWaits: { count: 1, ms: 100_000, byReason: {} },
+      }),
+    ];
+    const report = summarizePhases(metrics, { route: 'small' });
+    const group = report.byRoute[0];
+    expect(group?.unaccounted.outsideHumanWait.ms).toBe(0);
+    // unaccounted (sin fase) = wall - accounted = 100_000, sin descuento.
+    expect(group?.unaccounted.pctOfTotal).toBeCloseTo((100_000 / 600_000) * 100, 5);
+  });
+
+  it('una espera FUERA de toda fase sí se descuenta de "sin fase" y aparece en su fila', () => {
+    const metrics: TaskMetric[] = [
+      metric({
+        workItem: 'A',
+        routeFinal: 'small',
+        startedAt: '2026-11-01T08:00:00Z',
+        endedAt: '2026-11-01T08:10:00Z', // wall = 600_000
+        phases: { plan: { ms: 400_000, count: 1 } }, // sin humanWaitMs ⇒ toda la espera es "fuera"
+        humanWaits: { count: 1, ms: 50_000, byReason: {} },
+      }),
+    ];
+    const report = summarizePhases(metrics, { route: 'small' });
+    const group = report.byRoute[0];
+    // unaccountedMs bruto = 200_000. outside = min(50_000, 200_000) = 50_000.
+    // discounted = 150_000.
+    expect(group?.unaccounted.outsideHumanWait.ms).toBe(50_000);
+    expect(group?.unaccounted.medianMs).toBe(150_000);
+  });
+
+  it('N4: perTicket.unaccountedPct y dominantPhase usan el valor DESCONTADO', () => {
+    const metrics: TaskMetric[] = [
+      metric({
+        workItem: 'A',
+        routeFinal: 'small',
+        startedAt: '2026-11-01T08:00:00Z',
+        endedAt: '2026-11-01T08:10:00Z', // wall = 600_000
+        // fase real de 100_000ms (la más grande medida) + una espera larga fuera
+        // de fase (490_000) que, sin el clamp/descuento, "ganaría" y anularía la
+        // fase dominante.
+        phases: { plan: { ms: 100_000, count: 1 } },
+        humanWaits: { count: 1, ms: 490_000, byReason: {} },
+      }),
+    ];
+    const report = summarizePhases(metrics);
+    const ticket = report.perTicket.find((t) => t.workItem === 'A');
+    expect(ticket).toBeDefined();
+    // unaccountedMs bruto = 500_000 > bestMs(100_000) → antes anulaba dominantPhase.
+    // Descontado: outside=min(490_000,500_000)=490_000, discounted=10_000 < 100_000
+    // ⇒ "plan" SIGUE siendo la fase dominante.
+    expect(ticket?.dominantPhase).toBe('plan');
+    expect(ticket?.unaccountedPct).toBeCloseTo((10_000 / 600_000) * 100, 5);
+  });
+});
+
+describe('summarizePhases — N5: registro malformado nunca produce NaN en las columnas nuevas', () => {
+  it('humanWaits basura: outsideHumanWait queda en 0, sin NaN', () => {
+    const metrics: TaskMetric[] = [
+      metric({
+        workItem: 'A',
+        routeFinal: 'small',
+        startedAt: '2026-11-01T08:00:00Z',
+        endedAt: '2026-11-01T08:10:00Z',
+        phases: { plan: { ms: 1000, count: 1 } },
+        // biome-ignore lint/suspicious/noExplicitAny: fixture de jsonl editado a mano
+        humanWaits: { count: 'x', ms: 'y', byReason: {} } as any,
+      }),
+    ];
+    const report = summarizePhases(metrics, { route: 'small' });
+    expect(report.malformed).toBe(1);
+    const group = report.byRoute[0];
+    expect(group?.unaccounted.outsideHumanWait.ms).toBe(0);
+    expect(Number.isNaN(group?.unaccounted.outsideHumanWait.ms)).toBe(false);
+    expect(Number.isNaN(group?.unaccounted.pctOfTotal)).toBe(false);
+  });
+});
+
+describe('renderPhasesTable — M2 (no-regresión acotada a líneas concretas)', () => {
+  it('imprime las dos filas con sus etiquetas exactas', () => {
+    const metrics: TaskMetric[] = [
+      metric({
+        workItem: 'A',
+        routeFinal: 'small',
+        startedAt: '2026-11-01T08:00:00Z',
+        endedAt: '2026-11-01T08:10:00Z',
+        phases: { plan: { ms: 400_000, count: 1 } },
+        humanWaits: { count: 1, ms: 50_000, byReason: {} },
+      }),
+    ];
+    const report = summarizePhases(metrics, { route: 'small' });
+    const rendered = renderPhasesTable(report);
+    expect(rendered).toContain('sin fase (excluye esperas al humano)');
+    expect(rendered).toContain('esperas al humano fuera de fase');
   });
 });

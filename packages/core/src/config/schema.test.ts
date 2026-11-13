@@ -71,3 +71,90 @@ describe('parseChambaConfig', () => {
     expect(result.ok).toBe(false);
   });
 });
+
+describe('parseChambaConfig — repos.<name>.verify (CHAMBA-022)', () => {
+  it('accepts a minimal verify command, defaulting args/timeoutSec/inheritEnv', () => {
+    const result = parseChambaConfig({
+      version: 1,
+      repos: { chamba: { verify: [{ name: 'unit', command: 'node' }] } },
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const cmd = result.value.repos?.chamba?.verify[0];
+    expect(cmd).toMatchObject({
+      name: 'unit',
+      command: 'node',
+      args: [],
+      timeoutSec: 600,
+      inheritEnv: false,
+    });
+  });
+
+  it('accepts env (O7 escape hatch) and inheritEnv opt-in', () => {
+    const result = parseChambaConfig({
+      version: 1,
+      repos: {
+        chamba: {
+          verify: [
+            {
+              name: 'unit',
+              command: 'pnpm',
+              args: ['test'],
+              env: { DATABASE_URL: 'postgres://x' },
+              inheritEnv: true,
+            },
+          ],
+        },
+      },
+    });
+    expect(result.ok).toBe(true);
+  });
+
+  it('rejects a `command` with a space (D-4: must be separated into command + args)', () => {
+    const result = parseChambaConfig({
+      version: 1,
+      repos: { chamba: { verify: [{ name: 'unit', command: 'npm test' }] } },
+    });
+    expect(result.ok).toBe(false);
+  });
+
+  it('rejects a `command` with a shell metacharacter', () => {
+    const result = parseChambaConfig({
+      version: 1,
+      repos: { chamba: { verify: [{ name: 'unit', command: 'echo;rm' }] } },
+    });
+    expect(result.ok).toBe(false);
+  });
+
+  it('rejects an uppercase/invalid `name`', () => {
+    const result = parseChambaConfig({
+      version: 1,
+      repos: { chamba: { verify: [{ name: 'Unit_Test', command: 'node' }] } },
+    });
+    expect(result.ok).toBe(false);
+  });
+
+  it('rejects more than 10 verify commands for one repo', () => {
+    const verify = Array.from({ length: 11 }, (_, i) => ({ name: `c${i}`, command: 'node' }));
+    const result = parseChambaConfig({ version: 1, repos: { chamba: { verify } } });
+    expect(result.ok).toBe(false);
+  });
+
+  it('rejects an invalid env var name as an env key', () => {
+    const result = parseChambaConfig({
+      version: 1,
+      repos: {
+        chamba: { verify: [{ name: 'unit', command: 'node', env: { 'not valid': 'x' } }] },
+      },
+    });
+    expect(result.ok).toBe(false);
+  });
+
+  it('rejects an unknown key inside a verify command (strict)', () => {
+    const result = parseChambaConfig({
+      version: 1,
+      repos: { chamba: { verify: [{ name: 'unit', command: 'node', shell: true }] } },
+    });
+    expect(result.ok).toBe(false);
+  });
+});

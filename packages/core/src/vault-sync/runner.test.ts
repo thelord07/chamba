@@ -2268,3 +2268,130 @@ describe('CHAMBA-014 — FlakyHttp', () => {
     ).rejects.toThrow('ECONNRESET');
   });
 });
+
+// ─── CHAMBA-022 (O1) — evidence images are opt-in; report.md/tests-*.md always sync ──
+
+describe('scanLocal — O1: evidence images opt-in via opts.syncEvidence', () => {
+  it('by default (syncEvidence unset), an evidence image is EXCLUDED but report.md/tests-*.md are included', async () => {
+    const hash = new FakeHash();
+    const fs = new MemoryFilesystem();
+    await fs.writeBytes(
+      `${VAULT}/tareas/chamba-022/evidencia/run-1/captura.png`,
+      new Uint8Array([1, 2, 3]),
+    );
+    await fs.writeBytes(
+      `${VAULT}/tareas/chamba-022/evidencia/run-1/qa/report.md`,
+      new TextEncoder().encode('# reporte'),
+    );
+    await fs.writeBytes(
+      `${VAULT}/tareas/chamba-022/evidencia/run-1/tests-unit.md`,
+      new TextEncoder().encode('# evidencia'),
+    );
+
+    const { snapshot, includedEvidenceImages } = await scanLocal({ fs, hash }, VAULT);
+    expect(snapshot['tareas/chamba-022/evidencia/run-1/captura.png']).toBeUndefined();
+    expect(snapshot['tareas/chamba-022/evidencia/run-1/qa/report.md']).toBeDefined();
+    expect(snapshot['tareas/chamba-022/evidencia/run-1/tests-unit.md']).toBeDefined();
+    expect(includedEvidenceImages).toEqual([]);
+  });
+
+  it('with syncEvidence:true, the evidence image IS included and reported', async () => {
+    const hash = new FakeHash();
+    const fs = new MemoryFilesystem();
+    await fs.writeBytes(
+      `${VAULT}/tareas/chamba-022/evidencia/run-1/captura.png`,
+      new Uint8Array([1, 2, 3]),
+    );
+
+    const { snapshot, includedEvidenceImages } = await scanLocal({ fs, hash }, VAULT, undefined, {
+      syncEvidence: true,
+    });
+    expect(snapshot['tareas/chamba-022/evidencia/run-1/captura.png']).toBeDefined();
+    expect(includedEvidenceImages).toEqual(['tareas/chamba-022/evidencia/run-1/captura.png']);
+  });
+
+  it('a regular vault image OUTSIDE the evidence subtree is unaffected by syncEvidence:false', async () => {
+    const hash = new FakeHash();
+    const fs = new MemoryFilesystem();
+    await fs.writeBytes(`${VAULT}/proyectos/diagrama.png`, new Uint8Array([1, 2, 3]));
+
+    const { snapshot, includedEvidenceImages } = await scanLocal({ fs, hash }, VAULT);
+    expect(snapshot['proyectos/diagrama.png']).toBeDefined();
+    expect(includedEvidenceImages).toEqual([]);
+  });
+});
+
+describe('syncOnce — O1: single evidenceImagesWarning, persisted across syncs', () => {
+  it('warns on the first sync that includes an evidence image, not on a later no-op sync', async () => {
+    const parche = new FakeParche(makeClock());
+    const group = setupGroup(parche);
+    const token = makeToken(parche, group);
+    const deps = makeDeps(parche);
+    const { fs } = deps;
+
+    await fs.writeBytes(
+      `${VAULT}/tareas/chamba-022/evidencia/run-1/captura.png`,
+      new Uint8Array([1, 2, 3]),
+    );
+
+    const opts = { ...makeSyncOpts(token), syncEvidence: true };
+    const first = await syncOnce(deps, opts);
+    expect(first.pushed).toBe(1);
+    expect(first.evidenceImagesWarning).toMatch(/sin escanear/);
+
+    const state = await readState(fs, VAULT);
+    expect(state?.evidenceImagesWarned).toBe(true);
+
+    // Second sync: same file, nothing new to push — no warning repeated.
+    const second = await syncOnce(deps, opts);
+    expect(second.pushed).toBe(0);
+    expect(second.evidenceImagesWarning).toBeUndefined();
+  });
+
+  it('a second NEW evidence image on a later sync does not re-warn (already warned, persisted)', async () => {
+    const parche = new FakeParche(makeClock());
+    const group = setupGroup(parche);
+    const token = makeToken(parche, group);
+    const deps = makeDeps(parche);
+    const { fs } = deps;
+
+    await fs.writeBytes(
+      `${VAULT}/tareas/chamba-022/evidencia/run-1/captura.png`,
+      new Uint8Array([1, 2, 3]),
+    );
+    const opts = { ...makeSyncOpts(token), syncEvidence: true };
+    await syncOnce(deps, opts);
+
+    await fs.writeBytes(
+      `${VAULT}/tareas/chamba-022/evidencia/run-2/captura2.png`,
+      new Uint8Array([4, 5, 6]),
+    );
+    const again = await syncOnce(deps, opts);
+    expect(again.pushed).toBe(1); // the new image still syncs
+    expect(again.evidenceImagesWarning).toBeUndefined(); // but the notice doesn't repeat
+  });
+
+  it('without syncEvidence, no evidence image is pushed and there is no warning', async () => {
+    const parche = new FakeParche(makeClock());
+    const group = setupGroup(parche);
+    const token = makeToken(parche, group);
+    const deps = makeDeps(parche);
+    const { fs } = deps;
+
+    await fs.writeBytes(
+      `${VAULT}/tareas/chamba-022/evidencia/run-1/captura.png`,
+      new Uint8Array([1, 2, 3]),
+    );
+    await fs.writeBytes(
+      `${VAULT}/tareas/chamba-022/evidencia/run-1/tests-unit.md`,
+      new TextEncoder().encode('# evidencia'),
+    );
+
+    const summary = await syncOnce(deps, makeSyncOpts(token));
+    expect(summary.pushed).toBe(1); // only tests-unit.md
+    expect(summary.evidenceImagesWarning).toBeUndefined();
+
+    const state = await readState(fs, VAULT);
+    expect(state?.evidenceImagesWarned).toBeUndefined();
+  });
+});

@@ -175,6 +175,27 @@ describe('applyPhaseEvent', () => {
   });
 });
 
+describe('applyPhaseEvent — M1 (CHAMBA-022 review de CHAMBA-024): phase_start repetido', () => {
+  it('un phase_start de la MISMA fase ya abierta no la cierra ni la reabre', () => {
+    let state: PhaseState = emptyPhaseState();
+    state = applyPhaseEvent(state, { kind: 'phase_start', phase: 'context' }, at(0)).state;
+    const second = applyPhaseEvent(state, { kind: 'phase_start', phase: 'context' }, at(5));
+    expect(second.note).toMatch(/se ignora el phase_start repetido/);
+    state = second.state;
+    state = applyPhaseEvent(state, { kind: 'phase_end', phase: 'context' }, at(10)).state;
+    // Un solo tramo real: count 1, sin `inferred`.
+    expect(state.phases.context).toEqual({ ms: 10_000, count: 1 });
+  });
+
+  it('phase_start A seguido de phase_start B sigue cerrando A como inferred (no-regresión)', () => {
+    let state: PhaseState = emptyPhaseState();
+    state = applyPhaseEvent(state, { kind: 'phase_start', phase: 'context' }, at(0)).state;
+    state = applyPhaseEvent(state, { kind: 'phase_start', phase: 'plan' }, at(10)).state;
+    expect(state.phases.context).toEqual({ ms: 10_000, count: 1, inferred: true });
+    expect(state.activePhase).toEqual({ phase: 'plan', startedAt: at(10) });
+  });
+});
+
 describe('normalizeWorkItemId', () => {
   it('normaliza case e insensibiliza separadores', () => {
     expect(normalizeWorkItemId('CHAMBA-024')).toBe('chamba-024');
