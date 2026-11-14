@@ -142,5 +142,11 @@ never "pixel-perfect".
    to `report.md` inside the run folder, and end your reply with the full path to that
    `<evidence-root>/<ticket>/<run-date>/` folder so I have the trail.
 
+**You never write to the vault yourself.** Once `report.md` is written, hand the
+orchestrator that run folder's path — it's the one that calls
+`chamba_task(action='evidence', kind='qa', sourcePath=<that folder>)` to bring your
+evidence into the ticket's document; that call, and any vault write, is its job, not
+yours.
+
 If the plan has no `## QA plan` and the ticket isn't user-facing, say so and skip —
 don't invent a QA phase.

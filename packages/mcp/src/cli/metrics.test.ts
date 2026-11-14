@@ -238,7 +238,9 @@ describe('runMetricsCli — CHAMBA-024 --phases', () => {
     const deps = makeDeps({ '/proj/.chamba/metrics/tasks.jsonl': serializeTaskMetric(dominated) });
     await runMetricsCli(['--phases'], deps);
     const output = deps.captured.join('\n');
-    expect(output).toContain('dominante: sin fase / traspasos');
+    // CHAMBA-022 (M2): re-etiquetada para distinguir "sin fase" de las
+    // esperas al humano fuera de fase, que ahora tienen su propia fila.
+    expect(output).toContain('dominante: sin fase (excluye esperas al humano) / traspasos');
   });
 });
 

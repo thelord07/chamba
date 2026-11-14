@@ -6,6 +6,7 @@
 
 import {
   CredentialsStore,
+  excludeEvidencePush,
   joinFirstHint,
   joinPath,
   linkDirPlaceholderHint,
@@ -19,6 +20,7 @@ import {
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { Logger } from 'pino';
 import { redactSecrets, resolveBindingHeader } from '../parche/binding-ops.js';
+import { resolveSyncEvidenceFlag } from '../parche/vault-config.js';
 import type { Services } from '../services.js';
 
 const TOOL_NAME = 'chamba_parche_status';
@@ -66,6 +68,11 @@ export function registerParcheStatus(server: McpServer, logger: Logger, services
 
       const creds = new CredentialsStore(services.fs, services.homedir);
       const allSlugs = await creds.listSlugs();
+      // B-2: same evidence-image exclusion `syncOnce` applies — otherwise a
+      // vault with evidence images synced before (or by a teammate) would
+      // show a scary "pending: N" for a push that would never actually
+      // happen.
+      const syncEvidence = await resolveSyncEvidenceFlag(services);
 
       if (allSlugs.length === 0) {
         return {
@@ -132,8 +139,13 @@ export function registerParcheStatus(server: McpServer, logger: Logger, services
               const { snapshot } = await scanLocal(
                 { fs: services.fs, hash: services.hash },
                 vaultDir,
+                undefined,
+                { syncEvidence },
               );
-              const pushEntries = planPush(toSyncState(state), snapshot);
+              const pushEntries = excludeEvidencePush(
+                planPush(toSyncState(state), snapshot),
+                syncEvidence,
+              );
               pending = String(pushEntries.length);
             } catch {
               pending = 'error';

@@ -32,6 +32,7 @@
  */
 
 import type { DirEntry, FilesystemPort } from '../../ports/filesystem.js';
+import { isTaskEvidencePath } from '../../tasks/evidence-paths.js';
 import { isChambaGenerated, isDerivedPathPattern } from './derived-path.js';
 import type { TopicSuggestion } from './knowledge-graph.js';
 import { buildKnowledgeGraph, computeSuggestions } from './knowledge-graph.js';
@@ -334,6 +335,7 @@ export class VaultReindexer {
         const topPart = relPath.split('/')[0] ?? '';
         if (VAULT_SKIP_DIRS.has(topPart.toLowerCase())) continue;
         if (name.startsWith('.')) continue; // skip dotdirs
+        if (isTaskEvidencePath(relPath)) continue; // B8: evidence subtree, never derived files
         await this.collectDerivedRecursive(`${absDir}/${name}`, relPath, result);
       } else if (entry.isFile) {
         if (isDerivedPathPattern(relPath)) {

@@ -37,6 +37,44 @@ const safePathSchema = z.string().refine((s) => !s.includes('..') && !s.startsWi
   message: 'must be a relative path without ".."',
 });
 
+/** A valid environment-variable name (used as a `z.record` key). */
+const envKeySchema = z
+  .string()
+  .min(1)
+  .regex(/^[A-Za-z_][A-Za-z0-9_]*$/, 'must be a valid env var name');
+
+/** A repo name as it appears in `Workspace.projects[].name` (CHAMBA-022, N11). */
+const repoNameSchema = z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/, 'invalid repo name');
+
+/**
+ * A `verify` command for `chamba_task action='verify'` (CHAMBA-022, D-4/O7).
+ * `command` is the bare executable — never a shell string: no whitespace, no
+ * shell metacharacters. Args go in `args` as a plain array; chamba never
+ * parses a string into argv (that's where injection is born).
+ */
+export const verifyCommandSchema = z
+  .object({
+    // Doubles as the evidence filename (`tests-<name>.md`) — restricted to
+    // chars valid on all three OSes.
+    name: z.string().regex(/^[a-z0-9][a-z0-9-]{0,31}$/, 'must be lowercase kebab-case'),
+    command: z
+      .string()
+      .min(1)
+      .refine((s) => !/[\s;&|`$(){}<>"'*?~[\]!]/.test(s), {
+        message: 'el comando no puede tener espacios ni metacaracteres; separá los args en `args`',
+      }),
+    args: z.array(z.string()).max(32).default([]),
+    cwd: safePathSchema.optional(),
+    timeoutSec: z.number().int().min(1).max(1800).default(600),
+    /** Escape hatch (O7): extra env vars on top of the allowlist. */
+    env: z.record(envKeySchema, z.string()).optional(),
+    /** Opt-in (O7): inherit the full parent env instead of the allowlist. */
+    inheritEnv: z.boolean().default(false),
+  })
+  .strict();
+
+export type VerifyCommandConfig = z.infer<typeof verifyCommandSchema>;
+
 /** The `worktrees` block of a config file (all fields optional). */
 export const worktreeConfigSchema = z
   .object({
@@ -87,6 +125,21 @@ export const configFileSchema = z
     defaults: z.record(roleSchema, partialAgentConfigSchema).optional(),
     overrides: z.record(roleSchema, partialAgentConfigSchema).optional(),
     worktrees: worktreeConfigSchema.optional(),
+    /** Per-repo `verify` commands for `chamba_task` (CHAMBA-022). */
+    repos: z
+      .record(repoNameSchema, z.object({ verify: z.array(verifyCommandSchema).max(10) }).strict())
+      .optional(),
+    /**
+     * Vault-wide sync policy (CHAMBA-022, O1 — owner decision). Default
+     * `syncEvidence: false`: images under a task's evidence subtree
+     * (`tareas/<id>/evidencia/...`) are excluded from
+     * `chamba_vault_sync`/autosync; `report.md`/`tests-*.md` always sync.
+     * Setting it `true` opts into syncing the images too.
+     */
+    vault: z
+      .object({ syncEvidence: z.boolean().default(false) })
+      .strict()
+      .optional(),
   })
   .strict();
 

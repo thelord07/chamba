@@ -18,6 +18,7 @@ import type { HttpPort } from '../ports/http.js';
 import { readSecretAllowlist } from '../secrets/allowlist.js';
 import type { Finding } from '../secrets/scanner.js';
 import { scanText, shouldScanContent } from '../secrets/scanner.js';
+import { isEvidenceImagePath } from '../tasks/evidence-paths.js';
 import { detectStyle, isInvalidPath } from '../util/local-path.js';
 import { joinPath } from '../util/path.js';
 import { addConflictFrontmatter, readConflictMeta } from './conflict.js';
@@ -78,6 +79,13 @@ export interface SyncOpts {
    * the adapter layer.
    */
   platform?: string;
+  /**
+   * CHAMBA-022 (O1 — owner decision): when `true`, evidence IMAGES under a
+   * task's `evidencia/` subtree are included in sync — default `false`
+   * excludes them (`report.md`/`tests-*.md` always sync). Read by the
+   * caller from `config.vault.syncEvidence` (global/project layers).
+   */
+  syncEvidence?: boolean;
 }
 
 export interface JoinOpts {
@@ -142,6 +150,14 @@ export interface SyncSummary {
    * to `errors`.
    */
   blockedBySecretServer?: Array<{ path: string; kinds: string[] }>;
+  /**
+   * CHAMBA-022 (O1 — owner decision): set exactly once per vault — the
+   * first sync that includes an evidence image under `vault.syncEvidence:
+   * true` — warning that captures aren't scanned for secrets and may
+   * contain sensitive data. `undefined` on every later sync (persisted in
+   * local sync state, never in the shared vault).
+   */
+  evidenceImagesWarning?: string;
 }
 
 /** Local snapshot: path → sha256 hex */
@@ -223,15 +239,19 @@ export async function scanLocal(
   deps: Pick<SyncDeps, 'fs' | 'hash'>,
   vaultDir: string,
   knownHashes?: Record<string, string | null>,
+  opts?: { syncEvidence?: boolean },
 ): Promise<{
   snapshot: LocalSnapshot;
   blobSource: Map<string, string>;
   findingsByPath: Map<string, PrecomputedFileFindings>;
+  /** O1: evidence images actually included in this snapshot (only non-empty when `opts.syncEvidence`). */
+  includedEvidenceImages: string[];
 }> {
   const { fs, hash } = deps;
   const snapshot: LocalSnapshot = {};
   const blobSource = new Map<string, string>(); // hash → vault-absolute path
   const findingsByPath = new Map<string, PrecomputedFileFindings>();
+  const includedEvidenceImages: string[] = [];
 
   async function walk(dir: string, relDir: string): Promise<void> {
     let entries: Awaited<ReturnType<FilesystemPort['readDir']>>;
@@ -250,6 +270,13 @@ export async function scanLocal(
       } else if (entry.isFile) {
         const normalizedRel = relPath.normalize('NFC');
         if (!isSyncable(normalizedRel)) continue;
+        // O1 (owner decision): evidence IMAGES are opt-in via
+        // `vault.syncEvidence`; report.md/tests-*.md are unaffected
+        // (isEvidenceImagePath never matches `.md`).
+        if (isEvidenceImagePath(normalizedRel)) {
+          if (!opts?.syncEvidence) continue;
+          includedEvidenceImages.push(normalizedRel);
+        }
         const bytes = await fs.readBytes(absPath);
         const h = await hash.sha256(bytes);
         snapshot[normalizedRel] = h;
@@ -275,7 +302,41 @@ export async function scanLocal(
     throw new CaseCollisionError(collisions);
   }
 
-  return { snapshot, blobSource, findingsByPath };
+  return { snapshot, blobSource, findingsByPath, includedEvidenceImages };
+}
+
+// ─── Evidence-image policy (B-2, round 2 review) ──────────────────────────────
+
+/**
+ * B-2: `scanLocal` already excludes evidence images from `localSnapshot` when
+ * `syncEvidence` is false (O1), but `planPush`/`planPull` don't know about
+ * that policy — they just see "absent locally" and, for a path that's still
+ * in `state.files` from a PRIOR sync (evidence was pushed while
+ * `syncEvidence: true`, or by a teammate with it enabled), that reads as "was
+ * synced, now deleted locally" and emits a destructive tombstone.
+ *
+ * Fix: the policy is symmetric. When `syncEvidence` is false, evidence image
+ * paths are excluded from sync in BOTH directions — never pushed (not even
+ * as a delete) and never pulled (neither a write nor a delete is applied
+ * locally for them). A path already in `state.files` from before is simply
+ * left alone: no entry/action is ever generated for it, so `state.files`
+ * keeps its old value and nothing touches the remote or the local disk.
+ */
+export function excludeEvidencePush(
+  entries: PushEntry[],
+  syncEvidence: boolean | undefined,
+): PushEntry[] {
+  if (syncEvidence) return entries;
+  return entries.filter((e) => !isEvidenceImagePath(e.path));
+}
+
+/** Pull-side counterpart of `excludeEvidencePush` — see its doc comment. */
+function excludeEvidencePull(
+  actions: PullAction[],
+  syncEvidence: boolean | undefined,
+): PullAction[] {
+  if (syncEvidence) return actions;
+  return actions.filter((a) => !isEvidenceImagePath(a.path));
 }
 
 // ─── checkAbort ───────────────────────────────────────────────────────────────
@@ -917,8 +978,22 @@ function dedupeServerBlockedForSummary(
 
 export async function syncOnce(deps: SyncDeps, opts: SyncOpts): Promise<SyncSummary> {
   const { fs, http, hash, clock } = deps;
-  const { vaultDir, server, slug, token, localAuthor, batchSize = 500, signal, platform } = opts;
+  const {
+    vaultDir,
+    server,
+    slug,
+    token,
+    localAuthor,
+    batchSize = 500,
+    signal,
+    platform,
+    syncEvidence,
+  } = opts;
   const style = detectStyle(platform ?? 'posix');
+  // O1: once warned (persisted in local state, below), never warn again —
+  // this accumulator only ever goes from false to true within this run.
+  let evidenceImagesWarned = false;
+  let evidenceImagesWarning: string | undefined;
 
   const client = new ParcheClient(http, server, token);
 
@@ -940,6 +1015,7 @@ export async function syncOnce(deps: SyncDeps, opts: SyncOpts): Promise<SyncSumm
   let syncState: SyncState = stateFile
     ? { cursor: stateFile.cursor, files: stateFile.files }
     : { cursor: 0, files: {} };
+  evidenceImagesWarned = stateFile?.evidenceImagesWarned === true;
 
   // ── Phase 1: Push ──────────────────────────────────────────────────────────
   checkAbort(signal);
@@ -954,8 +1030,18 @@ export async function syncOnce(deps: SyncDeps, opts: SyncOpts): Promise<SyncSumm
     snapshot: localSnapshot,
     blobSource,
     findingsByPath: findingsByPath1,
-  } = await scanLocal({ fs, hash }, vaultDir, knownHashes1);
-  const allPushEntries = planPush(syncState, localSnapshot);
+    includedEvidenceImages: includedEvidenceImages1,
+  } = await scanLocal({ fs, hash }, vaultDir, knownHashes1, { syncEvidence });
+  if (!evidenceImagesWarned && includedEvidenceImages1.length > 0) {
+    evidenceImagesWarned = true;
+    evidenceImagesWarning =
+      'vault.syncEvidence está activo: las capturas de evidencia se sincronizan sin escanear ' +
+      '— pueden contener datos sensibles.';
+  }
+  // B-2: never push an evidence image when syncEvidence is off — not even a
+  // tombstone for one left in `state.files` from a prior sync (see
+  // `excludeEvidencePush`'s doc comment above).
+  const allPushEntries = excludeEvidencePush(planPush(syncState, localSnapshot), syncEvidence);
 
   // CHAMBA-021 S6: screen for un-allowlisted secrets BEFORE pushing. A file
   // with ≥1 finding is excluded entirely from this batch; the rest proceeds.
@@ -1082,6 +1168,7 @@ export async function syncOnce(deps: SyncDeps, opts: SyncOpts): Promise<SyncSumm
       undefined,
       blockedSecretMap,
       serverBlockedMap,
+      evidenceImagesWarned,
     ),
   );
 
@@ -1107,8 +1194,15 @@ export async function syncOnce(deps: SyncDeps, opts: SyncOpts): Promise<SyncSumm
     if (!page.hasMore) break;
   }
 
-  // Single planPull over all changes
-  const pullPlan = planPull(syncState, localSnapshot, allChanges, { localAuthor });
+  // Single planPull over all changes. B-2: a remote evidence-image
+  // write/delete is never applied locally when syncEvidence is off (cursor
+  // still advances off the full `allChanges`, so this doesn't cause a
+  // refetch loop — only the generated actions are filtered).
+  const rawPullPlan = planPull(syncState, localSnapshot, allChanges, { localAuthor });
+  const pullPlan = {
+    ...rawPullPlan,
+    actions: excludeEvidencePull(rawPullPlan.actions, syncEvidence),
+  };
 
   // Execute actions in order (passes style so invalid Windows names are skipped)
   const {
@@ -1254,6 +1348,7 @@ export async function syncOnce(deps: SyncDeps, opts: SyncOpts): Promise<SyncSumm
       newSkippedPaths,
       blockedSecretMap,
       serverBlockedMap,
+      evidenceImagesWarned,
     ),
   );
 
@@ -1273,13 +1368,25 @@ export async function syncOnce(deps: SyncDeps, opts: SyncOpts): Promise<SyncSumm
       snapshot: localSnapshot2,
       blobSource: blobSource2,
       findingsByPath: findingsByPath2,
-    } = await scanLocal({ fs, hash }, vaultDir, knownHashes2);
+      includedEvidenceImages: includedEvidenceImages2,
+    } = await scanLocal({ fs, hash }, vaultDir, knownHashes2, { syncEvidence });
+    if (!evidenceImagesWarned && includedEvidenceImages2.length > 0) {
+      evidenceImagesWarned = true;
+      evidenceImagesWarning =
+        'vault.syncEvidence está activo: las capturas de evidencia se sincronizan sin escanear ' +
+        '— pueden contener datos sensibles.';
+    }
     // Merge conflict blob sources into blobSource2
     for (const [h, absPath] of conflictBlobSource) {
       blobSource2.set(h, absPath);
     }
 
-    const allPushEntries2 = planPush(postPullState, localSnapshot2);
+    // B-2: same exclusion as phase 1 — a conflict-copy pass must not push an
+    // evidence-image tombstone either.
+    const allPushEntries2 = excludeEvidencePush(
+      planPush(postPullState, localSnapshot2),
+      syncEvidence,
+    );
     // CHAMBA-021 S6: gate conflict-copy pushes too — a conflict copy of a file
     // with a secret is a brand-new local file; without this it would leak
     // through this back door even though phase 1 blocked the original.
@@ -1385,6 +1492,7 @@ export async function syncOnce(deps: SyncDeps, opts: SyncOpts): Promise<SyncSumm
           newSkippedPaths,
           blockedSecretMap,
           serverBlockedMap,
+          evidenceImagesWarned,
         ),
       );
     }
@@ -1403,6 +1511,7 @@ export async function syncOnce(deps: SyncDeps, opts: SyncOpts): Promise<SyncSumm
     derivedConflictsResolved,
     blockedBySecret: [...blocked1, ...blocked2],
     blockedBySecretServer: dedupeServerBlockedForSummary(blockedBySecretServerAll),
+    ...(evidenceImagesWarning ? { evidenceImagesWarning } : {}),
   };
 }
 

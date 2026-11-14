@@ -42,7 +42,17 @@ export interface PhasesReport {
     route: MetricRoute;
     tickets: number;
     phases: PhaseStat[];
-    unaccounted: { pctOfTotal: number; medianMs: number; dominant: boolean };
+    /**
+     * M2: "sin fase" EXCLUDES human waits that fall outside any phase — those
+     * are reported separately below. Without the split, a long outside-phase
+     * wait would masquerade as "unaccounted work".
+     */
+    unaccounted: {
+      pctOfTotal: number;
+      medianMs: number;
+      dominant: boolean;
+      outsideHumanWait: { ms: number; medianMs: number; pctOfTotal: number };
+    };
     humanWaits: HumanWaitStat;
   }>;
   /** Líneas sin `phases` (previas a 1.16.0). */
@@ -288,9 +298,30 @@ export function summarizePhases(
       });
     }
 
-    const unaccountedSum = group.reduce((s, t) => s + Math.max(0, t.wallMs - t.accountedMs), 0);
+    // M2/B6: per ticket, clamp the "outside any phase" human-wait slice to
+    // what `unaccountedMs` can actually hold. `humanWaitMs` and
+    // `unaccountedMs` come from different clocks — a wait that starts
+    // inside a phase and ends outside it counts whole in `humanWaits.ms`
+    // but only partially in `phaseHumanWaitMs` — so without the clamp
+    // `discountedMs` can go negative.
+    const perTicketSplit = group.map((t) => {
+      const unaccountedMs = Math.max(0, t.wallMs - t.accountedMs);
+      const sumPhaseHumanWaitMs = Object.values(t.phaseHumanWaitMs).reduce(
+        (s, v) => s + (v ?? 0),
+        0,
+      );
+      const outsideMs = Math.min(Math.max(0, t.humanWaitMs - sumPhaseHumanWaitMs), unaccountedMs);
+      const discountedMs = Math.max(0, unaccountedMs - outsideMs);
+      return { outsideMs, discountedMs };
+    });
+
+    const unaccountedSum = perTicketSplit.reduce((s, v) => s + v.discountedMs, 0);
     const unaccountedPct = wallSum > 0 ? (100 * unaccountedSum) / wallSum : 0;
-    const unaccountedMedian = median(group.map((t) => Math.max(0, t.wallMs - t.accountedMs)));
+    const unaccountedMedian = median(perTicketSplit.map((v) => v.discountedMs));
+
+    const outsideSum = perTicketSplit.reduce((s, v) => s + v.outsideMs, 0);
+    const outsidePct = wallSum > 0 ? (100 * outsideSum) / wallSum : 0;
+    const outsideMedian = median(perTicketSplit.map((v) => v.outsideMs));
 
     // Sin reloj de pared que repartir (wallSum === 0, p. ej. startedAt === endedAt
     // en todo el grupo) ningún % es significativo — nadie es "dominante".
@@ -344,6 +375,7 @@ export function summarizePhases(
         pctOfTotal: unaccountedPct,
         medianMs: unaccountedMedian,
         dominant: unaccountedDominant,
+        outsideHumanWait: { ms: outsideSum, medianMs: outsideMedian, pctOfTotal: outsidePct },
       },
       humanWaits: {
         tickets: group.length,
@@ -363,13 +395,19 @@ export function summarizePhases(
         dominantPhase = phase as Phase;
       }
     }
-    const unaccountedMs = Math.max(0, t.wallMs - t.accountedMs);
-    if (t.wallMs > 0 && unaccountedMs > bestMs) dominantPhase = undefined;
+    // N4: use the DISCOUNTED unaccounted value (B6 clamp) — the raw value
+    // would let a long outside-phase human wait erase the real dominant
+    // phase (`phase-summary.ts` used to compare against the bruto figure).
+    const rawUnaccountedMs = Math.max(0, t.wallMs - t.accountedMs);
+    const sumPhaseHumanWaitMs = Object.values(t.phaseHumanWaitMs).reduce((s, v) => s + (v ?? 0), 0);
+    const outsideMs = Math.min(Math.max(0, t.humanWaitMs - sumPhaseHumanWaitMs), rawUnaccountedMs);
+    const discountedMs = Math.max(0, rawUnaccountedMs - outsideMs);
+    if (t.wallMs > 0 && discountedMs > bestMs) dominantPhase = undefined;
     return {
       workItem: t.workItem,
       route: t.route,
       dominantPhase,
-      unaccountedPct: t.wallMs > 0 ? (100 * unaccountedMs) / t.wallMs : 0,
+      unaccountedPct: t.wallMs > 0 ? (100 * discountedMs) / t.wallMs : 0,
       pauses: t.humanWaitCount,
       blockedMs: t.humanWaitMs,
     };
@@ -395,6 +433,14 @@ function formatDuration(ms: number): string {
   return `${(seconds / 3600).toFixed(1)}h`;
 }
 
+/** N13: the "sin fase" / "esperas al humano fuera de fase" row labels are
+ *  longer than any real phase name — the name column must be wide enough
+ *  for them too, or `padRight` is a no-op on those two rows and the numeric
+ *  columns that follow drift out of alignment with the header. */
+const UNACCOUNTED_LABEL = 'sin fase (excluye esperas al humano)';
+const OUTSIDE_HUMAN_WAIT_LABEL = 'esperas al humano fuera de fase';
+const NAME_COL_WIDTH = Math.max(14, UNACCOUNTED_LABEL.length, OUTSIDE_HUMAN_WAIT_LABEL.length);
+
 export function renderPhasesTable(report: PhasesReport): string {
   const lines: string[] = [];
 
@@ -408,7 +454,7 @@ export function renderPhasesTable(report: PhasesReport): string {
   for (const group of report.byRoute) {
     lines.push(`[${group.route}] ${group.tickets} ticket(s)`);
     const header = [
-      padRight('Fase', 14),
+      padRight('Fase', NAME_COL_WIDTH),
       padLeft('Tickets', 7),
       padLeft('Mediana', 9),
       padLeft('p90', 9),
@@ -419,7 +465,7 @@ export function renderPhasesTable(report: PhasesReport): string {
       const marker = p.dominant ? ' ← dominante' : '';
       lines.push(
         [
-          padRight(p.phase, 14),
+          padRight(p.phase, NAME_COL_WIDTH),
           padLeft(String(p.tickets), 7),
           padLeft(formatDuration(p.medianMs), 9),
           padLeft(formatDuration(p.p90Ms), 9),
@@ -428,16 +474,25 @@ export function renderPhasesTable(report: PhasesReport): string {
       );
     }
     const unaccountedMarker = group.unaccounted.dominant
-      ? ' ← dominante: sin fase / traspasos'
+      ? ' ← dominante: sin fase (excluye esperas al humano) / traspasos'
       : '';
     lines.push(
       [
-        padRight('unaccounted', 14),
+        padRight(UNACCOUNTED_LABEL, NAME_COL_WIDTH),
         padLeft('', 7),
         padLeft(formatDuration(group.unaccounted.medianMs), 9),
         padLeft('', 9),
         padLeft(`${group.unaccounted.pctOfTotal.toFixed(1)}%`, 8),
       ].join('  ') + unaccountedMarker,
+    );
+    lines.push(
+      [
+        padRight(OUTSIDE_HUMAN_WAIT_LABEL, NAME_COL_WIDTH),
+        padLeft('', 7),
+        padLeft(formatDuration(group.unaccounted.outsideHumanWait.medianMs), 9),
+        padLeft('', 9),
+        padLeft(`${group.unaccounted.outsideHumanWait.pctOfTotal.toFixed(1)}%`, 8),
+      ].join('  '),
     );
     lines.push('');
     lines.push('Pausas al humano:');

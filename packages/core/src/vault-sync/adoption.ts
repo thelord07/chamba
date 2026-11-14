@@ -13,6 +13,7 @@ import type { HashPort } from '../ports/hash.js';
 import { isSecretAllowed, readSecretAllowlist } from '../secrets/allowlist.js';
 import type { Finding } from '../secrets/scanner.js';
 import { isScannable, MAX_SCAN_BYTES, scanText, shouldScanContent } from '../secrets/scanner.js';
+import { isEvidenceImagePath } from '../tasks/evidence-paths.js';
 import { joinPath } from '../util/path.js';
 import { isSyncable } from './sync-filter.js';
 
@@ -45,6 +46,8 @@ export interface AdoptionSummary {
 export async function buildAdoptionSummary(
   deps: { fs: FilesystemPort; hash?: HashPort },
   vaultDir: string,
+  /** CHAMBA-022 (O1/NN7): same gate `syncOnce` applies — default excludes evidence images. */
+  opts: { syncEvidence?: boolean } = {},
 ): Promise<AdoptionSummary> {
   const { fs, hash } = deps;
   const syncable: string[] = [];
@@ -67,7 +70,10 @@ export async function buildAdoptionSummary(
       } else if (entry.isFile) {
         const normalizedRel = relPath.normalize('NFC');
         totalFiles++;
-        if (isSyncable(normalizedRel)) {
+        if (
+          isSyncable(normalizedRel) &&
+          (opts.syncEvidence || !isEvidenceImagePath(normalizedRel))
+        ) {
           syncable.push(normalizedRel);
           // CHAMBA-023 D-Q3 (owner decision §9): scan by content, not by
           // extension — any syncable file can be scanned (and rejected by

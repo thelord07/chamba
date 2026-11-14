@@ -1,5 +1,6 @@
 import type { ClockPort } from '../ports/clock.js';
 import type { FilesystemPort } from '../ports/filesystem.js';
+import { isTaskEvidencePath } from '../tasks/evidence-paths.js';
 import { joinPath } from '../util/path.js';
 import type { TopicSuggestion } from './knowledge/knowledge-graph.js';
 import type { NoteType } from './knowledge/note-metadata.js';
@@ -327,6 +328,7 @@ export class VaultWriter {
         const topPart = relPath.split('/')[0] ?? '';
         if (SCAN_SKIP.has(topPart.toLowerCase())) continue;
         if (name.startsWith('.')) continue;
+        if (isTaskEvidencePath(relPath)) continue; // B8: evidence subtree, never a knowledge note
         await this.scanForWorkItem(
           `${absDir}/${name}`,
           relPath,

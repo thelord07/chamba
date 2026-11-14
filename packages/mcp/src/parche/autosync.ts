@@ -13,6 +13,7 @@ import type { Services } from '../services.js';
 import type { ActiveParcheVault } from './active-vault.js';
 import { withVaultLock } from './mutex.js';
 import { consumePendingReindex, hasPendingReindex, markPendingReindex } from './reindex-state.js';
+import { resolveSyncEvidenceFlag } from './vault-config.js';
 
 /**
  * Total time budget for an auto-sync triggered by a tool call.
@@ -76,6 +77,8 @@ export async function maybeAutoSync(
     async () => {
       const syncStart = Date.now();
       try {
+        // O1: same two config layers `chamba_task verify` reads (B9).
+        const syncEvidence = await resolveSyncEvidenceFlag(services);
         const summary = await syncOnce(
           { fs: services.fs, http: services.http, hash: services.hash, clock: services.clock },
           {
@@ -87,6 +90,7 @@ export async function maybeAutoSync(
             device: vault.device,
             signal: controller.signal,
             platform: services.platform,
+            syncEvidence,
           },
         );
         // CHAMBA-023 S6: autosync stays silent by design (no summary printed) —
@@ -165,7 +169,11 @@ export async function maybeAutoSync(
           }
         }
 
-        return { ok: true as const, signal: controller.signal };
+        return {
+          ok: true as const,
+          signal: controller.signal,
+          ...(summary.evidenceImagesWarning ? { warning: summary.evidenceImagesWarning } : {}),
+        };
       } catch (err) {
         const msg = describeError(err, { slug: vault.slug });
         logger.warn({ tool: 'autosync', slug: vault.slug, phase, err: msg }, 'auto-sync failed');
@@ -195,5 +203,5 @@ export async function maybeAutoSync(
       warning: `auto-sync pausado: ${inner?.msg ?? 'unknown error'}. Usa \`${syncManualHint()}\` para sincronizar manualmente.`,
     };
   }
-  return { synced: true };
+  return { synced: true, ...(inner.warning ? { warning: inner.warning } : {}) };
 }

@@ -610,3 +610,37 @@ describe('CHAMBA-021 S10: provenance/estado frontmatter contract', () => {
     });
   });
 });
+
+// ─── CHAMBA-022: type 'tarea', estado_tarea, ruta ────────────────────────────
+
+describe('CHAMBA-022 — type: tarea, estado_tarea, ruta', () => {
+  it('reads type: tarea, estado_tarea and ruta from frontmatter', () => {
+    const content = [
+      '---',
+      'title: "CHAMBA-022 — tarea viva"',
+      'type: tarea',
+      'work_item: CHAMBA-022',
+      'estado_tarea: en_progreso',
+      'ruta: risky',
+      '---',
+      '# cuerpo',
+    ].join('\n');
+    const meta = readNoteMetadata(content, 'tareas/chamba-022.md');
+    expect(meta.type).toBe('tarea');
+    expect(meta.estado_tarea).toBe('en_progreso');
+    expect(meta.ruta).toBe('risky');
+  });
+
+  it('round-trips estado_tarea/ruta through upsertNoteMetadata, appended in KEY_ORDER', () => {
+    const content = ['---', 'title: x', 'type: tarea', '---', '# cuerpo'].join('\n');
+    const updated = upsertNoteMetadata(content, { estado_tarea: 'cerrada', ruta: 'risky' });
+    const meta = readNoteMetadata(updated, 'tareas/x.md');
+    expect(meta.estado_tarea).toBe('cerrada');
+    expect(meta.ruta).toBe('risky');
+  });
+
+  it('an unrecognized type falls back to "nota" (tolerant reader, pre-existing behaviour)', () => {
+    const meta = readNoteMetadata('---\ntype: inventado\n---\n', 'x.md');
+    expect(meta.type).toBe('nota');
+  });
+});

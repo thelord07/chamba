@@ -24,6 +24,7 @@ import { registerResourceBudget } from './tools/resource-budget.js';
 import { registerReviewPlan } from './tools/review-plan.js';
 import { registerSavePlan } from './tools/save-plan.js';
 import { registerSummarizeToVault } from './tools/summarize-to-vault.js';
+import { registerTask } from './tools/task.js';
 import { registerTaskMetrics } from './tools/task-metrics.js';
 import { registerTriageTicket } from './tools/triage-ticket.js';
 import { registerVaultAllowSecret } from './tools/vault-allow-secret.js';
@@ -76,6 +77,7 @@ export function createServer(logger: Logger, services: Services = createNodeServ
   registerTriageTicket(server, logger, services);
   registerClassifyTask(server, logger, services);
   registerTaskMetrics(server, logger, services);
+  registerTask(server, logger, services);
   registerSavePlan(server, logger, services);
   registerCreateWorktree(server, logger, services);
   registerListWorktrees(server, logger, services);

@@ -218,6 +218,47 @@ describe('mergeIntoStateFile', () => {
     );
     expect(merged.blockedSecretServer).toBeUndefined();
   });
+  // ── CHAMBA-022 (O1): evidenceImagesWarned — once true, always true ───────
+
+  it('evidenceImagesWarned stays undefined when never set', () => {
+    const base = { ...BASE_STATE };
+    const merged = mergeIntoStateFile(base, { cursor: 1, files: {} }, '2026-11-13T12:00:00.000Z');
+    expect(merged.evidenceImagesWarned).toBeUndefined();
+  });
+
+  it('sets evidenceImagesWarned to true when passed true (7th param)', () => {
+    const base = { ...BASE_STATE };
+    const merged = mergeIntoStateFile(
+      base,
+      { cursor: 1, files: {} },
+      '2026-11-13T12:00:00.000Z',
+      undefined,
+      undefined,
+      undefined,
+      true,
+    );
+    expect(merged.evidenceImagesWarned).toBe(true);
+  });
+
+  it('preserves evidenceImagesWarned:true from base when the new value is undefined (never un-warns)', () => {
+    const base = { ...BASE_STATE, evidenceImagesWarned: true };
+    const merged = mergeIntoStateFile(base, { cursor: 1, files: {} }, '2026-11-13T12:00:00.000Z');
+    expect(merged.evidenceImagesWarned).toBe(true);
+  });
+
+  it('passing false explicitly does NOT clear a prior true (one-way latch, never un-sets)', () => {
+    const base = { ...BASE_STATE, evidenceImagesWarned: true };
+    const merged = mergeIntoStateFile(
+      base,
+      { cursor: 1, files: {} },
+      '2026-11-13T12:00:00.000Z',
+      undefined,
+      undefined,
+      undefined,
+      false,
+    );
+    expect(merged.evidenceImagesWarned).toBe(true);
+  });
 });
 
 describe('syncStateFileSchema — blockedSecretServer (CHAMBA-023 S5)', () => {

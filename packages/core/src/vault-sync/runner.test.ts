@@ -2268,3 +2268,262 @@ describe('CHAMBA-014 — FlakyHttp', () => {
     ).rejects.toThrow('ECONNRESET');
   });
 });
+
+// ─── CHAMBA-022 (O1) — evidence images are opt-in; report.md/tests-*.md always sync ──
+
+describe('scanLocal — O1: evidence images opt-in via opts.syncEvidence', () => {
+  it('by default (syncEvidence unset), an evidence image is EXCLUDED but report.md/tests-*.md are included', async () => {
+    const hash = new FakeHash();
+    const fs = new MemoryFilesystem();
+    await fs.writeBytes(
+      `${VAULT}/tareas/chamba-022/evidencia/run-1/captura.png`,
+      new Uint8Array([1, 2, 3]),
+    );
+    await fs.writeBytes(
+      `${VAULT}/tareas/chamba-022/evidencia/run-1/qa/report.md`,
+      new TextEncoder().encode('# reporte'),
+    );
+    await fs.writeBytes(
+      `${VAULT}/tareas/chamba-022/evidencia/run-1/tests-unit.md`,
+      new TextEncoder().encode('# evidencia'),
+    );
+
+    const { snapshot, includedEvidenceImages } = await scanLocal({ fs, hash }, VAULT);
+    expect(snapshot['tareas/chamba-022/evidencia/run-1/captura.png']).toBeUndefined();
+    expect(snapshot['tareas/chamba-022/evidencia/run-1/qa/report.md']).toBeDefined();
+    expect(snapshot['tareas/chamba-022/evidencia/run-1/tests-unit.md']).toBeDefined();
+    expect(includedEvidenceImages).toEqual([]);
+  });
+
+  it('with syncEvidence:true, the evidence image IS included and reported', async () => {
+    const hash = new FakeHash();
+    const fs = new MemoryFilesystem();
+    await fs.writeBytes(
+      `${VAULT}/tareas/chamba-022/evidencia/run-1/captura.png`,
+      new Uint8Array([1, 2, 3]),
+    );
+
+    const { snapshot, includedEvidenceImages } = await scanLocal({ fs, hash }, VAULT, undefined, {
+      syncEvidence: true,
+    });
+    expect(snapshot['tareas/chamba-022/evidencia/run-1/captura.png']).toBeDefined();
+    expect(includedEvidenceImages).toEqual(['tareas/chamba-022/evidencia/run-1/captura.png']);
+  });
+
+  it('a regular vault image OUTSIDE the evidence subtree is unaffected by syncEvidence:false', async () => {
+    const hash = new FakeHash();
+    const fs = new MemoryFilesystem();
+    await fs.writeBytes(`${VAULT}/proyectos/diagrama.png`, new Uint8Array([1, 2, 3]));
+
+    const { snapshot, includedEvidenceImages } = await scanLocal({ fs, hash }, VAULT);
+    expect(snapshot['proyectos/diagrama.png']).toBeDefined();
+    expect(includedEvidenceImages).toEqual([]);
+  });
+});
+
+describe('syncOnce — O1: single evidenceImagesWarning, persisted across syncs', () => {
+  it('warns on the first sync that includes an evidence image, not on a later no-op sync', async () => {
+    const parche = new FakeParche(makeClock());
+    const group = setupGroup(parche);
+    const token = makeToken(parche, group);
+    const deps = makeDeps(parche);
+    const { fs } = deps;
+
+    await fs.writeBytes(
+      `${VAULT}/tareas/chamba-022/evidencia/run-1/captura.png`,
+      new Uint8Array([1, 2, 3]),
+    );
+
+    const opts = { ...makeSyncOpts(token), syncEvidence: true };
+    const first = await syncOnce(deps, opts);
+    expect(first.pushed).toBe(1);
+    expect(first.evidenceImagesWarning).toMatch(/sin escanear/);
+
+    const state = await readState(fs, VAULT);
+    expect(state?.evidenceImagesWarned).toBe(true);
+
+    // Second sync: same file, nothing new to push — no warning repeated.
+    const second = await syncOnce(deps, opts);
+    expect(second.pushed).toBe(0);
+    expect(second.evidenceImagesWarning).toBeUndefined();
+  });
+
+  it('a second NEW evidence image on a later sync does not re-warn (already warned, persisted)', async () => {
+    const parche = new FakeParche(makeClock());
+    const group = setupGroup(parche);
+    const token = makeToken(parche, group);
+    const deps = makeDeps(parche);
+    const { fs } = deps;
+
+    await fs.writeBytes(
+      `${VAULT}/tareas/chamba-022/evidencia/run-1/captura.png`,
+      new Uint8Array([1, 2, 3]),
+    );
+    const opts = { ...makeSyncOpts(token), syncEvidence: true };
+    await syncOnce(deps, opts);
+
+    await fs.writeBytes(
+      `${VAULT}/tareas/chamba-022/evidencia/run-2/captura2.png`,
+      new Uint8Array([4, 5, 6]),
+    );
+    const again = await syncOnce(deps, opts);
+    expect(again.pushed).toBe(1); // the new image still syncs
+    expect(again.evidenceImagesWarning).toBeUndefined(); // but the notice doesn't repeat
+  });
+
+  it('without syncEvidence, no evidence image is pushed and there is no warning', async () => {
+    const parche = new FakeParche(makeClock());
+    const group = setupGroup(parche);
+    const token = makeToken(parche, group);
+    const deps = makeDeps(parche);
+    const { fs } = deps;
+
+    await fs.writeBytes(
+      `${VAULT}/tareas/chamba-022/evidencia/run-1/captura.png`,
+      new Uint8Array([1, 2, 3]),
+    );
+    await fs.writeBytes(
+      `${VAULT}/tareas/chamba-022/evidencia/run-1/tests-unit.md`,
+      new TextEncoder().encode('# evidencia'),
+    );
+
+    const summary = await syncOnce(deps, makeSyncOpts(token));
+    expect(summary.pushed).toBe(1); // only tests-unit.md
+    expect(summary.evidenceImagesWarning).toBeUndefined();
+
+    const state = await readState(fs, VAULT);
+    expect(state?.evidenceImagesWarned).toBeUndefined();
+  });
+});
+
+// ─── B-2 (round 2 review): evidence images never tombstoned by policy ────────
+
+describe('B-2 — toggling syncEvidence true→false never tombstones an already-synced evidence image', () => {
+  const EVIDENCE_PATH = 'tareas/chamba-022/evidencia/run-1/captura.png';
+
+  it('second sync with syncEvidence:false pushes nothing and keeps the local file', async () => {
+    const parche = new FakeParche(makeClock());
+    const group = setupGroup(parche);
+    const token = makeToken(parche, group);
+    const deps = makeDeps(parche);
+    const { fs } = deps;
+
+    const bytes = new Uint8Array([1, 2, 3]);
+    await fs.writeBytes(`${VAULT}/${EVIDENCE_PATH}`, bytes);
+
+    // First sync: syncEvidence:true — the image is pushed.
+    const firstOpts = { ...makeSyncOpts(token), syncEvidence: true };
+    const first = await syncOnce(deps, firstOpts);
+    expect(first.pushed).toBe(1);
+
+    const stateAfterFirst = await readState(fs, VAULT);
+    expect(stateAfterFirst?.files[EVIDENCE_PATH]?.syncedHash).not.toBeNull();
+
+    // Toggle to syncEvidence:false — the local file is untouched on disk.
+    const secondOpts = { ...makeSyncOpts(token), syncEvidence: false };
+    const second = await syncOnce(deps, secondOpts);
+
+    // B-2: must NOT push a tombstone for the evidence image.
+    expect(second.pushed).toBe(0);
+
+    // The local file is still there, byte-for-byte.
+    expect(await fs.exists(`${VAULT}/${EVIDENCE_PATH}`)).toBe(true);
+    expect(await fs.readBytes(`${VAULT}/${EVIDENCE_PATH}`)).toEqual(bytes);
+
+    // state.files keeps the old syncedHash — never set to null (tombstone).
+    const stateAfterSecond = await readState(fs, VAULT);
+    expect(stateAfterSecond?.files[EVIDENCE_PATH]?.syncedHash).not.toBeNull();
+    expect(stateAfterSecond?.files[EVIDENCE_PATH]?.syncedHash).toBe(
+      stateAfterFirst?.files[EVIDENCE_PATH]?.syncedHash,
+    );
+
+    // A fresh participant with syncEvidence:true can still pull the image —
+    // proof the remote blob was never deleted.
+    const otherToken = makeToken(parche, group);
+    const otherFs = new MemoryFilesystem();
+    await otherFs.mkdir(VAULT);
+    const otherDeps = { fs: otherFs, http: parche, hash: new FakeHash(), clock: makeClock() };
+    const otherOpts = { ...makeSyncOpts(otherToken), syncEvidence: true };
+    await syncOnce(otherDeps, otherOpts);
+    expect(await otherFs.exists(`${VAULT}/${EVIDENCE_PATH}`)).toBe(true);
+  });
+});
+
+describe('B-2 — member with syncEvidence:false never pulls nor deletes evidence images pushed by another member', () => {
+  const EVIDENCE_PATH = 'tareas/chamba-022/evidencia/run-1/captura.png';
+  const NOTE_PATH = 'tareas/chamba-022/evidencia/run-1/tests-unit.md';
+
+  it('A pushes an evidence image with syncEvidence:true; B (syncEvidence:false) never downloads it, never registers it, and never deletes it remotely', async () => {
+    const parche = new FakeParche(makeClock());
+    const group = setupGroup(parche);
+    const hash = new FakeHash();
+
+    // ── A: pushes an evidence image + a regular evidence note ───────────────
+    const tokenA = makeToken(parche, group);
+    const fsA = new MemoryFilesystem();
+    const depsA = { fs: fsA, http: parche, hash, clock: makeClock() };
+    await fsA.writeBytes(`${VAULT}/${EVIDENCE_PATH}`, new Uint8Array([1, 2, 3]));
+    await fsA.writeBytes(`${VAULT}/${NOTE_PATH}`, new TextEncoder().encode('# evidencia'));
+
+    const optsA = { ...makeSyncOpts(tokenA), syncEvidence: true };
+    const summaryA1 = await syncOnce(depsA, optsA);
+    expect(summaryA1.pushed).toBe(2); // image + note
+
+    // ── B: first sync, syncEvidence:false ────────────────────────────────────
+    const tokenB = makeToken(parche, group);
+    const fsB = new MemoryFilesystem();
+    await fsB.mkdir(VAULT);
+    const depsB = { fs: fsB, http: parche, hash: new FakeHash(), clock: makeClock() };
+    const optsB = { ...makeSyncOpts(tokenB), syncEvidence: false };
+    const summaryB = await syncOnce(depsB, optsB);
+
+    // The regular note pulls normally; the evidence image is never written.
+    expect(await fsB.exists(`${VAULT}/${NOTE_PATH}`)).toBe(true);
+    expect(await fsB.exists(`${VAULT}/${EVIDENCE_PATH}`)).toBe(false);
+    expect(summaryB.pulled).toBe(1); // only the note, never the image
+
+    // B-2: B's own state never tracks the excluded evidence path.
+    const stateB = await readState(fsB, VAULT);
+    expect(stateB?.files[EVIDENCE_PATH]).toBeUndefined();
+    expect(stateB?.files[NOTE_PATH]?.syncedHash).not.toBeNull();
+
+    // A second sync for B (no-op) must still never push a delete for the
+    // path it never had locally in the first place.
+    const summaryB2 = await syncOnce(depsB, optsB);
+    expect(summaryB2.pushed).toBe(0);
+
+    // ── Proof the remote blob is intact: a fresh syncEvidence:true member
+    // (C) can still pull the image A pushed. ─────────────────────────────────
+    const tokenC = makeToken(parche, group);
+    const fsC = new MemoryFilesystem();
+    await fsC.mkdir(VAULT);
+    const depsC = { fs: fsC, http: parche, hash: new FakeHash(), clock: makeClock() };
+    const optsC = { ...makeSyncOpts(tokenC), syncEvidence: true };
+    await syncOnce(depsC, optsC);
+    expect(await fsC.exists(`${VAULT}/${EVIDENCE_PATH}`)).toBe(true);
+  });
+});
+
+describe('B-2 — with syncEvidence:true, push/pull/delete of evidence images keeps working normally', () => {
+  const EVIDENCE_PATH = 'tareas/chamba-022/evidencia/run-1/captura.png';
+
+  it('a local delete, while syncEvidence stays true, still produces a real tombstone', async () => {
+    const parche = new FakeParche(makeClock());
+    const group = setupGroup(parche);
+    const token = makeToken(parche, group);
+    const deps = makeDeps(parche);
+    const { fs } = deps;
+
+    await fs.writeBytes(`${VAULT}/${EVIDENCE_PATH}`, new Uint8Array([1, 2, 3]));
+    const opts = { ...makeSyncOpts(token), syncEvidence: true };
+    const first = await syncOnce(deps, opts);
+    expect(first.pushed).toBe(1);
+
+    await fs.remove(`${VAULT}/${EVIDENCE_PATH}`);
+    await syncOnce(deps, opts);
+    // `pushed` only counts content pushes (newHash !== null), not deletes —
+    // the real assertion is that the tombstone was applied to state.
+    const state = await readState(fs, VAULT);
+    expect(state?.files[EVIDENCE_PATH]?.syncedHash).toBeNull();
+  });
+});

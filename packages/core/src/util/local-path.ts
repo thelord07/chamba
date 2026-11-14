@@ -294,6 +294,49 @@ export function localRelative(base: string, target: string, style: PathStyle): s
   return target;
 }
 
+// ─── isUnderLocal ─────────────────────────────────────────────────────────────
+
+/**
+ * Containment check for already-resolved LOCAL paths (typically the result
+ * of `fs.realpath`), portable to win32 (CHAMBA-022, B5/B7).
+ *
+ * Both paths are case-folded per `style` (no-op on posix, lowercased +
+ * separator-unified on win32) before comparison — the single helper every
+ * realpath-containment check in the codebase should go through, instead of
+ * each callsite hand-rolling a POSIX-only `startsWith('/')`.
+ *
+ * `strict: true` (B7) rejects `candidate === root` — used when `root` must
+ * be a strict ANCESTOR of `candidate` (e.g. a worktree can never BE the
+ * workspace root). Default `false` allows equality (e.g. `cmd.cwd` defaults
+ * to the worktree root itself).
+ */
+export function isUnderLocal(
+  root: string,
+  candidate: string,
+  style: PathStyle,
+  opts: { strict?: boolean } = {},
+): boolean {
+  const foldRoot = caseFoldLocal(root, style).replace(/[/\\]+$/, '');
+  const foldCandidate = caseFoldLocal(candidate, style).replace(/[/\\]+$/, '');
+  if (foldCandidate === foldRoot) return opts.strict !== true;
+  // caseFoldLocal already unifies win32 separators to '/'; posix paths use '/' natively.
+  return foldCandidate.startsWith(`${foldRoot}/`);
+}
+
+// ─── sameLocalPath ────────────────────────────────────────────────────────────
+
+/**
+ * NB-1 (CHAMBA-022 round 2 review): compare two local paths for EQUALITY
+ * tolerant of a trailing separator ("/a/b/" vs "/a/b") and, on win32, case
+ * — never a bare `===`, which false-positives on either. Pairs with
+ * `isUnderLocal`'s own fold+strip logic; use this when the two paths are
+ * meant to name the SAME directory/file, not one containing the other.
+ */
+export function sameLocalPath(a: string, b: string, style: PathStyle): boolean {
+  const norm = (p: string) => caseFoldLocal(p, style).replace(/[/\\]+$/, '');
+  return norm(a) === norm(b);
+}
+
 // ─── isInvalidPath ────────────────────────────────────────────────────────────
 
 /**

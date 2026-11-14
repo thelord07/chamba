@@ -47,3 +47,6 @@ has already been reviewed and approved.
 - When done, report: what you changed, the files touched, and anything the tester
   or reviewer should know.
 - Add one line to your report — **Perf/concurrency notes:** what you considered, or "none relevant".
+- Report milestones to the orchestrator as you reach them — it's the one that calls
+  `chamba_task(action='update')`, not you. Never write to the vault yourself, and never
+  edit the task document or an acceptance criterion's text directly.

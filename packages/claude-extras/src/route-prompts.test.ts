@@ -119,6 +119,25 @@ for (const { name, content } of PROMPTS) {
       expect(content).toContain("kind='escalation'");
     });
   });
+
+  // ── CHAMBA-022: live task document calls ───────────────────────────────────
+  describe(`${name} — chamba_task (CHAMBA-022)`, () => {
+    it('calls chamba_task', () => {
+      expect(content).toContain('chamba_task');
+    });
+
+    it("opens the task document with action='open'", () => {
+      expect(content).toContain("action='open'");
+    });
+
+    it("runs verification with action='verify'", () => {
+      expect(content).toContain("action='verify'");
+    });
+
+    it("closes with action='close'", () => {
+      expect(content).toContain("action='close'");
+    });
+  });
 }
 
 // ── small route: no planner, no plan review ────────────────────────────────────
@@ -178,9 +197,27 @@ describe('ticket.md — risky route: DB guard (CHAMBA-013)', () => {
 
 // ── CHAMBA-024: fases + pausas al humano (T5) ──────────────────────────────
 
-/** Líneas base de 1.15.1 (ver plan §E1/E5): el delta por prompt debe quedar ≤ 45. */
-const BASELINE_LINES: Record<string, number> = { 'ticket.md': 205, 'orq.md': 102 };
+/**
+ * Líneas base: el tamaño de cada prompt en `0b0e59d` (release 1.16.0),
+ * ANTES de cualquier cambio de CHAMBA-022 — el re-anclaje a 1.16.0 que la
+ * nota de CHAMBA-024 dejaba pendiente explícitamente (N2). Re-anclarlos al
+ * tamaño actual (ya con `chamba_task`) dejaría el presupuesto en papel
+ * mojado: el delta de abajo mide específicamente lo que ESTE ticket agrega
+ * sobre esos 232/119, y debe quedar ≤ 45 líneas.
+ *
+ * Contados con `git show 0b0e59d:<path> | wc -l` (cuenta saltos de línea,
+ * no "elementos" de un split) — el conteo de abajo usa el mismo criterio
+ * para no introducir un off-by-one: `content.split('\n').length` cuenta un
+ * elemento vacío extra cuando el archivo termina en `\n` (y ambos commands
+ * siempre lo hacen), así que se resta 1 en ese caso.
+ */
+const BASELINE_LINES: Record<string, number> = { 'ticket.md': 232, 'orq.md': 119 };
 const MAX_LINE_DELTA = 45; // presupuesto de observación acordado en el plan CHAMBA-024
+
+function countLines(content: string): number {
+  const parts = content.split('\n').length;
+  return content.endsWith('\n') ? parts - 1 : parts;
+}
 
 const ALL_PHASES = [
   'context',
@@ -230,7 +267,7 @@ for (const { name, content } of PROMPTS) {
     // que aparecerían de todos modos).
     for (const phase of ALL_PHASES) {
       it(`lists phase "${phase}" in the canonical Phases enum`, () => {
-        expect(content).toMatch(new RegExp('`' + phase + '`'));
+        expect(content).toMatch(new RegExp(`\`${phase}\``));
       });
     }
 
@@ -244,7 +281,7 @@ for (const { name, content } of PROMPTS) {
     // `phase_start <phase>` o `phase_end <phase>` — discriminante: no basta
     // con que la palabra exista en otro lugar de la prosa. `qa` solo aplica a
     // ticket.md (orq.md no tiene paso de QA en su flujo de 8 pasos).
-    const NEVER_EMITTED = new Set(['context', 'verify']);
+    const NEVER_EMITTED = new Set(['context']);
     const EMITTED_PHASES = ALL_PHASES.filter(
       (p) => !NEVER_EMITTED.has(p) && !(name === 'orq.md' && p === 'qa'),
     );
@@ -254,9 +291,11 @@ for (const { name, content } of PROMPTS) {
       });
     }
 
-    // `verify` (fase) está reservada para CHAMBA-022 — no se emite todavía.
-    it('names "verify" as reserved for CHAMBA-022, not emitted yet', () => {
-      expect(content).toMatch(/`verify`\s*\(reserved for CHAMBA-022/);
+    // CHAMBA-022: the `verify` phase is active — it wraps the real
+    // `chamba_task(action='verify')` call, not just the metrics event.
+    it('wraps chamba_task verify in its own phase_start/phase_end verify', () => {
+      expect(content).toMatch(/phase_start verify[\s\S]{0,200}chamba_task/);
+      expect(content).toMatch(/chamba_task[\s\S]{0,200}phase_end verify/);
     });
 
     // Motivos de pausa: enums específicos del dominio (discriminantes por sí
@@ -285,8 +324,8 @@ for (const { name, content } of PROMPTS) {
       expect(content).toMatch(/do not retry|no retry|no reintentes/i);
     });
 
-    it('line delta over the 1.15.1 baseline stays within budget', () => {
-      const lines = content.split('\n').length;
+    it('line delta over the 1.16.0 baseline stays within budget', () => {
+      const lines = countLines(content);
       // biome-ignore lint/style/noNonNullAssertion: name is always one of the two baselines
       const baseline = BASELINE_LINES[name]!;
       expect(lines - baseline).toBeLessThanOrEqual(MAX_LINE_DELTA);

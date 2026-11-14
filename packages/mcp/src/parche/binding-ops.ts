@@ -47,6 +47,7 @@ import {
 } from '@chamba/core';
 import type { Services } from '../services.js';
 import { withVaultLock } from './mutex.js';
+import { resolveSyncEvidenceFlag } from './vault-config.js';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -453,6 +454,7 @@ export async function relinkPrepare(
   const summary = await buildAdoptionSummary(
     { fs: services.fs, hash: services.hash },
     canonicalDir,
+    { syncEvidence: await resolveSyncEvidenceFlag(services) },
   );
 
   return {
@@ -528,7 +530,9 @@ export async function resyncPrepare(
     );
   }
 
-  const summary = await buildAdoptionSummary({ fs: services.fs, hash: services.hash }, vaultDir);
+  const summary = await buildAdoptionSummary({ fs: services.fs, hash: services.hash }, vaultDir, {
+    syncEvidence: await resolveSyncEvidenceFlag(services),
+  });
 
   return { kind: 'ready', server: found.server, cred, vaultDir, summary };
 }
@@ -821,7 +825,9 @@ export async function getAdoptionSummary(
   services: Services,
   vaultDir: string,
 ): Promise<AdoptionSummary> {
-  return buildAdoptionSummary({ fs: services.fs, hash: services.hash }, vaultDir);
+  return buildAdoptionSummary({ fs: services.fs, hash: services.hash }, vaultDir, {
+    syncEvidence: await resolveSyncEvidenceFlag(services),
+  });
 }
 
 // ─── 11. Vault dir helpers ────────────────────────────────────────────────────

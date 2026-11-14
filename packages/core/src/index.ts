@@ -25,8 +25,13 @@ export {
   REASONING_PRIORITIES,
   ROLE_DESCRIPTIONS,
 } from './config/roles.js';
-export type { ConfigFile, ParseResult } from './config/schema.js';
-export { configFileSchema, parseChambaConfig, worktreeConfigSchema } from './config/schema.js';
+export type { ConfigFile, ParseResult, VerifyCommandConfig } from './config/schema.js';
+export {
+  configFileSchema,
+  parseChambaConfig,
+  verifyCommandSchema,
+  worktreeConfigSchema,
+} from './config/schema.js';
 export type { AgentConfig, ChambaConfig, ResolvedConfig } from './config/types.js';
 export type {
   PartialWorktreeConfig,
@@ -298,7 +303,13 @@ export type { DirEntry, FileStat, FilesystemPort, WriteBytesOptions } from './po
 export type { HashPort } from './ports/hash.js';
 export type { HttpPort, HttpRequest, HttpResponse } from './ports/http.js';
 export type { NetPort } from './ports/net.js';
-export type { ProcessExecOptions, ProcessPort, ProcessResult } from './ports/process.js';
+export type {
+  ProcessExecOptions,
+  ProcessPort,
+  ProcessResult,
+  ProcessRunOptions,
+  ProcessRunResult,
+} from './ports/process.js';
 export type { RandomPort } from './ports/random.js';
 export type { SystemPort, SystemResources } from './ports/system.js';
 // QA capabilities (project + machine probe for acceptance QA, no LLM)
@@ -363,10 +374,61 @@ export {
   readSkill,
   SKILLS_DIR,
 } from './skills/skill-registry.js';
+export type { CloseGateInput, CloseGateResult } from './tasks/close-gate.js';
+export { evaluateCloseGate } from './tasks/close-gate.js';
+// Tasks — live task documents + close gate + verify evidence (CHAMBA-022)
+export { assignAcIds } from './tasks/criteria.js';
+export type {
+  EvidenceBudgetLimits,
+  EvidenceBudgetPlan,
+  EvidenceFileInput,
+  EvidenceLinkOnlyEntry,
+} from './tasks/evidence-budget.js';
+export { DEFAULT_EVIDENCE_BUDGET, planEvidenceCopy } from './tasks/evidence-budget.js';
+export { isTaskEvidencePath } from './tasks/evidence-paths.js';
+export { computeNextStep } from './tasks/next-step.js';
+export type { ApplyScopeChangeResult, ScopeChangeInput } from './tasks/scope-change.js';
+export { applyScopeChange } from './tasks/scope-change.js';
+export type { TaskBlockName } from './tasks/task-blocks.js';
+// N4: `TASK_BLOCK_NAMES` is consumed internally by `task-blocks.ts`'s own
+// `readBlock`/`upsertBlock` — nothing outside core needs the raw list.
+export { readBlock, upsertBlock } from './tasks/task-blocks.js';
+export type {
+  AcceptanceCriterion,
+  AcEstado,
+  ChecklistItem,
+  EvidenceRef,
+  ParseTaskDocResult,
+  ScopeChangeEntry,
+  TaskDoc,
+  TaskEstado,
+  TaskRouteProfile,
+  VerifyRun,
+  VerifyRunCommandResult,
+} from './tasks/task-doc.js';
+export {
+  controlledBlocksDigestInput,
+  parseTaskDoc,
+  renderTaskDoc,
+  taskEvidenceRelDir,
+  taskNoteRelPath,
+} from './tasks/task-doc.js';
+export type { ReposConfig } from './tasks/verify-config.js';
+export { reposWithVerifyConfigured, resolveVerifyCommands } from './tasks/verify-config.js';
+export type {
+  TailRingOptions,
+  TailRingResult,
+  VerifyEvidenceInput,
+} from './tasks/verify-evidence.js';
+export {
+  renderVerifyEvidence,
+  renderVerifySummaryBlock,
+  tailRing,
+} from './tasks/verify-evidence.js';
 export { FakeHash } from './testing/fake-hash.js';
 export { FakeNet } from './testing/fake-net.js';
 export { FakeParche } from './testing/fake-parche.js';
-export type { ProcessHandler, RecordedCall } from './testing/fake-process.js';
+export type { ProcessHandler, ProcessRunHandler, RecordedCall } from './testing/fake-process.js';
 export { FakeProcess } from './testing/fake-process.js';
 export { FakeRandom } from './testing/fake-random.js';
 export type { FlakyHttpOptions } from './testing/flaky-http.js';
@@ -393,11 +455,13 @@ export {
   detectStyle,
   isAbsoluteLocal,
   isInvalidPath,
+  isUnderLocal,
   joinLocal,
   localBasename,
   localDirname,
   localRelative,
   normalizeLocal,
+  sameLocalPath,
   toAbsoluteLocal,
 } from './util/local-path.js';
 // Path helpers
@@ -525,6 +589,7 @@ export {
   AdoptionPendingError,
   BlobHashMismatchError,
   CaseCollisionError,
+  excludeEvidencePush,
   joinOnce,
   scanLocal,
   syncOnce,

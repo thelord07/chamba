@@ -469,6 +469,37 @@ async function handleEnd(
     inflight.routeFinal ??
     inflight.routeSuggested) as MetricRoute;
 
+  // O5 (owner decision): `chamba_task close` wins over the agent's own
+  // booleans when it ran first. Without a prior `close`, the agent's values
+  // are accepted but marked `evidenceLevel: 'agent-reported'` so the
+  // historical record distinguishes measured fact from mere assertion.
+  const taskEvidence = inflight.taskEvidence;
+  const testsPassed = taskEvidence ? taskEvidence.testsPassed : input.testsPassed;
+  const delivered = taskEvidence ? taskEvidence.delivered : input.delivered;
+  // B3: `measured` only when `close`'s own verify run was ACTUALLY executed
+  // by chamba (`verifyLevel === 'executed'`) — a `reported-by-agent` run (no
+  // command configured) is not a measurement, even though `close` wrote a
+  // `taskEvidence` entry for it.
+  const evidenceLevel: 'measured' | 'agent-reported' =
+    taskEvidence && taskEvidence.verifyLevel === 'executed' ? 'measured' : 'agent-reported';
+  if (
+    taskEvidence &&
+    (taskEvidence.testsPassed !== input.testsPassed || taskEvidence.delivered !== input.delivered)
+  ) {
+    logger.warn(
+      {
+        tool: TOOL_NAME,
+        action: 'end',
+        workItem: input.workItem,
+        agentTestsPassed: input.testsPassed,
+        agentDelivered: input.delivered,
+        closeTestsPassed: taskEvidence.testsPassed,
+        closeDelivered: taskEvidence.delivered,
+      },
+      'end: chamba_task close discrepa del agente — se usa el valor de close',
+    );
+  }
+
   // A2/B1: cierra toda fase/pausa abierta (inferred) antes de persistir.
   const closed = closeOpenSpans(
     {
@@ -491,10 +522,11 @@ async function handleEnd(
     planReviewRounds: inflight.planReviewRounds,
     verifyRounds: inflight.verifyRounds,
     notesRead,
-    testsPassed: input.testsPassed,
+    testsPassed,
     qaResult: input.qaResult as QaResult | undefined,
-    delivered: input.delivered,
+    delivered,
     source: inflight.source,
+    evidenceLevel,
     // AC-7: solo si no están vacíos.
     ...(Object.keys(closed.phases).length > 0 ? { phases: closed.phases } : {}),
     ...(closed.humanWaits.count > 0 ? { humanWaits: closed.humanWaits } : {}),
@@ -509,14 +541,15 @@ async function handleEnd(
       action: 'end',
       workItem: input.workItem,
       route: routeFinal,
-      delivered: input.delivered,
+      delivered,
+      evidenceLevel,
     },
     'metrics ended',
   );
 
   return okResult(
     `Métricas cerradas para ${input.workItem}. Ruta final: ${routeFinal}. ` +
-      `Entregado: ${input.delivered ? 'sí' : 'no'}.`,
+      `Entregado: ${delivered ? 'sí' : 'no'} (${evidenceLevel === 'measured' ? 'medido por chamba_task close' : 'declarado por el agente'}).`,
   );
 }
 
