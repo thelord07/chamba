@@ -9,4 +9,4 @@
  */
 const value = process.env.CHAMBA_TEST_SECRETISH;
 console.log(`CHAMBA_TEST_SECRETISH=${value === undefined ? '<absent>' : value}`);
-process.exit(0);
+process.exitCode = 0; // not process.exit(): it can cut piped stdout before it flushes

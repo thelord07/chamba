@@ -15,4 +15,4 @@ for (let i = 1; i <= 250; i++) {
 }
 const secret = `${'AKIA'}${'ABCDEFGHIJKLMNOP'}`;
 console.log(`token=${secret}`);
-process.exit(0);
+process.exitCode = 0; // not process.exit(): it can cut piped stdout before it flushes

@@ -6,4 +6,4 @@
  * `chamba_task action=verify` end to end against a REAL `NodeProcess`.
  */
 console.log('ok');
-process.exit(0);
+process.exitCode = 0; // not process.exit(): it can cut piped stdout before it flushes

@@ -4,4 +4,4 @@
  * Always exits 1, portably (no shell).
  */
 console.log('boom');
-process.exit(1);
+process.exitCode = 1; // not process.exit(): it can cut piped stdout before it flushes
