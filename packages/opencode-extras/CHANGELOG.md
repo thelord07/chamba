@@ -1,5 +1,13 @@
 # @chamba/opencode-extras
 
+## 1.17.0
+
+### Patch Changes
+
+- Updated dependencies [244345c]
+  - @chamba/core@1.17.0
+  - @chamba/adapters@1.17.0
+
 ## 1.16.0
 
 ### Patch Changes
