@@ -190,7 +190,9 @@ async function ensureMetricsGitignored(services: Services, wsRoot: string): Prom
 async function sweepStaleInflights(services: Services, wsRoot: string): Promise<void> {
   try {
     const ids = await listInflightIds(services, wsRoot);
-    const now = Date.now();
+    // Same injected clock as `startedAt`; Date.now() here made the sweep drop
+    // fresh inflights whenever the test clock lagged the wall clock by >7 days.
+    const now = services.clock.now().getTime();
     const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
     for (const id of ids) {
       const inflight = await readInflight(services, wsRoot, id);

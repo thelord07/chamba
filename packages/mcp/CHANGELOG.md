@@ -50,6 +50,7 @@
 
 ### Patch Changes
 
+- `chamba_task_metrics`: the 7-day sweep of stale in-flight metrics now uses the injected clock (`services.clock`) instead of `Date.now()`, like the rest of the tool. Same behavior in production; it stops the sweep from dropping fresh tickets when the clock is not the wall clock (it made a concurrency test fail on any machine more than 7 days after its fixed date).
 - Updated dependencies [244345c]
   - @chamba/core@1.17.0
   - @chamba/adapters@1.17.0
